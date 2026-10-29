@@ -1,0 +1,135 @@
+{
+  "dshVersion": "0.2.1-rc.3",
+  "generatedAt": "2026-10-29T15:43:12.986Z",
+  "generator": "tools/knowledge-gen.mjs",
+  "runtimeNodeModules": "C:/Users/finef/Desktop/mini-harness/runtime/node_modules",
+  "packagesScanned": 297,
+  "services": [
+    {
+      "name": "appExit",
+      "seenIn": [
+        "dsh-cmdline"
+      ]
+    },
+    {
+      "name": "appReady",
+      "seenIn": [
+        "dsh-cmdline"
+      ]
+    },
+    {
+      "name": "baseUrl",
+      "seenIn": [
+        "cordis:Context"
+      ]
+    },
+    {
+      "name": "chatFileMentions",
+      "seenIn": [
+        "dsh-client-ui-deliverables"
+      ]
+    },
+    {
+      "name": "cmdlineArgs",
+      "seenIn": [
+        "dsh-cmdline"
+      ]
+    },
+    {
+      "name": "connection",
+      "seenIn": [
+        "dsh-client-connection"
+      ]
+    },
+    {
+      "name": "cordisInspect",
+      "seenIn": [
+        "dsh-cordis-client-runner"
+      ]
+    },
+    {
+      "name": "dshHomePath",
+      "seenIn": [
+        "dsh-app-boot"
+      ]
+    },
+    {
+      "name": "dynamicCordisRunner",
+      "seenIn": [
+        "dsh-cordis-client-runner"
+      ]
+    },
+    {
+      "name": "events",
+      "seenIn": [
+        "cordis:Context"
+      ]
+    },
+    {
+      "name": "feedbackUi",
+      "seenIn": [
+        "dsh-client-ui-message-feedback"
+      ]
+    },
+    {
+      "name": "inspector",
+      "seenIn": [
+        "dsh-experimental-inspector"
+      ]
+    },
+    {
+      "name": "locale",
+      "seenIn": [
+        "dsh-client-locale"
+      ]
+    },
+    {
+      "name": "logger",
+      "seenIn": [
+        "cordis:Context"
+      ]
+    },
+    {
+      "name": "reflect",
+      "seenIn": [
+        "cordis:Context"
+      ]
+    },
+    {
+      "name": "registry",
+      "seenIn": [
+        "cordis:Context"
+      ]
+    },
+    {
+      "name": "root",
+      "seenIn": [
+        "cordis:Context"
+      ]
+    },
+    {
+      "name": "sessionLogDownload",
+      "seenIn": [
+        "dsh-session-log-export"
+      ]
+    },
+    {
+      "name": "theme",
+      "seenIn": [
+        "dsh-client-ui-theme"
+      ]
+    },
+    {
+      "name": "webApp",
+      "seenIn": [
+        "dsh-web-app"
+      ]
+    },
+    {
+      "name": "workspaceChanges",
+      "seenIn": [
+        "dsh-workspace-changes"
+      ]
+    }
+  ]
+}

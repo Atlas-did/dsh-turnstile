@@ -5,15 +5,39 @@
 // usage: node tools/conflict.mjs <profileDir>
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { ROOT } from './config.mjs';
+import { runtimeVersion } from './version.mjs';
 
 const dir = process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop';
 const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
 const deps = Object.keys(pkg.dependencies || {});
 const nm = join(dir, 'node_modules');
 
-const CORE_SERVICES = ['fs', 'tools', 'session', 'agent', 'llm', 'webServer', 'webRuntime',
+// The ctx service set comes from the installed runtime when a knowledge file exists
+// (tools/knowledge-gen.mjs). The literal list below is only a fallback, and a version
+// mismatch is reported instead of silently trusting stale names.
+const LEGACY_CORE_SERVICES = ['fs', 'tools', 'session', 'agent', 'llm', 'webServer', 'webRuntime',
   'subprocess', 'settings', 'commands', 'workspace', 'inspector', 'connection', 'agentPresets',
   'sessionProjections', 'skills', 'jobs', 'http', 'storageDomain', 'homePaths'];
+
+const knowledgePath = join(ROOT, 'knowledge', 'ctx-services.json');
+let CORE_SERVICES = LEGACY_CORE_SERVICES;
+let knowledgeSource = 'built-in fallback list (stale by construction)';
+if (existsSync(knowledgePath)) {
+  try {
+    const k = JSON.parse(readFileSync(knowledgePath, 'utf8'));
+    if (k.dshVersion === runtimeVersion) {
+      CORE_SERVICES = k.services.map((s) => s.name);
+      knowledgeSource = 'knowledge/ctx-services.json (dsh ' + k.dshVersion + ', ' + CORE_SERVICES.length + ' services)';
+    } else {
+      console.log('WARNING: knowledge is for dsh ' + k.dshVersion + ' but the runtime is ' + runtimeVersion);
+      console.log('         regenerate: node tools/knowledge-gen.mjs');
+      knowledgeSource = 'knowledge (STALE: built for ' + k.dshVersion + ')';
+    }
+  } catch (e) {
+    console.log('WARNING: cannot read ' + knowledgePath + ': ' + String(e.message).slice(0, 80));
+  }
+}
 
 function jsFiles(d) {
   const out = [];
@@ -94,7 +118,7 @@ const seen = new Set();
 const uniq = rows.filter(r => { const k = r.kind + '|' + r.plugin + '|' + r.detail; if (seen.has(k)) return false; seen.add(k); return true; });
 const order = { 'ctx-assign': 0, 'service-dup': 1, 'dep-divergence': 2, 'fixed-port': 3, 'state-file': 4 };
 uniq.sort((a, b) => (order[a.kind] - order[b.kind]) || String(a.plugin).localeCompare(String(b.plugin)));
-console.log('profile: ' + dir + '  (known services: ' + known.size + ')');
+console.log('profile: ' + dir + '  (known services: ' + known.size + ' via ' + knowledgeSource + ')');
 if (!uniq.length) { console.log('no conflict patterns found'); process.exit(0); }
 console.log('KIND'.padEnd(16) + 'PLUGIN'.padEnd(30) + 'DETAIL'.padEnd(46) + 'SPREAD');
 for (const r of uniq) console.log(String(r.kind).padEnd(16) + String(r.plugin).slice(0, 29).padEnd(30) + String(r.detail).slice(0, 45).padEnd(46) + r.contagious);
