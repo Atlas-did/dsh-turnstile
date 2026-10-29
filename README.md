@@ -173,6 +173,41 @@ node tools/selftest.mjs --strict       # release gate: skip anything and it fail
 
 ---
 
+## The runtime probe (the only check that sees dynamic code)
+
+Static scanners read text. A plugin can register a service under a computed name and every
+regex in this repo will miss it. `probe` does not read: it **applies the plugin against a
+stub ctx** and records what actually happened.
+
+```bash
+node tools/probe.mjs <profileDir>            # advisory: reports static blind spots
+node tools/probe.mjs <profileDir> --strict   # exit 7 when the probe saw something static missed
+```
+
+Real output on a fixture whose service name is assembled at runtime:
+
+```
+PLUGIN          STATUS   PROVIDED      MISSED-BY-STATIC
+plug-dynamic    ran      sharedStore   sharedStore
+ran 1/1   static blind spots: 1
+STRICT: 1 plugin(s) registered something the static scan missed   (exit 7)
+```
+
+On a real profile most plugins report `import-error` or `apply-error` — they need host
+services the stub does not provide. That is not a failure of the probe: it is the measured
+answer to "what does this plugin actually need?", which static scanning cannot give you.
+
+| Probe status | Meaning |
+|---|---|
+| `ran` | applied cleanly against the stub; `provided` / `assigned` are observed facts |
+| `apply-error` | reached `apply()` but needed a real service (the error names it) |
+| `import-error` | could not even load — usually a host-provided module |
+| `timeout` / `killed` | exceeded the budget; the child process is killed, the scan continues |
+
+Each plugin runs in its own child process, so a hang or a crash cannot take the scan down.
+
+---
+
 ## Adding a check
 
 1. Write `tools/your-check.mjs` — take a profile dir, exit `0` on clear, non-zero on findings.

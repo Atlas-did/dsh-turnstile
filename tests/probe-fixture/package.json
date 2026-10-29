@@ -1,0 +1,7 @@
+{
+  "name": "probe-fixture",
+  "private": true,
+  "dependencies": {
+    "plug-dynamic": "1.0.0"
+  }
+}

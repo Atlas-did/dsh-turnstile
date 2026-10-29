@@ -28,6 +28,11 @@ check('risk catches RED fixture', r.code === 6 && /plug-red\s+1\.0\.0\s+RED/.tes
 r = run('tools/risk.mjs', join(root, 'tests/ast-fixture'));
 check('risk ignores commented imports', r.code === 0 && /GREEN/.test(r.out) && /evidence: ast/.test(r.out), 'exit=' + r.code);
 
+// Runtime probe: a service registered under a computed name is invisible to the static
+// scan. The probe must see it, and --strict must fail on that gap.
+r = run('tools/probe.mjs', join(root, 'tests/probe-fixture'), '--strict');
+check('probe sees computed registration', r.code === 7 && /sharedStore/.test(r.out), 'exit=' + r.code);
+
 r = run('tools/conflict.mjs', join(root, 'tests/conflict-fixture'));
 check('conflict catches ctx + service', /ctx-assign/.test(r.out) && /service-dup/.test(r.out), 'exit=' + r.code);
 
