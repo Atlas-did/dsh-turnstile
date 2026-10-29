@@ -128,7 +128,7 @@ A gate that hides its blind spots is worse than no gate. These are real, measure
 
 | Limit | Status | Evidence |
 |---|---|---|
-| Most checks are text heuristics (regex over imports, `ctx.x =`, `{{var}}`, `dsh.client.inject`) | Open | Dynamic registration, re-exports and bundled output can slip past. `import-health` is the exception: it resolves modules instead of grepping. Roadmap: AST scan + runtime probe. |
+| Most checks were text heuristics | **Mostly fixed** | Imports and `ctx.*` now go through a real tokenizer/parser (`es-module-lexer` + `acorn`), with regex only as fallback, and `evidence: ast|text` is printed. Still heuristic: `{{var}}` prompt scanning and `dsh.client.inject` reading. Dynamic registration is covered by the runtime probe instead. |
 | Version rules were re-implemented by hand | Fixed here | `tools/version.mjs` delegates to the host's own `evaluatePluginCompatibility`; fallback is `semver` with includePrerelease. For `^0.2.0-rc.1` vs `0.2.1-rc.3`, plain `semver.satisfies` says false, the host says true. Only the host is authoritative. |
 | `semver` / core-service knowledge is hand-maintained and drifts | Partly open | Version rules no longer drift (delegated). The known-ctx-service allowlist is still a constant; next step is generating it from the installed runtime and failing loudly when the runtime version has no knowledge file. |
 | Deeply tied to DSH internals | By design | It understands `cordis.patch.yml`, `--dump-config` and the inspector byte budget. Another harness needs an adapter, not a flag. |
@@ -148,7 +148,8 @@ skipped               -> neither; coverage you did not get
 |---|---|---|
 | data | read from package.json / --dump-config | high |
 | resolve | the module was actually resolved | high |
-| text | regex over source | medium |
+| ast | parsed with es-module-lexer / acorn | high |
+| text | regex over source (fallback only) | medium |
 | runtime | observed in a live host | highest (not implemented) |
 
 ---
@@ -205,6 +206,21 @@ answer to "what does this plugin actually need?", which static scanning cannot g
 | `timeout` / `killed` | exceeded the budget; the child process is killed, the scan continues |
 
 Each plugin runs in its own child process, so a hang or a crash cannot take the scan down.
+
+---
+
+
+### What each scanner actually uses
+
+| Scanner | Evidence | Can be fooled by |
+|---|---|---|
+| `risk` (imports) | ast via es-module-lexer | computed specifiers: `import(name)` |
+| `conflict` (ctx writes / provides) | ast via acorn | `ctx[key] = ...` with a computed key |
+| `conflict` (known services) | data: generated from the installed runtime's `interface Context` augmentations | a runtime whose d.ts lie about what it provides |
+| `engines` / `version` | host evaluator (`evaluatePluginCompatibility`) | nothing — it is the host's own rule |
+| `prompt-vars` | text | variable names assembled at runtime |
+| `ui-surface` | data: `dsh.client.inject` + patch rows | UI injected from code instead of the manifest |
+| `probe` | runtime: applied against a stub ctx | anything that needs a real service before it registers |
 
 ---
 

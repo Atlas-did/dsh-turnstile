@@ -6,6 +6,7 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './config.mjs';
+import { ctxUsage } from './scan.mjs';
 import { runtimeVersion } from './version.mjs';
 
 const dir = process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop';
@@ -69,18 +70,27 @@ for (const name of deps) {
   }
 }
 
+// ctx usage comes from an AST walk (tools/scan.mjs); comments and string literals cannot
+// fake an assignment, and `evidence` records which path produced the finding.
 const provided = new Map();
-for (const t of texts) for (const m of t.text.matchAll(/ctx\.provide\(\s*['"]([\w.-]+)['"]/g)) {
-  const list = provided.get(m[1]) || [];
-  if (!list.includes(t.plugin)) list.push(t.plugin);
-  provided.set(m[1], list);
+let ctxEvidence = 'text';
+for (const t of texts) {
+  const u = ctxUsage(t.text);
+  ctxEvidence = u.evidence;
+  for (const name of u.provided) {
+    const list = provided.get(name) || [];
+    if (!list.includes(t.plugin)) list.push(t.plugin);
+    provided.set(name, list);
+  }
 }
 const known = new Set([...CORE_SERVICES, ...provided.keys()]);
 
 const rows = [];
 for (const t of texts) {
-  for (const m of t.text.matchAll(/ctx\.([a-zA-Z_$][\w$]*)\s*=(?!=)/g)) {
-    if (!known.has(m[1])) continue;
+  const usage = ctxUsage(t.text);
+  for (const name of usage.assigned) {
+    if (!known.has(name)) continue;
+    const m = [null, name];
     rows.push({ kind: 'ctx-assign', plugin: t.plugin, detail: 'ctx.' + m[1] + ' =', contagious: 'yes' });
   }
   for (const m of t.text.matchAll(/\.listen\(\s*(?:[^,]+,\s*)?(\d{4,5})/g)) {
@@ -127,7 +137,7 @@ const seen = new Set();
 const uniq = rows.filter(r => { const k = r.kind + '|' + r.plugin + '|' + r.detail; if (seen.has(k)) return false; seen.add(k); return true; });
 const order = { 'ctx-assign': 0, 'service-dup': 1, 'dep-divergence': 2, 'fixed-port': 3, 'state-file': 4 };
 uniq.sort((a, b) => (order[a.kind] - order[b.kind]) || String(a.plugin).localeCompare(String(b.plugin)));
-console.log('profile: ' + dir + '  (known services: ' + known.size + ' via ' + knowledgeSource + ')');
+console.log('profile: ' + dir + '  (known services: ' + known.size + ' via ' + knowledgeSource + '; ctx evidence: ' + ctxEvidence + ')');
 if (!uniq.length) { console.log('no conflict patterns found'); process.exit(0); }
 console.log('KIND'.padEnd(16) + 'PLUGIN'.padEnd(30) + 'DETAIL'.padEnd(46) + 'SPREAD');
 for (const r of uniq) console.log(String(r.kind).padEnd(16) + String(r.plugin).slice(0, 29).padEnd(30) + String(r.detail).slice(0, 45).padEnd(46) + r.contagious);

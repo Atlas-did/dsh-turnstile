@@ -50,3 +50,56 @@ export function packageOf(specifier) {
   const m = specifier.match(PKG_RE);
   return m ? m[1] : null;
 }
+
+let acorn = null;
+try { acorn = createRequire(join(ROOT, 'package.json'))('acorn'); } catch { acorn = null; }
+export const usingParser = Boolean(acorn && acorn.parse);
+
+const CTX_TEXT_RE = /ctx\.([A-Za-z_$][\w$]*)\s*=(?!=)/g;
+const PROVIDE_TEXT_RE = /ctx\.provide\(\s*['"]([\w.-]+)['"]/g;
+
+/**
+ * Find what a module does to ctx: `ctx.<name> = ...` assignments and `ctx.provide('name')`.
+ * AST path walks the syntax tree, so strings/comments cannot fake an assignment.
+ * Returns { assigned: string[], provided: string[], evidence: 'ast' | 'text' }.
+ */
+export function ctxUsage(code) {
+  if (acorn && acorn.parse) {
+    try {
+      const ast = acorn.parse(code, { ecmaVersion: 'latest', sourceType: 'module', allowHashBang: true });
+      const assigned = new Set();
+      const provided = new Set();
+      const visit = (node) => {
+        if (!node || typeof node !== 'object') return;
+        if (node.type === 'AssignmentExpression' && node.left && node.left.type === 'MemberExpression') {
+          const l = node.left;
+          if (!l.computed && l.object && l.object.type === 'Identifier' && l.object.name === 'ctx' && l.property && l.property.name) {
+            assigned.add(l.property.name);
+          }
+        }
+        if (node.type === 'CallExpression' && node.callee && node.callee.type === 'MemberExpression') {
+          const c = node.callee;
+          if (!c.computed && c.object && c.object.type === 'Identifier' && c.object.name === 'ctx' && c.property && c.property.name === 'provide') {
+            const a0 = node.arguments && node.arguments[0];
+            if (a0 && a0.type === 'Literal' && typeof a0.value === 'string') provided.add(a0.value);
+          }
+        }
+        for (const k of Object.keys(node)) {
+          const v = node[k];
+          if (Array.isArray(v)) { for (const x of v) visit(x); }
+          else if (v && typeof v === 'object' && typeof v.type === 'string') visit(v);
+        }
+      };
+      visit(ast);
+      return { assigned: [...assigned].sort(), provided: [...provided].sort(), evidence: 'ast' };
+    } catch { /* fall through to text */ }
+  }
+  const assigned = new Set();
+  const provided = new Set();
+  let m;
+  CTX_TEXT_RE.lastIndex = 0;
+  while ((m = CTX_TEXT_RE.exec(code))) assigned.add(m[1]);
+  PROVIDE_TEXT_RE.lastIndex = 0;
+  while ((m = PROVIDE_TEXT_RE.exec(code))) provided.add(m[1]);
+  return { assigned: [...assigned].sort(), provided: [...provided].sort(), evidence: 'text' };
+}

@@ -30,6 +30,10 @@ check('risk ignores commented imports', r.code === 0 && /GREEN/.test(r.out) && /
 
 // Runtime probe: a service registered under a computed name is invisible to the static
 // scan. The probe must see it, and --strict must fail on that gap.
+// A known service assigned only in a comment or a string must not be reported.
+r = run('tools/conflict.mjs', join(root, 'tests/conflict-fixture'));
+check('conflict ignores commented ctx writes', r.code === 0 && !/ctx\.fs/.test(r.out) && /ctx evidence: ast/.test(r.out), 'exit=' + r.code);
+
 r = run('tools/probe.mjs', join(root, 'tests/probe-fixture'), '--strict');
 check('probe sees computed registration', r.code === 7 && /sharedStore/.test(r.out), 'exit=' + r.code);
 

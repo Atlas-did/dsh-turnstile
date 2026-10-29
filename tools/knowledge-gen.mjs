@@ -40,6 +40,18 @@ function walk(dir, cb, depth = 0) {
   }
 }
 
+function walkDts(dir, cb, depth = 0) {
+  if (depth > 4) return;
+  let entries;
+  try { entries = readdirSync(dir); } catch { return; }
+  for (const e of entries) {
+    const p = join(dir, e);
+    let st; try { st = statSync(p); } catch { continue; }
+    if (st.isDirectory()) { if (e !== 'node_modules') walkDts(p, cb, depth + 1); }
+    else if (e.endsWith('.d.ts') && st.size < 4 * 1024 * 1024) cb(p);
+  }
+}
+
 const pkgDir = join(nm, '@deepseek-ai');
 let pkgs = [];
 try { pkgs = readdirSync(pkgDir).filter((d) => d.startsWith('dsh') || d === 'cordis'); } catch { pkgs = []; }
@@ -50,6 +62,23 @@ for (const pkg of pkgs) {
     let txt = '';
     try { txt = readFileSync(file, 'utf8'); } catch { return; }
     for (const m of txt.matchAll(/ctx\.provide\(\s*["']([A-Za-z0-9_.-]+)["']/g)) add(m[1], pkg);
+  });
+}
+
+// 2b) every package that augments `interface Context` — the authoritative service surface.
+//     This is where Service subclasses actually declare their ctx property; the literal
+//     ctx.provide("...") scan above cannot see them.
+for (const pkg of pkgs) {
+  const lib = join(pkgDir, pkg, 'lib');
+  if (!existsSync(lib)) continue;
+  walkDts(lib, (file) => {
+    let t = '';
+    try { t = readFileSync(file, 'utf8'); } catch { return; }
+    const blocks = t.match(/interface Context[^{]*\{([\s\S]*?)\n\}/g) || [];
+    for (const b of blocks) {
+      const body = b.slice(b.indexOf('{') + 1);
+      for (const m of body.matchAll(/^\s{2,}([a-zA-Z_$][\w$]*)\s*[?:]/gm)) add(m[1], pkg + ':Context');
+    }
   });
 }
 

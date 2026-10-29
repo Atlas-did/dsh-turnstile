@@ -1,20 +1,70 @@
 {
   "dshVersion": "0.2.1-rc.3",
-  "generatedAt": "2026-10-29T15:43:12.986Z",
+  "generatedAt": "2026-10-29T16:04:55.750Z",
   "generator": "tools/knowledge-gen.mjs",
   "runtimeNodeModules": "C:/Users/finef/Desktop/mini-harness/runtime/node_modules",
   "packagesScanned": 297,
   "services": [
     {
+      "name": "agentDefaultModel",
+      "seenIn": [
+        "dsh-agent-default-model:Context"
+      ]
+    },
+    {
+      "name": "agentLoop",
+      "seenIn": [
+        "dsh-agent-loop:Context"
+      ]
+    },
+    {
+      "name": "agentPresets",
+      "seenIn": [
+        "dsh-agent-preset-registry:Context"
+      ]
+    },
+    {
+      "name": "agents",
+      "seenIn": [
+        "dsh-agent:Context"
+      ]
+    },
+    {
+      "name": "agentTeams",
+      "seenIn": [
+        "dsh-experimental-agent-team:Context"
+      ]
+    },
+    {
       "name": "appExit",
       "seenIn": [
-        "dsh-cmdline"
+        "dsh-cmdline",
+        "dsh-cmdline:Context"
       ]
     },
     {
       "name": "appReady",
       "seenIn": [
-        "dsh-cmdline"
+        "dsh-cmdline",
+        "dsh-cmdline:Context"
+      ]
+    },
+    {
+      "name": "approval",
+      "seenIn": [
+        "dsh-user-approval:Context"
+      ]
+    },
+    {
+      "name": "attachments",
+      "seenIn": [
+        "dsh-attachment:Context"
+      ]
+    },
+    {
+      "name": "authorization",
+      "seenIn": [
+        "dsh-authorization:Context"
       ]
     },
     {
@@ -26,37 +76,162 @@
     {
       "name": "chatFileMentions",
       "seenIn": [
-        "dsh-client-ui-deliverables"
+        "dsh-client-ui-deliverables",
+        "dsh-client-ui-chat:Context"
+      ]
+    },
+    {
+      "name": "clientModules",
+      "seenIn": [
+        "dsh-client-modules:Context"
       ]
     },
     {
       "name": "cmdlineArgs",
       "seenIn": [
-        "dsh-cmdline"
+        "dsh-cmdline",
+        "dsh-cmdline:Context"
+      ]
+    },
+    {
+      "name": "commands",
+      "seenIn": [
+        "dsh-commands:Context"
+      ]
+    },
+    {
+      "name": "commandUi",
+      "seenIn": [
+        "dsh-client-ui-commands:Context"
+      ]
+    },
+    {
+      "name": "compaction",
+      "seenIn": [
+        "dsh-compaction:Context"
+      ]
+    },
+    {
+      "name": "configEditor",
+      "seenIn": [
+        "dsh-config-editor:Context"
+      ]
+    },
+    {
+      "name": "configForms",
+      "seenIn": [
+        "dsh-client-ui-settings:Context"
+      ]
+    },
+    {
+      "name": "configuredAgentIdentities",
+      "seenIn": [
+        "dsh-agent-loop:Context"
       ]
     },
     {
       "name": "connection",
       "seenIn": [
-        "dsh-client-connection"
+        "dsh-client-connection",
+        "dsh-client-connection:Context"
+      ]
+    },
+    {
+      "name": "content",
+      "seenIn": [
+        "dsh-client-ui-chat:Context",
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
+      "name": "contextWindow",
+      "seenIn": [
+        "dsh-client-ui-conversation:Context",
+        "dsh-token-meter:Context"
+      ]
+    },
+    {
+      "name": "conversation",
+      "seenIn": [
+        "dsh-client-ui-conversation:Context"
       ]
     },
     {
       "name": "cordisInspect",
       "seenIn": [
-        "dsh-cordis-client-runner"
+        "dsh-cordis-client-runner",
+        "dsh-cordis-client-runner:Context",
+        "dsh-cordis-host-runner:Context"
+      ]
+    },
+    {
+      "name": "cotTranslation",
+      "seenIn": [
+        "dsh-experimental-client-ui-cot-translation:Context"
+      ]
+    },
+    {
+      "name": "credentials",
+      "seenIn": [
+        "dsh-credentials:Context"
+      ]
+    },
+    {
+      "name": "credentialsController",
+      "seenIn": [
+        "dsh-api-settings-controller:Context"
+      ]
+    },
+    {
+      "name": "deepseekAccount",
+      "seenIn": [
+        "dsh-deepseek-account:Context"
+      ]
+    },
+    {
+      "name": "deepseekLlmApiExtensions",
+      "seenIn": [
+        "dsh-deepseek-llm-api-extensions:Context"
+      ]
+    },
+    {
+      "name": "directoryPicker",
+      "seenIn": [
+        "dsh-host-directory-picker:Context"
+      ]
+    },
+    {
+      "name": "directoryPickerController",
+      "seenIn": [
+        "dsh-api-workspace-controller:Context"
+      ]
+    },
+    {
+      "name": "documentPreviews",
+      "seenIn": [
+        "dsh-client-ui-sidebar-documentpreview:Context"
       ]
     },
     {
       "name": "dshHomePath",
       "seenIn": [
-        "dsh-app-boot"
+        "dsh-app-boot",
+        "dsh-app-boot:Context"
       ]
     },
     {
       "name": "dynamicCordisRunner",
       "seenIn": [
-        "dsh-cordis-client-runner"
+        "dsh-cordis-client-runner",
+        "dsh-cordis-client-runner:Context",
+        "dsh-cordis-host-runner:Context"
+      ]
+    },
+    {
+      "name": "error",
+      "seenIn": [
+        "dsh-agent-loop:Context",
+        "dsh-compaction:Context"
       ]
     },
     {
@@ -68,25 +243,265 @@
     {
       "name": "feedbackUi",
       "seenIn": [
-        "dsh-client-ui-message-feedback"
+        "dsh-client-ui-message-feedback",
+        "dsh-client-ui-message-feedback:Context"
+      ]
+    },
+    {
+      "name": "fiber",
+      "seenIn": [
+        "cordis:Context"
+      ]
+    },
+    {
+      "name": "fileReferences",
+      "seenIn": [
+        "dsh-file-reference:Context"
+      ]
+    },
+    {
+      "name": "fileUpload",
+      "seenIn": [
+        "dsh-client-file-upload:Context"
+      ]
+    },
+    {
+      "name": "fileUploads",
+      "seenIn": [
+        "dsh-client-file-upload:Context"
+      ]
+    },
+    {
+      "name": "form",
+      "seenIn": [
+        "dsh-client-ui-chat:Context",
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
+      "name": "fs",
+      "seenIn": [
+        "dsh-fs:Context"
+      ]
+    },
+    {
+      "name": "goals",
+      "seenIn": [
+        "dsh-goal:Context"
+      ]
+    },
+    {
+      "name": "hmr",
+      "seenIn": [
+        "dsh-hmr:Context"
+      ]
+    },
+    {
+      "name": "inputTriggers",
+      "seenIn": [
+        "dsh-client-ui-input-trigger:Context"
       ]
     },
     {
       "name": "inspector",
       "seenIn": [
-        "dsh-experimental-inspector"
+        "dsh-experimental-inspector",
+        "dsh-experimental-inspector:Context"
+      ]
+    },
+    {
+      "name": "jobController",
+      "seenIn": [
+        "dsh-api-job-controller:Context"
+      ]
+    },
+    {
+      "name": "jobs",
+      "seenIn": [
+        "dsh-api-job-controller:Context",
+        "dsh-jobs:Context"
+      ]
+    },
+    {
+      "name": "kind",
+      "seenIn": [
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
+      "name": "label",
+      "seenIn": [
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
+      "name": "launchEnvironment",
+      "seenIn": [
+        "dsh-launch-environment:Context"
+      ]
+    },
+    {
+      "name": "launcherSessionQueryPath",
+      "seenIn": [
+        "dsh-session-query-sqlite:Context"
+      ]
+    },
+    {
+      "name": "layout",
+      "seenIn": [
+        "dsh-client-ui-layout:Context"
+      ]
+    },
+    {
+      "name": "llm",
+      "seenIn": [
+        "dsh-llm:Context"
       ]
     },
     {
       "name": "locale",
       "seenIn": [
-        "dsh-client-locale"
+        "dsh-client-locale",
+        "dsh-client-locale:Context"
       ]
     },
     {
       "name": "logger",
       "seenIn": [
         "cordis:Context"
+      ]
+    },
+    {
+      "name": "mcpResources",
+      "seenIn": [
+        "dsh-mcp-resources:Context"
+      ]
+    },
+    {
+      "name": "messageFeedback",
+      "seenIn": [
+        "dsh-message-feedback:Context"
+      ]
+    },
+    {
+      "name": "messageTokens",
+      "seenIn": [
+        "dsh-token-meter:Context"
+      ]
+    },
+    {
+      "name": "modelDirectories",
+      "seenIn": [
+        "dsh-client-ui-model-selection:Context"
+      ]
+    },
+    {
+      "name": "modules",
+      "seenIn": [
+        "dsh-client-modules:Context"
+      ]
+    },
+    {
+      "name": "officeToPdf",
+      "seenIn": [
+        "dsh-office-to-pdf:Context"
+      ]
+    },
+    {
+      "name": "otel",
+      "seenIn": [
+        "dsh-otel:Context"
+      ]
+    },
+    {
+      "name": "percent",
+      "seenIn": [
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
+      "name": "permissionPresets",
+      "seenIn": [
+        "dsh-permission-presets:Context"
+      ]
+    },
+    {
+      "name": "planMode",
+      "seenIn": [
+        "dsh-plan-mode:Context"
+      ]
+    },
+    {
+      "name": "pluginManager",
+      "seenIn": [
+        "dsh-plugin-manager:Context"
+      ]
+    },
+    {
+      "name": "pluginMarket",
+      "seenIn": [
+        "dsh-plugin-market:Context"
+      ]
+    },
+    {
+      "name": "pluginNavigation",
+      "seenIn": [
+        "dsh-client-ui-plugin-manager:Context"
+      ]
+    },
+    {
+      "name": "pluginPackages",
+      "seenIn": [
+        "dsh-app-boot:Context"
+      ]
+    },
+    {
+      "name": "pluginRegistryProbe",
+      "seenIn": [
+        "dsh-client-ui-plugin-manager:Context"
+      ]
+    },
+    {
+      "name": "pressureTokens",
+      "seenIn": [
+        "dsh-token-meter:Context"
+      ]
+    },
+    {
+      "name": "producer",
+      "seenIn": [
+        "dsh-client-ui-chat:Context",
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
+      "name": "productAnalytics",
+      "seenIn": [
+        "dsh-client-product-analytics:Context"
+      ]
+    },
+    {
+      "name": "productTelemetry",
+      "seenIn": [
+        "dsh-host-product-telemetry-otel:Context"
+      ]
+    },
+    {
+      "name": "profileContext",
+      "seenIn": [
+        "dsh-app-boot:Context"
+      ]
+    },
+    {
+      "name": "projectedTokens",
+      "seenIn": [
+        "dsh-token-meter:Context"
+      ]
+    },
+    {
+      "name": "ptcRuntime",
+      "seenIn": [
+        "dsh-ptc-runtime:Context"
       ]
     },
     {
@@ -102,33 +517,497 @@
       ]
     },
     {
+      "name": "remote",
+      "seenIn": [
+        "dsh-api-gateway:Context",
+        "dsh-api-remotes:Context"
+      ]
+    },
+    {
+      "name": "remoteAccess",
+      "seenIn": [
+        "dsh-api-remote-access:Context"
+      ]
+    },
+    {
+      "name": "resources",
+      "seenIn": [
+        "dsh-client-resources:Context"
+      ]
+    },
+    {
+      "name": "role",
+      "seenIn": [
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
       "name": "root",
       "seenIn": [
         "cordis:Context"
       ]
     },
     {
+      "name": "sandbox",
+      "seenIn": [
+        "dsh-sandbox:Context"
+      ]
+    },
+    {
+      "name": "sandboxPolicy",
+      "seenIn": [
+        "dsh-sandbox-policy:Context"
+      ]
+    },
+    {
+      "name": "schedule",
+      "seenIn": [
+        "dsh-schedule:Context"
+      ]
+    },
+    {
+      "name": "seq",
+      "seenIn": [
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
+      "name": "session",
+      "seenIn": [
+        "dsh-compaction:Context"
+      ]
+    },
+    {
+      "name": "sessionController",
+      "seenIn": [
+        "dsh-api-session-controller:Context"
+      ]
+    },
+    {
+      "name": "sessionFeedback",
+      "seenIn": [
+        "dsh-command-feedback:Context"
+      ]
+    },
+    {
+      "name": "sessionFileReferences",
+      "seenIn": [
+        "dsh-api-session-controller:Context"
+      ]
+    },
+    {
+      "name": "sessionId",
+      "seenIn": [
+        "dsh-agent-loop:Context"
+      ]
+    },
+    {
       "name": "sessionLogDownload",
       "seenIn": [
-        "dsh-session-log-export"
+        "dsh-session-log-export",
+        "dsh-session-log-export:Context"
+      ]
+    },
+    {
+      "name": "sessionPersistence",
+      "seenIn": [
+        "dsh-session-persistence:Context"
+      ]
+    },
+    {
+      "name": "sessionProjectionCache",
+      "seenIn": [
+        "dsh-session-projection-cache:Context"
+      ]
+    },
+    {
+      "name": "sessionProjections",
+      "seenIn": [
+        "dsh-session-projection:Context"
+      ]
+    },
+    {
+      "name": "sessionQuery",
+      "seenIn": [
+        "dsh-session-query:Context"
+      ]
+    },
+    {
+      "name": "sessionReferenceResolver",
+      "seenIn": [
+        "dsh-session-reference:Context"
+      ]
+    },
+    {
+      "name": "sessions",
+      "seenIn": [
+        "dsh-api-session-controller:Context",
+        "dsh-session:Context"
+      ]
+    },
+    {
+      "name": "sessionSkillCatalog",
+      "seenIn": [
+        "dsh-api-session-controller:Context"
+      ]
+    },
+    {
+      "name": "sessionTelemetry",
+      "seenIn": [
+        "dsh-session-telemetry:Context"
+      ]
+    },
+    {
+      "name": "sessionTitle",
+      "seenIn": [
+        "dsh-session-title:Context"
+      ]
+    },
+    {
+      "name": "settings",
+      "seenIn": [
+        "dsh-settings:Context"
+      ]
+    },
+    {
+      "name": "settingsController",
+      "seenIn": [
+        "dsh-api-settings-controller:Context"
+      ]
+    },
+    {
+      "name": "settingsSchema",
+      "seenIn": [
+        "dsh-client-ui-settings:Context"
+      ]
+    },
+    {
+      "name": "shell",
+      "seenIn": [
+        "dsh-shell:Context"
+      ]
+    },
+    {
+      "name": "shellEnv",
+      "seenIn": [
+        "dsh-shell-env:Context"
+      ]
+    },
+    {
+      "name": "shortcuts",
+      "seenIn": [
+        "dsh-client-shortcuts:Context"
+      ]
+    },
+    {
+      "name": "sidebarRight",
+      "seenIn": [
+        "dsh-client-ui-sidebar-right:Context"
+      ]
+    },
+    {
+      "name": "sidebarRightTabs",
+      "seenIn": [
+        "dsh-client-ui-sidebar-right:Context"
+      ]
+    },
+    {
+      "name": "signal",
+      "seenIn": [
+        "dsh-compaction:Context"
+      ]
+    },
+    {
+      "name": "skills",
+      "seenIn": [
+        "dsh-skill:Context"
+      ]
+    },
+    {
+      "name": "slots",
+      "seenIn": [
+        "dsh-client-ui-renderer:Context"
+      ]
+    },
+    {
+      "name": "source",
+      "seenIn": [
+        "dsh-client-ui-chat:Context",
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
+      "name": "sourceEventSeqs",
+      "seenIn": [
+        "dsh-compaction:Context"
+      ]
+    },
+    {
+      "name": "speechController",
+      "seenIn": [
+        "dsh-experimental-api-speech-to-text:Context"
+      ]
+    },
+    {
+      "name": "speechToText",
+      "seenIn": [
+        "dsh-experimental-speech-to-text:Context"
+      ]
+    },
+    {
+      "name": "spillStore",
+      "seenIn": [
+        "dsh-spill:Context"
+      ]
+    },
+    {
+      "name": "storage",
+      "seenIn": [
+        "dsh-storage:Context"
+      ]
+    },
+    {
+      "name": "storageDomain",
+      "seenIn": [
+        "dsh-storage-domain:Context"
+      ]
+    },
+    {
+      "name": "subagentModelSelection",
+      "seenIn": [
+        "dsh-tool-subagent:Context"
+      ]
+    },
+    {
+      "name": "subagents",
+      "seenIn": [
+        "dsh-subagent:Context"
+      ]
+    },
+    {
+      "name": "subprocess",
+      "seenIn": [
+        "dsh-subprocess:Context"
+      ]
+    },
+    {
+      "name": "systemPrompt",
+      "seenIn": [
+        "dsh-system-prompt:Context"
+      ]
+    },
+    {
+      "name": "systemTokens",
+      "seenIn": [
+        "dsh-token-meter:Context"
+      ]
+    },
+    {
+      "name": "t",
+      "seenIn": [
+        "dsh-client-ui-chat:Context",
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
+      "name": "terminalController",
+      "seenIn": [
+        "dsh-api-terminal-controller:Context"
+      ]
+    },
+    {
+      "name": "terminals",
+      "seenIn": [
+        "dsh-terminal:Context"
       ]
     },
     {
       "name": "theme",
       "seenIn": [
-        "dsh-client-ui-theme"
+        "dsh-client-ui-theme",
+        "dsh-client-ui-theme:Context"
+      ]
+    },
+    {
+      "name": "time",
+      "seenIn": [
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
+      "name": "timer",
+      "seenIn": [
+        "dsh-cordis-client-runner:Context"
+      ]
+    },
+    {
+      "name": "tokenMeter",
+      "seenIn": [
+        "dsh-token-meter:Context"
+      ]
+    },
+    {
+      "name": "toolResultPruner",
+      "seenIn": [
+        "dsh-compaction-tool-result-pruner:Context"
+      ]
+    },
+    {
+      "name": "tools",
+      "seenIn": [
+        "dsh-tools:Context"
+      ]
+    },
+    {
+      "name": "toolsTokens",
+      "seenIn": [
+        "dsh-token-meter:Context"
+      ]
+    },
+    {
+      "name": "translator",
+      "seenIn": [
+        "dsh-experimental-translator:Context"
+      ]
+    },
+    {
+      "name": "typert",
+      "seenIn": [
+        "dsh-typert-protocol:Context"
+      ]
+    },
+    {
+      "name": "typertGateway",
+      "seenIn": [
+        "dsh-api-gateway:Context"
+      ]
+    },
+    {
+      "name": "uiConversation",
+      "seenIn": [
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
+      "name": "uiRenderer",
+      "seenIn": [
+        "dsh-client-ui-renderer:Context"
+      ]
+    },
+    {
+      "name": "uiSession",
+      "seenIn": [
+        "dsh-client-ui-session:Context"
+      ]
+    },
+    {
+      "name": "uiWorkspace",
+      "seenIn": [
+        "dsh-client-ui-workspace:Context"
+      ]
+    },
+    {
+      "name": "usedTokens",
+      "seenIn": [
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
+      "name": "useProjection",
+      "seenIn": [
+        "dsh-client-ui-conversation:Context"
+      ]
+    },
+    {
+      "name": "userQuestionPanels",
+      "seenIn": [
+        "dsh-client-ui-tool:Context"
+      ]
+    },
+    {
+      "name": "userQuestions",
+      "seenIn": [
+        "dsh-user-questions:Context"
+      ]
+    },
+    {
+      "name": "version",
+      "seenIn": [
+        "dsh-fs:Context"
+      ]
+    },
+    {
+      "name": "web",
+      "seenIn": [
+        "dsh-web:Context"
       ]
     },
     {
       "name": "webApp",
       "seenIn": [
-        "dsh-web-app"
+        "dsh-web-app",
+        "dsh-web-app:Context"
+      ]
+    },
+    {
+      "name": "webServer",
+      "seenIn": [
+        "dsh-host-webserver:Context"
+      ]
+    },
+    {
+      "name": "webTerminals",
+      "seenIn": [
+        "dsh-api-terminal-controller:Context"
+      ]
+    },
+    {
+      "name": "workflowEngine",
+      "seenIn": [
+        "dsh-workflow:Context"
+      ]
+    },
+    {
+      "name": "workingDirectory",
+      "seenIn": [
+        "dsh-working-directory:Context"
       ]
     },
     {
       "name": "workspaceChanges",
       "seenIn": [
-        "dsh-workspace-changes"
+        "dsh-workspace-changes",
+        "dsh-workspace-changes:Context"
+      ]
+    },
+    {
+      "name": "workspaceController",
+      "seenIn": [
+        "dsh-api-workspace-controller:Context"
+      ]
+    },
+    {
+      "name": "workspaceFiles",
+      "seenIn": [
+        "dsh-api-workspace-files:Context"
+      ]
+    },
+    {
+      "name": "workspaceRegistry",
+      "seenIn": [
+        "dsh-workspace:Context"
+      ]
+    },
+    {
+      "name": "workspaces",
+      "seenIn": [
+        "dsh-api-workspace-controller:Context"
+      ]
+    },
+    {
+      "name": "worktrees",
+      "seenIn": [
+        "dsh-experimental-worktree:Context"
       ]
     }
   ]

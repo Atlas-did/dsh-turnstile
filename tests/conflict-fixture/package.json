@@ -3,6 +3,7 @@
   "private": true,
   "dependencies": {
     "plug-a": "1.0.0",
-    "plug-b": "1.0.0"
+    "plug-b": "1.0.0",
+    "plug-ctx-comment": "1.0.0"
   }
 }
