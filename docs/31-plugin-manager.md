@@ -175,6 +175,45 @@ mini · 插件 24
 弹窗现在只能看。要能开关还需要：客户端 → host 的 RPC（客户端拿不到文件系统），
 host 侧复用已测过的 `toggleInPatch()`。这是下一步，且必须走 host。
 
+
+## 第三版：可交互（2026-10-30 00:32）
+
+弹窗现在**从 host 路由取实时数据**，点一行就切换，并写回 `cordis.patch.yml`。
+
+### Host 侧（`lib/index.js`）
+
+```
+GET  /turnstile/plugins   -> { profile, rows:[{name, disabled, row, installed}] }
+POST /turnstile/toggle    -> body {package, disable} -> 写 patch + 备份
+```
+
+复用与 `manage.mjs` 相同的规则：行 id 从插件自己的 bundle patch 读，写前 `copyFileSync` 备份，
+空 `[]` 哨兵替换，保证 YAML 合法。
+
+### 已验证
+
+| 项 | 证据 |
+|---|---|
+| GET 返回实时数据 | `curl .../turnstile/plugins` → 24 行，`dsh-context`/`dsh-token-diet` 标停用 |
+| POST 停用 | `{"ok":true,"package":"dsh-talk","row":"talk","disabled":true}` → patch 出现 `- id: talk` |
+| POST 启用 | 同样调用 disable:false → `grep id: talk` 归零 |
+| 写后 YAML 合法 | js-yaml 解析出 5 个条目 |
+| 备份 | patch 同目录生成 `.bak-<时间戳>` |
+| 界面渲染 | 截图 `state/popup-final2.png`：停用 2 · 引擎跳过 1 · 点一行切换 |
+| mini 健康 | quicktest **10/10** |
+
+### 还没验证的一步
+
+**在无头浏览器里点行**：playwright 定位到该行但点击超时（弹窗内部可滚动，元素被遮挡）。
+路由本身已经 curl 验证过，所以缺的只是「UI 点击 → 请求」这一段的人机确认。
+真实窗口里点一下即可闭环。
+
+### 一个值得记住的坑
+
+构建器一开始用 `tpl.replace("__TURNSTILE_DATA__", ...)` 注入数据，结果替换到了**注释里第一次出现的位置**，
+代码里的占位符还在 → `ReferenceError` → 整个 client 入口激活失败、整页 failed。
+改成唯一标记 `/*__TURNSTILE_DATA__*/null` 之后恢复。**注入点必须是代码里的唯一标记，不能是注释里也出现的词。**
+
 ## 明确不做的
 
 - 换 harness 的适配层：本工具是 DSH 形状的，另一套宿主需要重写适配而不是加开关。
