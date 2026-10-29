@@ -4,6 +4,7 @@
 // DSH_BIN             → path to @deepseek-ai/dsh/lib/bin.js (needed for --dump-config)
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 export const ROOT = process.env.DSH_TURNSTILE_ROOT || dirname(dirname(fileURLToPath(import.meta.url)));
 export const DSH_HOME = process.env.DSH_HOME || join(ROOT, 'home');
@@ -19,3 +20,26 @@ export function resolveDshBin() {
 }
 export const DSH_BIN = resolveDshBin();
 export function profileDir(name, home = DSH_HOME) { return join(home, 'profiles', name); }
+
+/**
+ * Resolve a dependency from the repo first, then from a nearby DSH install.
+ * Lets the tools run straight after `git clone` without any install step.
+ */
+export function requireDep(name) {
+  const bases = [join(ROOT, 'package.json')];
+  if (DSH_BIN) bases.push(join(dirname(DSH_BIN), '..', '..', name, 'package.json'));
+  bases.push(join(ROOT, 'runtime/node_modules', name, 'package.json'));
+  let lastErr = null;
+  for (const b of bases) {
+    try { return createRequire(b)(name); } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('cannot resolve ' + name);
+}
+
+/** js-yaml with a schema that tolerates the harness's !!js expressions. */
+export function loadYaml() {
+  const yaml = requireDep('js-yaml');
+  const jsType = new yaml.Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: (d) => String(d) });
+  const schema = yaml.DEFAULT_SCHEMA.extend([jsType]);
+  return { yaml, schema };
+}

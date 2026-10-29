@@ -6,10 +6,11 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync, readdirSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
-import { ROOT as root, DSH_BIN, DSH_HOME } from './config.mjs';
-const yaml = createRequire(join(root, 'package.json'))('js-yaml');
+import { ROOT as root, DSH_BIN, DSH_HOME, loadYaml } from './config.mjs';
+import { checkCompatibility, runtimeVersion } from './version.mjs';
+const { yaml, schema } = loadYaml();
 const jsType = new yaml.Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: (d) => String(d) });
-const schema = yaml.DEFAULT_SCHEMA.extend([jsType]);
+
 const argv = process.argv.slice(2);
 let profileName = null, home = process.env.DSH_HOME || null, dir = null, budget = Number(process.env.DSH_BUDGET_LIMIT || 4194304);
 for (let i = 0; i < argv.length; i++) {
@@ -95,30 +96,14 @@ for (const [ui, who] of srows.slice(0, 6)) console.log('   ' + ui.padEnd(22) + S
 console.log('   >=3 个插件抢占的界面: ' + hot.length + (hot.length ? '  ← 建议收进母按钮' : ''));
 console.log(bar('引擎闸门'));
 const skipped = [];
-const semverOk = (range, ver) => {
-  if (!range || !ver) return true;
-  const parts = String(range).split('||').map(s => s.trim());
-  const cmpKey = (v) => v.split(/[.+-]/).slice(0, 3).map(x => parseInt(x, 10) || 0);
-  const ge = (a, b) => { const A = cmpKey(a), B = cmpKey(b); for (let i = 0; i < 3; i++) { if (A[i] !== B[i]) return A[i] > B[i]; } return true; };
-  const lt = (a, b) => { const A = cmpKey(a), B = cmpKey(b); for (let i = 0; i < 3; i++) { if (A[i] !== B[i]) return A[i] < B[i]; } return false; };
-  return parts.some(p => {
-    const caret = p.match(/^\^(\S+)$/);
-    if (caret) { const b = caret[1]; const [ma] = cmpKey(b); const up = ma > 0 ? (ma + 1) + '.0.0' : '0.' + (cmpKey(b)[1] + 1) + '.0'; return ge(ver, b) && lt(ver, up); }
-    const tilde = p.match(/^~\s*(\S+)$/);
-    if (tilde) { const c = cmpKey(tilde[1]); return ge(ver, tilde[1]) && lt(ver, c[0] + '.' + (c[1] + 1) + '.0'); }
-    if (p.startsWith('>=') && !p.includes(' ')) return ver >= p.slice(2).replace(/\s/g, '');
-    const m = p.match(/^>=\s*(\S+)\s*<\s*(\S+)$/);
-    if (m) return ver >= m[1] && ver < m[2];
-    return p === ver || p === '*' ;
-  });
-};
-const hostVer = (() => { const j = createRequire(join(root, 'package.json'))('@deepseek-ai/dsh/package.json'); return j.version; })();
+const hostVer = runtimeVersion;
 for (const name of bundles) {
   const d = join(profileDir, 'node_modules', name);
   if (!existsSync(join(d, 'package.json'))) continue;
   const j = JSON.parse(readFileSync(join(d, 'package.json'), 'utf8'));
   const range = j.engines?.dsh;
-  if (range && !semverOk(range, hostVer)) skipped.push(name + ' (' + range + ')');
+  const issue = range ? checkCompatibility({ name, version: j.version, engines: { dsh: range } }) : null;
+  if (issue) skipped.push(name + ' (' + range + ')');
 }
 console.log('   host ' + hostVer + '；会被跳过的: ' + (skipped.length ? skipped.join(', ') : '无'));
 const warn = userOff.length + dups.length + hot.length + skipped.length;

@@ -7,10 +7,11 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
-import { ROOT as root, DSH_BIN, DSH_HOME } from './config.mjs';
-const yaml = createRequire(join(root, 'package.json'))('js-yaml');
+import { ROOT as root, DSH_BIN, DSH_HOME, loadYaml } from './config.mjs';
+import { checkCompatibility, runtimeVersion } from './version.mjs';
+const { yaml, schema } = loadYaml();
 const jsType = new yaml.Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: (d) => String(d) });
-const schema = yaml.DEFAULT_SCHEMA.extend([jsType]);
+
 const argv = process.argv.slice(2);
 let profileName = null, home = process.env.DSH_HOME || null, out = null;
 for (let i = 0; i < argv.length; i++) {
@@ -111,23 +112,7 @@ if (existsSync(histPath)) {
     allRuns = (h2.runs || []).slice(-40).map(r => ({ at: r.at, result: r.result, profile: String(r.profile || '').split(/[\\/]/).pop(), failed: (r.checks || []).filter(c => !c.ok).map(c => c.name) }));
   } catch { allRuns = []; }
 }
-const hostVer = (() => { try { return createRequire(join(root, 'package.json'))('@deepseek-ai/dsh/package.json').version; } catch { return ''; } })();
-const cmp = (v) => String(v).split(/[.+-]/).slice(0, 3).map(x => parseInt(x, 10) || 0);
-const ge = (a, b) => { const A = cmp(a), B = cmp(b); for (let i = 0; i < 3; i++) if (A[i] !== B[i]) return A[i] > B[i]; return true; };
-const lt = (a, b) => { const A = cmp(a), B = cmp(b); for (let i = 0; i < 3; i++) if (A[i] !== B[i]) return A[i] < B[i]; return false; };
-const inRange = (range, ver) => {
-  if (!range) return true;
-  return String(range).split('||').map(s => s.trim()).some(part => {
-    const c = part.match(/^\^(\S+)$/);
-    if (c) { const k = cmp(c[1]); const up = k[0] > 0 ? (k[0] + 1) + '.0.0' : '0.' + (k[1] + 1) + '.0'; return ge(ver, c[1]) && lt(ver, up); }
-    const t = part.match(/^~\s*(\S+)$/);
-    if (t) { const k = cmp(t[1]); return ge(ver, t[1]) && lt(ver, k[0] + '.' + (k[1] + 1) + '.0'); }
-    const m = part.match(/^>=\s*(\S+)\s*<\s*(\S+)$/);
-    if (m) return ge(ver, m[1]) && lt(ver, m[2]);
-    if (part.startsWith('>=')) return ge(ver, part.slice(2).trim());
-    return part === ver;
-  });
-};
+const hostVer = runtimeVersion;
 const engineSkipped = [];
 for (const name of bundles) {
   const pjF = join(profileDir, 'node_modules', name, 'package.json');
@@ -135,7 +120,8 @@ for (const name of bundles) {
   try {
     const j = JSON.parse(readFileSync(pjF, 'utf8'));
     const range = j.engines?.dsh;
-    if (range && hostVer && !inRange(range, hostVer)) engineSkipped.push({ name, range, src: pjF.replace(/\\\\/g, '/') });
+    const issue = range ? checkCompatibility({ name, version: j.version, engines: { dsh: range } }) : null;
+    if (issue) engineSkipped.push({ name, range, src: pjF.split(String.fromCharCode(92)).join('/') });
   } catch { /* ignore */ }
 }
 const uiHot = surfaceRows.filter(s => s.plugins.length > 10);

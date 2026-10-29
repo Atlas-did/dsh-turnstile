@@ -35,18 +35,22 @@ check('preflight blocks the fixture', r.code === 1, 'exit=' + r.code);
 
 // Environment-specific cases: only meaningful on a machine that actually has these profiles.
 // They are skipped (and reported as skipped, not passed) everywhere else.
+let skipped = 0, envRun = 0;
 const hasDesk = existsSync(DESK), hasMini = existsSync(MINI);
 if (hasDesk) {
+  envRun++;
   r = run('tools/preflight.mjs', DESK, '--no-record');
   check('preflight clears desktop', r.code === 0, 'exit=' + r.code);
-} else console.log('  SKIP  preflight clears desktop          (no profile at ' + DESK + ')');
+} else { skipped++; console.log('  SKIP  preflight clears desktop          (no profile at ' + DESK + ')'); }
 
 if (hasMini) {
+  envRun += 2;
   r = run('tools/preflight.mjs', MINI, '--no-record');
   check('preflight clears mini', r.code === 0, 'exit=' + r.code);
   r = run('tools/registry.mjs', MINI);
   check('matrix distinguishes EXEMPTED', /EXEMPTED/.test(r.out), 'exit=' + r.code);
 } else {
+  skipped += 2;
   console.log('  SKIP  preflight clears mini             (no profile at ' + MINI + ')');
   console.log('  SKIP  matrix distinguishes EXEMPTED     (no mini profile)');
 }
@@ -57,14 +61,31 @@ check('ui-surface blocks crowded fixture', r.code === 11, 'exit=' + r.code);
 r = run('tools/preflight.mjs', join(root, 'tests/import-fixture'), '--no-record');
 check('preflight blocks unimportable plugin', r.code === 1 && /import-health/.test(r.out), 'exit=' + r.code);
 
-r = run('tools/history.mjs', 'stale', DESK);
-check('decisions match installed versions', r.code === 0, 'exit=' + r.code);
-
-r = run('tools/history.mjs', 'new-since', DESK);
-check('no unvetted bundle on desktop', r.code === 0, 'exit=' + r.code);
+if (hasDesk) {
+  envRun += 2;
+  r = run('tools/history.mjs', 'stale', DESK);
+  check('decisions match installed versions', r.code === 0, 'exit=' + r.code);
+  r = run('tools/history.mjs', 'new-since', DESK);
+  check('no unvetted bundle on desktop', r.code === 0, 'exit=' + r.code);
+} else {
+  skipped += 2;
+  console.log('  SKIP  gate ledger checks                (no profile at ' + DESK + ')');
+}
 
 let failed = 0;
 for (const c of cases) { if (!c.pass) failed++; console.log((c.pass ? '  PASS  ' : '  FAIL  ') + c.name.padEnd(34) + c.detail); }
 console.log('');
-console.log(failed ? 'RESULT: ' + failed + ' self-test failure(s)' : 'RESULT: gate is healthy (' + cases.length + ' cases)');
+const strict = process.argv.includes('--strict');
+if (failed) {
+  console.log('RESULT: ' + failed + ' self-test failure(s)');
+  process.exit(1);
+}
+const fix = cases.length - envRun;
+console.log('RESULT: ' + fix + ' fixture cases passed, ' + envRun + ' environment case(s) passed, ' + skipped + ' skipped');
+if (skipped) {
+  console.log('        环境用例未运行 ⇒ 这里的"通过"只描述夹具覆盖，不描述任何真实 profile。');
+  console.log('        要把它变成硬性要求：node tools/selftest.mjs --strict');
+}
+if (strict && skipped) { console.log('STRICT: failing because ' + skipped + ' environment case(s) were skipped'); process.exit(4); }
+process.exit(0);
 process.exit(failed ? 1 : 0);

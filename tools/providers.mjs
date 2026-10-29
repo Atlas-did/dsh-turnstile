@@ -4,11 +4,11 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { ROOT as root, DSH_BIN, DSH_HOME } from './config.mjs';
-const yaml = createRequire(join(root, 'package.json'))('js-yaml');
+import { ROOT as root, DSH_BIN, DSH_HOME, loadYaml } from './config.mjs';
+const { yaml, schema } = loadYaml();
 // composed config embeds !!js expressions; keep them as opaque scalars
 const jsType = new yaml.Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: (d) => String(d) });
-const schema = yaml.DEFAULT_SCHEMA.extend([jsType]);
+
 const profile = process.argv[2] || 'mini';
 const home = (() => {
   const e = process.env.DSH_HOME;

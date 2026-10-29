@@ -12,7 +12,7 @@ function pickHome() {
   if (explicit && existsSync(join(explicit, 'profiles', profile))) return explicit;
   return join(root, 'home');
 }
-import { ROOT as root, DSH_BIN, DSH_HOME } from './config.mjs';
+import { ROOT as root, DSH_BIN, DSH_HOME, loadYaml } from './config.mjs';
 const profile = process.argv[2] || 'mini';
 const patchIdx = process.argv.indexOf('--patch');
 const patchFile = patchIdx > 0 ? process.argv[patchIdx + 1] : null;

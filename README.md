@@ -119,6 +119,40 @@ Add a check, add its fixture. A scanner without a failing fixture is not trusted
 
 ---
 
+
+---
+
+## Known limits, and what this repo does about them
+
+A gate that hides its blind spots is worse than no gate. These are real, measured compromises.
+
+| Limit | Status | Evidence |
+|---|---|---|
+| Most checks are text heuristics (regex over imports, `ctx.x =`, `{{var}}`, `dsh.client.inject`) | Open | Dynamic registration, re-exports and bundled output can slip past. `import-health` is the exception: it resolves modules instead of grepping. Roadmap: AST scan + runtime probe. |
+| Version rules were re-implemented by hand | Fixed here | `tools/version.mjs` delegates to the host's own `evaluatePluginCompatibility`; fallback is `semver` with includePrerelease. For `^0.2.0-rc.1` vs `0.2.1-rc.3`, plain `semver.satisfies` says false, the host says true. Only the host is authoritative. |
+| `semver` / core-service knowledge is hand-maintained and drifts | Partly open | Version rules no longer drift (delegated). The known-ctx-service allowlist is still a constant; next step is generating it from the installed runtime and failing loudly when the runtime version has no knowledge file. |
+| Deeply tied to DSH internals | By design | It understands `cordis.patch.yml`, `--dump-config` and the inspector byte budget. Another harness needs an adapter, not a flag. |
+| `selftest` reported "healthy" while skipping environment cases | Fixed here | Summary now separates fixture from environment coverage, and `--strict` exits 4 when anything was skipped. A green line no longer means two different things. |
+
+### What a green report actually means
+
+```
+fixture cases passed  -> the scanners still catch what they must catch
+environment cases     -> your profiles were really scanned (needs DSH_HOME)
+skipped               -> neither; coverage you did not get
+```
+
+### Trust levels (planned)
+
+| Class | How it was found | Strength |
+|---|---|---|
+| data | read from package.json / --dump-config | high |
+| resolve | the module was actually resolved | high |
+| text | regex over source | medium |
+| runtime | observed in a live host | highest (not implemented) |
+
+---
+
 ## Adding a check
 
 1. Write `tools/your-check.mjs` — take a profile dir, exit `0` on clear, non-zero on findings.
