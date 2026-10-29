@@ -1,4 +1,8 @@
 node_modules/
+
+# fixtures deliberately contain fake node_modules trees — they are test data
+!tests/**/node_modules/
+!tests/**/node_modules/**
 npm-debug.log*
 pnpm-debug.log*
 .DS_Store
