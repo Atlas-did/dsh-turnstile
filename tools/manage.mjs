@@ -155,6 +155,11 @@ function toggleInPatch(text, rowId, off) {
 
 if (argv.includes('--menu')) { await menuMode(); }
 
+if (argv.includes('--json')) {
+  console.log(JSON.stringify({ profile, rows: rows.map((r) => ({ name: r.name, version: r.version, row: r.ids[0] || '', disabled: r.disabled, engineSkipped: r.engineSkipped, missing: r.missing })) }, null, 2));
+  process.exit(0);
+}
+
 if (!doDisable && !doEnable) {
   console.log('profile: ' + profile);
   console.log('bundles ' + bundles.length + '  (runtime-provided ' + (bundles.length - managed.length) + ', managed ' + managed.length + ')   deps ' + deps.length);

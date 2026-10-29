@@ -130,6 +130,51 @@ window.__ModuleLoader__.load({ id: 'turnstile-popup', factory: (require) => ({ a
 弹窗这件事现在是「**契约已知、第一次实现失败、可安全回滚**」。剩下的是对齐包装层，
 而不是设计问题。CLI 与数据层已完全可用，界面层是增量。
 
+
+## 第二次尝试：成功（2026-10-30 00:25）
+
+关键差异只有一处：client 模块必须**导出 `inject`（服务名，不是包名）**。
+
+```js
+window.__ModuleLoader__.load({
+  id: "turnstile-popup",
+  factory: (require) => {
+    var module = { exports: {} };
+    var exports = module.exports;
+    exports.inject = ["slots"];              // ← 第一次失败就是因为缺这行
+    exports.apply = function apply(ctx) {
+      var React = require("react");
+      ctx.slots.inject("shell.overlay", () => ctx.slots.register({ name: "shell.overlay", id: "turnstile.plugin-list" }, Card));
+    };
+    return module.exports;
+  },
+});
+```
+
+实测结果（mini，截图 `state/popup-v3.png`）：
+
+```
+mini · 插件 24
+停用 2 · 引擎跳过 1 · 只读
+· dsh-better-sidebar
+× dsh-context
+· dsh-talk                    skip
+...
+```
+
+同时：`quicktest` **10/10 全 PASS**，界面正常，无 failed 条目。
+
+### 这一版学到的三条
+
+1. **`inject` 是服务名**（`slots` / `sessions` / `locale` …），不是包名；缺了它 `ctx.slots` 就是 undefined，整个 client 入口激活失败；
+2. **`factory` 要返回 `module.exports`**，`apply` 挂在其上（照抄 `dsh-api-job-controller/lib/client.js` 的形状）；
+3. 数据不要在客户端解析文本：`manage.mjs --json` 出结构化数据，`build-popup.mjs` 直接吃 JSON。第一次我用正则解析对齐表格，`dsh-talk` 的 `on ENGINE-SKIP` 被解析成了插件名 `ENGINE-SKIP`。
+
+### 仍然是只读
+
+弹窗现在只能看。要能开关还需要：客户端 → host 的 RPC（客户端拿不到文件系统），
+host 侧复用已测过的 `toggleInPatch()`。这是下一步，且必须走 host。
+
 ## 明确不做的
 
 - 换 harness 的适配层：本工具是 DSH 形状的，另一套宿主需要重写适配而不是加开关。
