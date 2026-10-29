@@ -81,6 +81,80 @@ const rows = managed.map((name) => {
   };
 });
 
+/**
+ * --menu : a small interactive front-end over the same data model a UI would use.
+ * Reads line commands so it works both on a TTY and through a pipe (which is how it is tested):
+ *   t <n>  toggle row n (no file write yet)     s  save pending toggles     q  quit
+ */
+async function menuMode() {
+  const { createInterface } = await import('node:readline');
+  const pending = new Map(); // row id -> true (disable) / false (enable)
+  const paint = () => {
+    console.log('');
+    console.log('  mini plugin set · ' + profile);
+    console.log('  ' + '─'.repeat(64));
+    rows.forEach((r, i) => {
+      const wantOff = pending.has(r.ids[0]) ? pending.get(r.ids[0]) : r.disabled;
+      const mark = wantOff ? '[ ]' : '[x]';
+      const warn = (r.engineSkipped ? ' ENGINE-SKIP' : '') + (r.missing ? ' NOT-INSTALLED' : '');
+      console.log('  ' + String(i + 1).padStart(2) + '. ' + mark + ' ' + String(r.name).padEnd(32) + (r.ids[0] || '-') + warn);
+    });
+    console.log('  ' + '─'.repeat(64));
+    console.log('  t <n> 切换   s 保存   q 退出' + (pending.size ? '   (待保存 ' + pending.size + ' 项)' : ''));
+  };
+  paint();
+  const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: Boolean(process.stdin.isTTY) });
+  for await (const line of rl) {
+    const cmd = line.trim();
+    if (!cmd) continue;
+    if (cmd === 'q') break;
+    if (cmd === 's') {
+      if (!pending.size) { console.log('  没有待保存的改动'); continue; }
+      let next = patchText;
+      for (const [rowId, off] of pending) next = toggleInPatch(next, rowId, off);
+      copyFileSync(patchPath, patchPath + '.bak-' + Date.now());
+      writeFileSync(patchPath, next);
+      console.log('  已写入 ' + pending.size + ' 项，备份已留。重启 DSH 生效。');
+      pending.clear();
+      continue;
+    }
+    const m = cmd.match(/^t\s+(\d+)$/);
+    if (!m) { console.log('  看不懂：' + cmd); continue; }
+    const idx = Number(m[1]) - 1;
+    const row = rows[idx];
+    if (!row || !row.ids.length) { console.log('  没有可切换的行'); continue; }
+    const cur0 = pending.has(row.ids[0]) ? pending.get(row.ids[0]) : row.disabled;
+    pending.set(row.ids[0], !cur0);
+    paint();
+  }
+  rl.close();
+  process.exit(0);
+}
+
+/** pure: return the patch text with row `rowId` disabled (off=true) or enabled (off=false) */
+function toggleInPatch(text, rowId, off) {
+  if (off) {
+    const emptyRe = /^\[\]\s*$/m;
+    const block = '- id: ' + rowId + '\n  disabled: true';
+    return emptyRe.test(text) ? text.replace(emptyRe, block) : text.replace(/\s*$/, '') + '\n' + block + '\n';
+  }
+  const lines = text.split(/\r?\n/);
+  const out = [];
+  let dropping = false;
+  for (const line of lines) {
+    const m = line.match(/^-\s*id:\s*([\w.@/-]+)\s*$/);
+    if (m) dropping = m[1] === rowId;
+    else if (/^\S/.test(line)) dropping = false;
+    if (dropping) continue;
+    out.push(line);
+  }
+  let next = out.join('\n');
+  if (!/^- /m.test(next)) next = next.replace(/\s*$/, '\n') + '[]\n';
+  return next;
+}
+
+if (argv.includes('--menu')) { await menuMode(); }
+
 if (!doDisable && !doEnable) {
   console.log('profile: ' + profile);
   console.log('bundles ' + bundles.length + '  (runtime-provided ' + (bundles.length - managed.length) + ', managed ' + managed.length + ')   deps ' + deps.length);

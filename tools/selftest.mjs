@@ -9,6 +9,15 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const MINI = join(root, 'home/profiles/mini');
 const DESK = (process.env.DSH_HOME || '') + '/profiles/desktop';
 
+function runCmd(shellCommand) {
+  try {
+    const out = execFileSync('bash', ['-lc', shellCommand], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
+    return { code: 0, out: String(out) };
+  } catch (e) {
+    return { code: e.status ?? 1, out: String((e.stdout || '') + (e.stderr || '')) };
+  }
+}
+
 function run(script, ...args) {
   try {
     const out = execFileSync(process.execPath, [join(root, script), ...args], { encoding: 'utf8', timeout: 480000 });
@@ -31,6 +40,10 @@ check('risk ignores commented imports', r.code === 0 && /GREEN/.test(r.out) && /
 // Runtime probe: a service registered under a computed name is invisible to the static
 // scan. The probe must see it, and --strict must fail on that gap.
 // A known service assigned only in a comment or a string must not be reported.
+// menu mode: toggling then quitting must not touch the file.
+r = runCmd('printf "t 1\\nq\\n" | node tools/manage.mjs "' + join(root, 'tests/manage-fixture') + '" --menu');
+check('manage menu toggles without writing', /\[ \]/.test(r.out) && !/已写入/.test(r.out), 'exit=' + r.code);
+
 r = run('tools/conflict.mjs', join(root, 'tests/conflict-fixture'));
 check('conflict ignores commented ctx writes', r.code === 0 && !/ctx\.fs/.test(r.out) && /ctx evidence: ast/.test(r.out), 'exit=' + r.code);
 
