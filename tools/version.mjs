@@ -20,10 +20,19 @@ if (hostPath) { try { host = await import('file://' + hostPath.split(String.from
 
 export const runtimeVersion = (() => {
   try { if (host && host.getDshRuntimeVersion) return host.getDshRuntimeVersion(); } catch { /* fall through */ }
+  if (process.env.DSH_VERSION) return process.env.DSH_VERSION;
   try { return createRequire(join(ROOT, 'package.json'))('@deepseek-ai/dsh/package.json').version; } catch { return ''; }
 })();
 
 export function checkCompatibility(manifest) {
+  if (!runtimeVersion) {
+    // No runtime to judge against: an unknown answer must never be reported as a skip.
+    if (!globalThis.__turnstileVerWarned) {
+      globalThis.__turnstileVerWarned = true;
+      console.error('WARNING: runtime version unknown (set DSH_BIN or DSH_VERSION); version checks report nothing.');
+    }
+    return null;
+  }
   if (host && host.evaluatePluginCompatibility) {
     try {
       const issue = host.evaluatePluginCompatibility(manifest);
@@ -37,7 +46,13 @@ export function checkCompatibility(manifest) {
     const ok = semver.satisfies(runtimeVersion, range, { includePrerelease: true });
     return ok ? null : { name: manifest.name, version: manifest.version, runtimeVersion, requirements: { 'engines.dsh': range }, exempted: false, source: 'semver' };
   } catch {
-    return { name: manifest && manifest.name, version: manifest && manifest.version, runtimeVersion, requirements: { 'engines.dsh': range }, exempted: false, source: 'unknown' };
+    // Neither the host evaluator nor semver is available. Do NOT claim incompatibility:
+    // an unknown answer must never be reported as a skip.
+    if (!globalThis.__turnstileWarned) {
+      globalThis.__turnstileWarned = true;
+      console.error('WARNING: no host evaluator and no semver — version checks are unavailable (results will not claim skips).');
+    }
+    return null;
   }
 }
 

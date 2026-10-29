@@ -33,6 +33,10 @@ check('risk ignores commented imports', r.code === 0 && /GREEN/.test(r.out) && /
 r = run('tools/probe.mjs', join(root, 'tests/probe-fixture'), '--strict');
 check('probe sees computed registration', r.code === 7 && /sharedStore/.test(r.out), 'exit=' + r.code);
 
+// manage: a dry run must describe the change and write nothing.
+r = run('tools/manage.mjs', join(root, 'tests/manage-fixture'), '--disable', 'plug-toggle');
+check('manage dry-run writes nothing', r.code === 0 && /DRY RUN/.test(r.out), 'exit=' + r.code);
+
 r = run('tools/conflict.mjs', join(root, 'tests/conflict-fixture'));
 check('conflict catches ctx + service', /ctx-assign/.test(r.out) && /service-dup/.test(r.out), 'exit=' + r.code);
 

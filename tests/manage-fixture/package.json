@@ -1,0 +1,14 @@
+{
+  "name": "manage-fixture",
+  "private": true,
+  "dependencies": {
+    "plug-toggle": "1.0.0"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "plug-toggle"
+      ]
+    }
+  }
+}

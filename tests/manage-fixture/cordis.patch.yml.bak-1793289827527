@@ -1,0 +1,3 @@
+# profile patch
+- id: toggle-row
+  disabled: true
