@@ -1,0 +1,8 @@
+{
+  "name": "conflict-fixture",
+  "private": true,
+  "dependencies": {
+    "plug-a": "1.0.0",
+    "plug-b": "1.0.0"
+  }
+}

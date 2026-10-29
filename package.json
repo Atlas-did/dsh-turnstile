@@ -1,0 +1,38 @@
+{
+  "name": "dsh-turnstile",
+  "version": "0.1.0",
+  "description": "Install-time gate and sandbox for DeepSeek Harness plugins — catch a plugin before it breaks your environment.",
+  "type": "module",
+  "bin": {
+    "dsh-turnstile": "./tools/preflight.mjs",
+    "turnstile-doctor": "./tools/doctor.mjs",
+    "turnstile-map": "./tools/gate-map.mjs",
+    "turnstile-ui": "./tools/ui-surfaces.mjs"
+  },
+  "scripts": {
+    "selftest": "node tools/selftest.mjs",
+    "doctor": "node tools/doctor.mjs",
+    "map": "node tools/gate-map.mjs"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "optionalDependencies": {
+    "playwright-core": "^1.40.0"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Atlas-did/dsh-turnstile.git"
+  },
+  "files": [
+    "tools",
+    "tests",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ]
+}

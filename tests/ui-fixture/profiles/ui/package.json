@@ -1,0 +1,21 @@
+{
+  "name": "ui-fixture",
+  "private": true,
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "fake-ui-plugin-1",
+        "fake-ui-plugin-2",
+        "fake-ui-plugin-3",
+        "fake-ui-plugin-4",
+        "fake-ui-plugin-5",
+        "fake-ui-plugin-6",
+        "fake-ui-plugin-7",
+        "fake-ui-plugin-8",
+        "fake-ui-plugin-9",
+        "fake-ui-plugin-10",
+        "fake-ui-plugin-11"
+      ]
+    }
+  }
+}

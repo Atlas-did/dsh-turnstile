@@ -1,0 +1,15 @@
+{
+  "name": "gate-fixture",
+  "private": true,
+  "dependencies": {
+    "plug-bad": "1.0.0",
+    "plug-js": "1.0.0"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "plug-bad"
+      ]
+    }
+  }
+}

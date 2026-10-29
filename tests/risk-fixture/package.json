@@ -1,0 +1,9 @@
+{
+  "name": "risk-fixture",
+  "private": true,
+  "dependencies": {
+    "plug-red": "1.0.0",
+    "plug-amber": "1.0.0",
+    "plug-green": "1.0.0"
+  }
+}

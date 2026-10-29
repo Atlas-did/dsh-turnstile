@@ -1,0 +1,103 @@
+// Conflict scan for a DSH profile.
+// Scope discipline: an assignment to `ctx.<name>` only counts when <name> is a
+// service this profile actually knows (from ctx.provide() or the core list).
+// That filters out canvas/DOM look-alikes such as ctx.fillStyle.
+// usage: node tools/conflict.mjs <profileDir>
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+
+const dir = process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop';
+const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+const deps = Object.keys(pkg.dependencies || {});
+const nm = join(dir, 'node_modules');
+
+const CORE_SERVICES = ['fs', 'tools', 'session', 'agent', 'llm', 'webServer', 'webRuntime',
+  'subprocess', 'settings', 'commands', 'workspace', 'inspector', 'connection', 'agentPresets',
+  'sessionProjections', 'skills', 'jobs', 'http', 'storageDomain', 'homePaths'];
+
+function jsFiles(d) {
+  const out = [];
+  const walk = (p, depth) => {
+    if (depth > 2 || out.length > 40) return;
+    let st; try { st = statSync(p); } catch { return; }
+    if (st.isDirectory()) { for (const e of readdirSync(p)) walk(join(p, e), depth + 1); }
+    else if (p.endsWith('.js') && st.size > 40) out.push(p);
+  };
+  walk(d, 0);
+  return out;
+}
+
+const texts = [];
+for (const name of deps) {
+  const d = join(nm, name);
+  if (!existsSync(join(d, 'package.json'))) continue;
+  for (const f of [...jsFiles(join(d, 'lib')), ...jsFiles(d)].slice(0, 12)) {
+    try { texts.push({ plugin: name, file: f.slice(d.length + 1).replace(/\\/g, '/'), text: readFileSync(f, 'utf8') }); } catch {}
+  }
+}
+
+const provided = new Map();
+for (const t of texts) for (const m of t.text.matchAll(/ctx\.provide\(\s*['"]([\w.-]+)['"]/g)) {
+  const list = provided.get(m[1]) || [];
+  if (!list.includes(t.plugin)) list.push(t.plugin);
+  provided.set(m[1], list);
+}
+const known = new Set([...CORE_SERVICES, ...provided.keys()]);
+
+const rows = [];
+for (const t of texts) {
+  for (const m of t.text.matchAll(/ctx\.([a-zA-Z_$][\w$]*)\s*=(?!=)/g)) {
+    if (!known.has(m[1])) continue;
+    rows.push({ kind: 'ctx-assign', plugin: t.plugin, detail: 'ctx.' + m[1] + ' =', contagious: 'yes' });
+  }
+  for (const m of t.text.matchAll(/\.listen\(\s*(?:[^,]+,\s*)?(\d{4,5})/g)) {
+    rows.push({ kind: 'fixed-port', plugin: t.plugin, detail: 'listen(' + m[1] + ')', contagious: 'no' });
+  }
+  for (const m of t.text.matchAll(/writeFileSync\(\s*['"]([^'"]+\.(?:json|db|lock))['"]/g)) {
+    rows.push({ kind: 'state-file', plugin: t.plugin, detail: m[1], contagious: 'yes' });
+  }
+}
+for (const [svc, list] of provided) {
+  if (list.length > 1) rows.push({ kind: 'service-dup', plugin: list.join(','), detail: 'ctx.provide("' + svc + '")', contagious: 'yes' });
+}
+
+// installed-version divergence: compare what is actually on disk, not the ranges.
+const installed = new Map();  // pkg -> Set(version)
+for (const name of deps) {
+  for (const base of [join(nm, name, 'node_modules'), nm]) {
+    if (!existsSync(base)) continue;
+    for (const entry of readdirSync(base)) {
+      if (!entry.startsWith('@')) continue;
+      const scopeDir = join(base, entry);
+      let subs = [];
+      try { subs = readdirSync(scopeDir); } catch { continue; }
+      for (const sub of subs) {
+        const pj = join(scopeDir, sub, 'package.json');
+        if (!existsSync(pj)) continue;
+        try {
+          const j = JSON.parse(readFileSync(pj, 'utf8'));
+          if (!j.name || !j.version) continue;
+          const set = installed.get(j.name) || new Set();
+          set.add(j.version);
+          installed.set(j.name, set);
+        } catch {}
+      }
+    }
+  }
+}
+for (const [dep, set] of installed) {
+  if (set.size > 1 && dep.startsWith('@deepseek-ai/')) {
+    rows.push({ kind: 'dep-divergence', plugin: '-', detail: dep + ' :: ' + [...set].join(' | '), contagious: 'yes' });
+  }
+}
+const seen = new Set();
+const uniq = rows.filter(r => { const k = r.kind + '|' + r.plugin + '|' + r.detail; if (seen.has(k)) return false; seen.add(k); return true; });
+const order = { 'ctx-assign': 0, 'service-dup': 1, 'dep-divergence': 2, 'fixed-port': 3, 'state-file': 4 };
+uniq.sort((a, b) => (order[a.kind] - order[b.kind]) || String(a.plugin).localeCompare(String(b.plugin)));
+console.log('profile: ' + dir + '  (known services: ' + known.size + ')');
+if (!uniq.length) { console.log('no conflict patterns found'); process.exit(0); }
+console.log('KIND'.padEnd(16) + 'PLUGIN'.padEnd(30) + 'DETAIL'.padEnd(46) + 'SPREAD');
+for (const r of uniq) console.log(String(r.kind).padEnd(16) + String(r.plugin).slice(0, 29).padEnd(30) + String(r.detail).slice(0, 45).padEnd(46) + r.contagious);
+const byKind = uniq.reduce((a, r) => (a[r.kind] = (a[r.kind] || 0) + 1, a), {});
+console.log('');
+console.log('summary: ' + JSON.stringify(byKind));
