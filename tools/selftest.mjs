@@ -24,6 +24,10 @@ const check = (name, pass, detail) => cases.push({ name, pass, detail });
 let r = run('tools/risk.mjs', join(root, 'tests/risk-fixture'));
 check('risk catches RED fixture', r.code === 6 && /plug-red\s+1\.0\.0\s+RED/.test(r.out), 'exit=' + r.code);
 
+// AST vs regex: an import that exists only in a comment must not be reported.
+r = run('tools/risk.mjs', join(root, 'tests/ast-fixture'));
+check('risk ignores commented imports', r.code === 0 && /GREEN/.test(r.out) && /evidence: ast/.test(r.out), 'exit=' + r.code);
+
 r = run('tools/conflict.mjs', join(root, 'tests/conflict-fixture'));
 check('conflict catches ctx + service', /ctx-assign/.test(r.out) && /service-dup/.test(r.out), 'exit=' + r.code);
 
@@ -87,5 +91,15 @@ if (skipped) {
   console.log('        要把它变成硬性要求：node tools/selftest.mjs --strict');
 }
 if (strict && skipped) { console.log('STRICT: failing because ' + skipped + ' environment case(s) were skipped'); process.exit(4); }
+// Exit-code contract:
+//   0  every case ran and passed          (full coverage)
+//   1  at least one case failed
+//   3  no failures, but coverage was partial (environment cases skipped)
+//   4  --strict and coverage was partial
+//   0  ... unless --allow-skips, which downgrades 3 back to 0 on purpose
+if (skipped && !process.argv.includes('--allow-skips')) {
+  console.log('EXIT 3: 覆盖不完整（' + skipped + ' 个环境用例未运行）。要接受这一点请加 --allow-skips。');
+  process.exit(3);
+}
 process.exit(0);
 process.exit(failed ? 1 : 0);

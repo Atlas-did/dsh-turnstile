@@ -27,8 +27,17 @@ if (existsSync(knowledgePath)) {
   try {
     const k = JSON.parse(readFileSync(knowledgePath, 'utf8'));
     if (k.dshVersion === runtimeVersion) {
-      CORE_SERVICES = k.services.map((s) => s.name);
-      knowledgeSource = 'knowledge/ctx-services.json (dsh ' + k.dshVersion + ', ' + CORE_SERVICES.length + ' services)';
+      const generated = k.services.map((s) => s.name);
+      // The extractor only sees literal ctx.provide("name") plus the cordis Context members;
+      // Service subclasses register under names it cannot read. Union with the curated list so
+      // version-awareness never *removes* coverage, and say so when the extractor looks thin.
+      CORE_SERVICES = [...new Set([...generated, ...LEGACY_CORE_SERVICES])];
+      knowledgeSource = 'knowledge (dsh ' + k.dshVersion + ': ' + generated.length + ' generated + ' +
+        (CORE_SERVICES.length - generated.length) + ' curated = ' + CORE_SERVICES.length + ')';
+      if (generated.length < LEGACY_CORE_SERVICES.length / 2) {
+        console.log('NOTE: the runtime extractor only found ' + generated.length + ' services by literal ctx.provide();');
+        console.log('      Service-subclass registrations are invisible to it, so the curated list still contributes.');
+      }
     } else {
       console.log('WARNING: knowledge is for dsh ' + k.dshVersion + ' but the runtime is ' + runtimeVersion);
       console.log('         regenerate: node tools/knowledge-gen.mjs');

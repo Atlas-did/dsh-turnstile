@@ -1,0 +1,31 @@
+name: selftest
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      # Fixtures must always pass. Environment cases skip here because no DSH install exists,
+      # so --allow-skips keeps the run meaningful instead of silently green.
+      - name: scanners still catch their fixtures
+        run: node tools/selftest.mjs --allow-skips
+      # The crowding check must go red on 11 plugins, or the threshold logic regressed.
+      - name: ui fixture must trip the threshold
+        run: |
+          set +e
+          node tools/ui-surfaces.mjs tests/ui-fixture/profiles/ui
+          code=$?
+          set -e
+          if [ $code -ne 11 ]; then echo "expected exit 11, got $code"; exit 1; fi
+      # A commented-out bad import must stay green: this is the AST-vs-regex guarantee.
+      - name: ast fixture must not report commented imports
+        run: node tools/risk.mjs tests/ast-fixture

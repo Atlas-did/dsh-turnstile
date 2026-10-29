@@ -1,0 +1,14 @@
+{
+  "name": "ast-fixture",
+  "private": true,
+  "dependencies": {
+    "plug-comment": "1.0.0"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "plug-comment"
+      ]
+    }
+  }
+}

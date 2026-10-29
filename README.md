@@ -153,6 +153,26 @@ skipped               -> neither; coverage you did not get
 
 ---
 
+## Exit codes (so a green line cannot lie)
+
+| Code | Meaning |
+|---|---|
+| `0` | every case ran and passed — full coverage |
+| `1` | at least one case failed |
+| `3` | no failures, but coverage was partial (environment cases skipped) |
+| `4` | `--strict`, and coverage was partial |
+
+`--allow-skips` downgrades `3` back to `0` on purpose — use it in CI, where no DSH install
+exists, so the fixture checks stay meaningful instead of silently claiming full coverage.
+
+```bash
+node tools/selftest.mjs                # local: 3 if any environment case could not run
+node tools/selftest.mjs --allow-skips  # CI: fixtures only, still fails on a broken scanner
+node tools/selftest.mjs --strict       # release gate: skip anything and it fails
+```
+
+---
+
 ## Adding a check
 
 1. Write `tools/your-check.mjs` — take a profile dir, exit `0` on clear, non-zero on findings.

@@ -4,6 +4,7 @@
 // usage: node tools/risk.mjs <profileDir>
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { importsOf } from './scan.mjs';
 
 const dir = process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop';
 const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
@@ -11,12 +12,15 @@ const deps = Object.keys(pkg.dependencies || {});
 const nm = join(dir, 'node_modules');
 
 const OFFICIAL = '@deepseek-ai/';
+// Import discovery goes through tools/scan.mjs: a real tokenizer when es-module-lexer
+// is installed, regex only as a fallback. The returned evidence tells the reader which
+// one produced the finding ('ast' is stronger than 'text').
+let lastEvidence = 'text';
 function scopes(text) {
   const out = new Set();
-  const re = /(?:from\s*|import\s*\(|require\()\s*['"]([^'"]+)['"]/g;
-  let m;
-  while ((m = re.exec(text))) {
-    const spec = m[1];
+  const { specifiers, evidence } = importsOf(text);
+  lastEvidence = evidence;
+  for (const spec of specifiers) {
     if (!spec.startsWith('@')) continue;
     const scope = spec.split('/').slice(0, 2).join('/');
     if (!scope.startsWith(OFFICIAL) && !scope.startsWith('@cordisjs/')) out.add(scope);
@@ -84,5 +88,6 @@ for (const r of rows) {
 }
 const counts = rows.reduce((acc, r) => { acc[r.level] = (acc[r.level] || 0) + 1; return acc; }, {});
 console.log('');
+console.log('import evidence: ' + lastEvidence);
 console.log('summary: ' + JSON.stringify(counts));
 process.exitCode = counts.RED ? 6 : 0;

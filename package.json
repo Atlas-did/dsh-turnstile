@@ -15,7 +15,8 @@
     "map": "node tools/gate-map.mjs"
   },
   "dependencies": {
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "es-module-lexer": "^1.5.4"
   },
   "optionalDependencies": {
     "playwright-core": "^1.40.0"
