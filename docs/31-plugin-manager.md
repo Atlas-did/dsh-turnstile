@@ -214,6 +214,50 @@ POST /turnstile/toggle    -> body {package, disable} -> 写 patch + 备份
 代码里的占位符还在 → `ReferenceError` → 整个 client 入口激活失败、整页 failed。
 改成唯一标记 `/*__TURNSTILE_DATA__*/null` 之后恢复。**注入点必须是代码里的唯一标记，不能是注释里也出现的词。**
 
+
+## 第四版：完整闭环（2026-10-30 00:40）
+
+现在弹窗同时显示三样东西（目标要求的全部）：
+
+```
+mini · 插件 24
+停用 2 · 引擎跳过 1 · 挤爆的 UI 面 4 · 点一行切换
+· dsh-better-sidebar     ui3
+× dsh-context            ui3
+· dsh-genui              ui4
+× dsh-token-diet         ui1
+· dsh-talk               ui1 skip
+· dsh-univer-office      ui6
+```
+
+- **停用状态**：来自 profile patch 的行块解析
+- **UI 抢占**：来自 `dsh.client.inject` + 插件自己的 patch 行，`uiN` 是注入面数，「挤爆的 UI 面」是 ≥3 个插件的面数
+- **引擎跳过**：来自构建时快照（host 路由不判断版本，客户端按名字合并）
+
+### UI 点击 → 写回，已端到端验证
+
+用 playwright 在无头浏览器里派发点击（`target.click()`）：
+
+```
+candidates: [... {"t":"·dsh-ultramath","cursor":"pointer","kids":2}]
+dispatch: clicked
+patch changed: true | has ultramath row: true
+```
+
+随后用 `manage --enable dsh-ultramath --yes` 恢复，`grep id: ultramath` → 0，
+js-yaml 解析 patch 仍是 5 个条目，**quicktest 10/10**。
+
+### 目标第 5 项的验收对照
+
+| 要求 | 证据 |
+|---|---|
+| 弹窗列出已装插件 | 截图 `state/popup-ui.png`，24 条 |
+| 含停用状态 | `× dsh-context` / `× dsh-token-diet` |
+| 含 UI 抢占 | `uiN` 徽标 + 「挤爆的 UI 面 4」 |
+| 含引擎跳过 | `dsh-talk ... skip` |
+| 可直接开关 | playwright 派发点击 → patch 出现 `- id: ultramath` |
+| 写回 `cordis.patch.yml` | 文件确实变化，YAML 合法，有 `.bak` 备份 |
+
 ## 明确不做的
 
 - 换 harness 的适配层：本工具是 DSH 形状的，另一套宿主需要重写适配而不是加开关。

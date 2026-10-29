@@ -23,7 +23,7 @@ window.__ModuleLoader__.load({
         return list
           .filter(function (r) { return r.name.indexOf("@deepseek-ai/") !== 0; })
           .map(function (r) {
-            return { name: r.name, disabled: !!r.disabled, engineSkipped: known[r.name] || false, row: r.row || "" };
+            return { name: r.name, disabled: !!r.disabled, engineSkipped: known[r.name] || false, row: r.row || "", ui: r.ui || [] };
           });
       }
       function Card() {
@@ -46,15 +46,19 @@ window.__ModuleLoader__.load({
         if (!open) return h("button", { onClick: function () { setOpen(true); }, style: { position: "fixed", right: "18px", bottom: "18px", zIndex: 9999, padding: "6px 10px", borderRadius: "8px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "12px" } }, "插件 " + rows.length);
         var off = rows.filter(function (r) { return r.disabled; }).length;
         var sk = rows.filter(function (r) { return r.engineSkipped; }).length;
+        var hot = {};
+        rows.forEach(function (r) { (r.ui || []).forEach(function (u) { hot[u] = (hot[u] || 0) + 1; }); });
+        var crowded = Object.keys(hot).filter(function (u) { return hot[u] >= 3; }).length;
         return h("div", { style: { position: "fixed", right: "18px", bottom: "18px", zIndex: 9999, width: "330px", maxHeight: "50vh", overflow: "auto", background: "#0e1116", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "10px", padding: "12px 14px", fontFamily: "ui-sans-serif,system-ui" } },
           h("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "6px" } },
             h("strong", { style: { fontSize: "13px" } }, "mini · 插件 " + rows.length),
             h("button", { onClick: function () { setOpen(false); }, style: { background: "none", border: 0, color: "#8b96a5", cursor: "pointer" } }, "×")),
-          h("div", { style: { color: "#8b96a5", fontSize: "11.5px", marginBottom: "8px" } }, "停用 " + off + " · 引擎跳过 " + sk + " · 点一行切换"),
+          h("div", { style: { color: "#8b96a5", fontSize: "11.5px", marginBottom: "8px" } }, "停用 " + off + " · 引擎跳过 " + sk + " · 挤爆的 UI 面 " + crowded + " · 点一行切换"),
           rows.map(function (r) {
             return h("div", { key: r.name, onClick: function () { if (!busy) flip(r); }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
               h("span", { style: { width: "12px", color: r.disabled ? "#f85149" : "#3fb950" } }, r.disabled ? "×" : "·"),
               h("span", { style: { flex: 1, fontFamily: "ui-monospace,monospace" } }, r.name),
+              (r.ui && r.ui.length) ? h("span", { title: (r.ui || []).join(", "), style: { color: "#58a6ff", fontSize: "11px" } }, "ui" + r.ui.length) : null,
               r.engineSkipped ? h("span", { style: { color: "#d29922", fontSize: "11px" } }, "skip") : null);
           }));
       }
