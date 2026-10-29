@@ -52,6 +52,40 @@ selftest 覆盖 11 个夹具用例，其中两个专门盯这条路径。
 2. 再加「跳转到 gate-map 报告」的链接；
 3. 最后才加开关（写操作必须经 host 侧，且复用 `manage.mjs` 的同一套纯函数 `toggleInPatch`）。
 
+
+## 客户端契约：已经查到（2026-10-30）
+
+证据来自已安装的 `dsh-voice` 客户端 bundle（`lib/update-client.js`）：
+
+```js
+// 第 415-416 行：注册到浮层插槽，这正是「弹窗」需要的入口
+ctx.slots.inject('plugins.detail.section', () => ctx.slots.register({ name: 'plugins.detail.section', id: '...', order: 1000 }, NativeFooter));
+ctx.slots.inject('shell.overlay',       () => ctx.slots.register({ name: 'shell.overlay', id: '...' }, Reminder));
+```
+
+结论：
+
+| 之前的问题 | 答案 |
+|---|---|
+| 有没有浮层插槽 | **有**：`shell.overlay`（浮层）、`plugins.detail.section`（插件详情区） |
+| 客户端插件怎么注册 | `ctx.slots.inject(slotName, () => ctx.slots.register({name, id, order?}, Component))` |
+| 组件怎么写 | 直接 `React.createElement`，无构建步骤；宿主提供 React 全局 |
+| 入口格式 | `window.__ModuleLoader__.load(__wrap({id, factory}, {name, version, hasWorkbench}))`（打包器生成） |
+
+所以「弹窗」在技术上可行，形状是：一个 client bundle → `apply(ctx)` 里 `ctx.slots.inject('shell.overlay', ...)` → 渲染我们的插件清单。
+
+### 还剩的风险
+
+1. `__ModuleLoader__.load` 的包装格式是打包器生成的，手写要贴得很准；
+2. 弹窗读数据需要宿主侧接口（客户端拿不到文件系统）；写开关必须走 host；
+3. 客户端错误会砸整个界面 —— 必须先在 mini 上试，且能一键卸载。
+
+### 下一步（下一步才做）
+
+1. 复制 `dsh-voice/lib/update-client.js` 的包装结构，做一个**只读**最小 bundle（列出插件名 + 状态）；
+2. 在 mini 安装 → 重启 → 看 `shell.overlay` 是否出现（无 UI 也能从日志/截图判断）；
+3. 只读验证通过后，再考虑把 `manage.mjs` 的 `toggleInPatch` 通过 host RPC 接上。
+
 ## 明确不做的
 
 - 换 harness 的适配层：本工具是 DSH 形状的，另一套宿主需要重写适配而不是加开关。
