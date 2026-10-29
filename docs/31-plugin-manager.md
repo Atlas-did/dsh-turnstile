@@ -86,6 +86,50 @@ ctx.slots.inject('shell.overlay',       () => ctx.slots.register({ name: 'shell.
 2. 在 mini 安装 → 重启 → 看 `shell.overlay` 是否出现（无 UI 也能从日志/截图判断）；
 3. 只读验证通过后，再考虑把 `manage.mjs` 的 `toggleInPatch` 通过 host RPC 接上。
 
+
+## 第一次弹窗尝试：失败，已回滚（2026-10-30 00:10）
+
+按上面的契约写了最小只读 bundle（`research/turnstile-popup/`，22 条快照），装进 mini 后：
+
+```
+HARNESS
+Failed to load plugins
+turnstile-popup
+web boot: 1 entry did not activate
+turnstile-popup: failed
+```
+
+整页变成错误状态（桌宠还在渲染，说明宿主本身没崩，是**这一个 client 入口激活失败**）。
+quicktest 从 10/10 掉到 `new-conversation errors=4`。已回滚：`pnpm remove turnstile-popup`、
+从 bundles 里删掉，重启后 quicktest 恢复 **10/10**。
+
+### 目前知道的
+
+- 客户端入口失败会让**整个界面**报 failed —— 这是真实风险，不是理论风险；
+- 我在 bundle 里写的是朴素形式：
+
+```js
+window.__ModuleLoader__.load({ id: 'turnstile-popup', factory: (require) => ({ apply(ctx) { ... } }) });
+```
+
+  而 dsh-voice 实际用的是 **包装器**：`__stardustUpdatesWrap({ id, factory }, participant)`，
+  它返回 `{ ...definition, factory(require) { ...原 factory 结果 + apply 包装... } }`（第 224-230 行）。
+
+- 也就是说：`factory` 的返回对象、`apply` 的签名、以及 registration 的 id 规则，
+  都还没对齐；**猜一次就等于把界面弄挂一次**。
+
+### 下一次的正确做法
+
+1. **照抄一个能用的现成 bundle**（`dsh-voice/lib/update-client.js` 或 runtime 里 `dsh-api-job-controller/lib/client.js`），
+   只把内部组件换掉，先不改包装结构；
+2. 在 mini 上验证顺序：先确认 `apply` 被调用（打日志），再确认 `ctx.slots` 存在，最后才注册组件；
+3. 每次失败都必须能**一条命令回滚**（删 bundle + pnpm remove + 重启），本次已演练过。
+
+### 结论（写进目标状态）
+
+弹窗这件事现在是「**契约已知、第一次实现失败、可安全回滚**」。剩下的是对齐包装层，
+而不是设计问题。CLI 与数据层已完全可用，界面层是增量。
+
 ## 明确不做的
 
 - 换 harness 的适配层：本工具是 DSH 形状的，另一套宿主需要重写适配而不是加开关。
