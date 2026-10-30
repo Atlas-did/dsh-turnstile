@@ -20,6 +20,15 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
   return createServer(async (req, res) => {
     const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
     const json = (code, value) => { res.statusCode = code; res.setHeader('content-type', 'application/json; charset=utf-8'); res.end(JSON.stringify(value)); };
+    if (pathname === '/turnstile/sort-context.js') {
+      res.setHeader('content-type', 'text/javascript; charset=utf-8');
+      res.setHeader('cache-control', 'no-store');
+      const src = readFileSync(join(root, 'plugins', 'turnstile-popup', 'lib', 'sort-context.js'), 'utf8')
+        .replace(/\bexport\s+(function|const|class)/g, '$1')
+        .replace(/^if \(typeof window[\s\S]*$/m, '');
+      res.end(src + '\nwindow.TurnstileSort = { SORT_KEYS: SORT_KEYS, valueOf: valueOf, compareRows: compareRows, orderedRows: orderedRows };\n');
+      return;
+    }
     if (pathname === '/turnstile/console-designer.js') {
       if (req.method !== 'GET') return json(405, { error: 'method' });
       res.setHeader('content-type', 'text/javascript; charset=utf-8');

@@ -26,6 +26,7 @@
 </div>
 <footer class="statusbar"><span><i class="dot"></i><span id="connection">正在读取</span></span><span id="counts">0 / 0</span><span class="spacer"></span><span id="generated"></span></footer>
 </div>
+<script src="/turnstile/sort-context.js"></script>
 <script>
 'use strict';
 const $=(id)=>document.getElementById(id);
@@ -77,12 +78,10 @@ function overview(){
 }
 function checks(){const all=state.data.report?.checks||[];const list=all.filter(matches);$('main').append(pageHead('门禁检查','检查是 verdict 的账本；点击一行查看发现、证据和修复建议。'));if(!state.data.report){$('main').append(empty('没有报告。缺失报告不会被渲染成“检查通过”。'));setStatus(0,0);return;}$('main').append(panel('检查明细 · '+list.length+' / '+all.length,list.length?table(['检查','结果','耗时','发现'],list.map(c=>row([node('span',{class:'mono',text:c.name}),chip(c.ok?'PASS':'CHECK',c.ok?'good':'warn'),(c.ms??'—')+' ms',String((c.findings||[]).length)],()=>select({title:c.name,kind:'check',properties:{检查:c.name,结果:c.ok?'通过':'需检查',耗时:(c.ms??'未记录')+' ms',发现数:(c.findings||[]).length},findings:c.findings||[]}),'check-'+c.name))):empty('没有匹配的检查。')));setStatus(list.length,all.length);}
 function plugins(){
-  const key=state.sort.key,dir=state.sort.dir;
-  const all=state.data.plugins.filter(p=>(state.pluginStatus==='all'||(state.pluginStatus==='disabled'?p.disabled:state.pluginStatus==='missing'?p.missing:!p.disabled&&!p.missing))&&matches(p)).sort((a,b)=>{
-    const av=key==='name'?a.name:key==='version'?a.version:key==='status'?(a.missing?'missing':a.disabled?'off':'on'):key==='rows'?a.rows.length:a.ui.length;
-    const bv=key==='name'?b.name:key==='version'?b.version:key==='status'?(b.missing?'missing':b.disabled?'off':'on'):key==='rows'?b.rows.length:b.ui.length;
-    return (typeof av==='number'?av-bv:String(av).localeCompare(String(bv)))*dir;
-  });
+  const filtered=state.data.plugins.filter(p=>(state.pluginStatus==='all'||(state.pluginStatus==='disabled'?p.disabled:state.pluginStatus==='missing'?p.missing:!p.disabled&&!p.missing))&&matches(p));
+  // A sort context, not an inline comparator: ties resolve on name so the same context always
+  // yields the same order, whatever order the data arrived in.
+  const all=(window.TurnstileSort?window.TurnstileSort.orderedRows(filtered,state.sort):filtered);
   $('main').append(pageHead('插件','点击表头排序；右键或 Del 进入同一个 patch 预览命令。'));if(state.notice)$('main').append(node('div',{class:'notice',text:state.notice}));$('main').append(deltaStrip());
   const selectEl=node('select',{class:'select','data-testid':'plugin-status',onchange:e=>{state.pluginStatus=e.target.value;render();}},[['all','全部状态'],['enabled','配置启用'],['disabled','已停用'],['missing','未安装']].map(([v,t])=>node('option',{value:v,text:t,selected:state.pluginStatus===v?'selected':null})));
   $('main').append(node('div',{class:'toolbar'},[selectEl,node('span',{class:'hint',text:'青色=新增；黄色=状态变化；蓝色=位置变化。'})]));

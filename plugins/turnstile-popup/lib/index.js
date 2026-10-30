@@ -291,6 +291,22 @@ export function apply(ctx, config) {
 
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
+    path: "/turnstile/sort-context.js",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      const here = dirname(fileURLToPath(import.meta.url));
+      // The module is ESM for the tests; the page loads it as a classic script, so drop the
+      // `export` keywords and attach the same API to window.
+      const src = readFileSync(join(here, "sort-context.js"), "utf8")
+        .replace(/\bexport\s+(function|const|class)/g, "$1")
+        .replace(/^if \(typeof window[\s\S]*$/m, "");
+      res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
+      res.end(src + "\nwindow.TurnstileSort = { SORT_KEYS: SORT_KEYS, valueOf: valueOf, compareRows: compareRows, orderedRows: orderedRows };\n");
+    },
+  }), "turnstile: GET /turnstile/sort-context.js");
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
     path: "/turnstile/console-designer.js",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
