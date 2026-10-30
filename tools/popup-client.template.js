@@ -74,6 +74,8 @@ window.__ModuleLoader__.load({
         var tab = React.useState("概览"), active = tab[0], setActive = tab[1];
         var data = React.useState({ rows: [], occ: null, err: "", delta: null }), d = data[0], setData = data[1];
         var selRow = React.useState(null), chosen = selRow[0], setChosen = selRow[1];
+        var qv = React.useState(""), q = qv[0], setQ = qv[1];
+        function hit(text) { return !q || String(text || "").toLowerCase().indexOf(q.toLowerCase()) !== -1; }
         var act = React.useState(null), activity = act[0], setActivity = act[1];
         React.useEffect(function () {
           Promise.all([api("plugins").catch(function () { return null; }), api("occupancy").catch(function () { return null; }), api("activity").catch(function () { return null; })])
@@ -116,7 +118,7 @@ window.__ModuleLoader__.load({
         var content = null;
         if (active === "插件") {
           content = table([{ title: "插件" }, { title: "状态" }, { title: "UI 面", num: true }, { title: "位置" }],
-            rows.map(function (r) {
+            rows.filter(function (r) { return hit(r.name) || hit(r.row) || (r.ui || []).some(hit); }).map(function (r) {
               return h("tr", { key: r.name, "data-testid": "srow-" + r.name, onClick: function () { setChosen(chosen && chosen.name === r.name ? null : r); }, style: { cursor: "pointer", background: chosen && chosen.name === r.name ? "#eff6ff" : "transparent" } },
                 cell(h("span", null, deltaMark(r.name) + (r.disabled ? "× " : "· ") + r.name), { fontFamily: "ui-monospace,monospace", color: deltaMark(r.name) === "＋" ? "#0969da" : undefined }),
                 cell(r.disabled ? "停用" : (r.engineSkipped ? "引擎跳过" : "启用"), { color: r.disabled ? "#cf222e" : (r.engineSkipped ? "#9a6700" : "#1a7f37") }),
@@ -129,7 +131,7 @@ window.__ModuleLoader__.load({
             }));
         } else if (active === "占用") {
           content = table([{ title: "UI 面" }, { title: "插件数", num: true }, { title: "硬编码", num: true }, { title: "插件" }],
-            surfaces.map(function (s) {
+            surfaces.filter(function (s) { return hit(s.surface) || (s.plugins || []).some(hit); }).map(function (s) {
               return h("tr", { key: s.surface },
                 cell(s.surface, { fontFamily: "ui-monospace,monospace" }),
                 cell(s.count, { textAlign: "right" }),
@@ -176,7 +178,10 @@ window.__ModuleLoader__.load({
               return h("div", { key: p, "data-testid": "page-" + p, onClick: function () { setActive(p); }, style: { padding: "6px 14px", fontSize: "13px", cursor: "pointer", color: active === p ? "#1f6feb" : "#374151", fontWeight: active === p ? "600" : "400", background: active === p ? "#eff6ff" : "transparent" } }, p);
             })),
           h("div", { "data-testid": "settings-body", style: { padding: "14px 18px", fontSize: "13px", color: "#374151", overflow: "auto", maxHeight: "62vh" } },
-            h("div", { style: { fontSize: "14px", fontWeight: "600", marginBottom: "10px" } }, active),
+            h("div", { style: { display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" } },
+              h("span", { style: { fontSize: "14px", fontWeight: "600" } }, active),
+              h("input", { "data-testid": "settings-filter", value: q, placeholder: "筛选插件 / UI 面", onChange: function (e) { setQ(e.target.value); },
+                style: { marginLeft: "auto", width: "200px", padding: "3px 8px", borderRadius: "6px", border: "1px solid #d0d7de", fontSize: "12px" } })),
             d.err ? h("div", { style: { color: "#cf222e" } }, "读取失败: " + d.err) : null,
             deltaLine ? h("div", { "data-testid": "delta-line", style: { fontSize: "12px", color: "#57606a", marginBottom: "8px" } }, deltaLine) : null,
             detail,
