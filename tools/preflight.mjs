@@ -102,6 +102,28 @@ const results = await Promise.all(selected.map(one));
 const blocking = results.filter((r) => !r.ok && !selected.find((c) => c.name === r.name)?.advisory);
 const failed = blocking;
 
+// Machine-readable report for panels/CI. Written unless --no-report.
+if (!isFlag('--no-report')) {
+  const reportPath = (() => { const i = argv.indexOf('--report'); return i >= 0 ? argv[i + 1] : join(root, 'state', 'report-' + (dir.split(/[\\/]/).pop()) + '.json'); })();
+  try {
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(join(root, 'state'), { recursive: true });
+    writeFileSync(reportPath, JSON.stringify({
+      profile: dir,
+      generatedAt: new Date().toISOString(),
+      runtimeTimeoutMs: timeout,
+      checks: results.map((r) => ({
+        name: r.name, ok: r.ok, exit: r.exit, ms: r.ms, timedOut: Boolean(r.timedOut),
+        structured: r.structured, findings: r.findings,
+        summary: r.structured ? '' : (r.out.trim().split('\n').pop() || '').slice(0, 200),
+      })),
+      blocking: blocking.map((r) => r.name),
+      result: failed.length ? 'blocked' : 'clear',
+      exit: failed.length ? 1 : 0,
+    }, null, 2) + '\n');
+  } catch { /* a report is a convenience, never a gate */ }
+}
+
 if (isFlag('--json')) {
   console.log(JSON.stringify({
     profile: dir,

@@ -47,6 +47,10 @@ check('manage menu toggles without writing', /\[ \]/.test(r.out) && !/已写入/
 r = run('tools/conflict.mjs', join(root, 'tests/conflict-fixture'));
 check('conflict ignores commented ctx writes', r.code === 0 && !/ctx\.fs/.test(r.out) && /ctx evidence: ast/.test(r.out), 'exit=' + r.code);
 
+// Watch: a crash log's service table must be attributed to a named root cause.
+r = run('tools/watch.mjs', join(root, 'tests/watch-fixture/crash-host.log'));
+check('watch names the crash root cause', r.code === 1 && /webRuntime/.test(r.out) && /ROOT CAUSE/.test(r.out), 'exit=' + r.code);
+
 // Fix planner: a dry run must name the alias and write nothing.
 r = run('tools/fix.mjs', join(root, 'tests/risk-fixture'));
 check('fix plans an npm alias, dry', r.code === 4 && /npm:@deepseek-ai\/schemastery/.test(r.out), 'exit=' + r.code);
@@ -86,7 +90,7 @@ let skipped = 0, envRun = 0;
 
 // A case whose fixture is missing must FAIL, not quietly pass because the tool errored out.
 const FIXTURES = ['ast-fixture', 'conflict-fixture', 'gate-fixture', 'import-fixture',
-  'manage-fixture', 'probe-fixture', 'risk-fixture', 'scan-fixture', 'ui-fixture'];
+  'manage-fixture', 'probe-fixture', 'risk-fixture', 'scan-fixture', 'ui-fixture', 'watch-fixture'];
 for (const f of FIXTURES) {
   check('fixture exists: ' + f, existsSync(join(root, 'tests', f)), 'tests/' + f);
 }
