@@ -19,3 +19,6 @@ shots/
 .env
 .env.*
 !/.env.example
+# fixtures may contain a fake DSH home — that is test data, not a real home
+!tests/**/home/
+!tests/**/home/**

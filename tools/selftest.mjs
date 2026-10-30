@@ -156,7 +156,7 @@ check('promote is a dry run by default', /DRY RUN/.test(r.out), 'exit=' + r.code
 }
 
 // E2E must degrade to exit 3 (coverage incomplete) when there is no panel, never exit 0.
-r = run('tools/e2e-panel.mjs', '--log', join(root, 'tests/e2e-fixture/mini.log'), '--patch', join(root, 'tests/e2e-fixture/cordis.patch.yml'), '--row', 'dsh-talk', '--port', '9');
+r = run('tools/e2e-panel.mjs', '--log', join(root, 'tests/e2e-fixture/mini.txt'), '--patch', join(root, 'tests/e2e-fixture/cordis.patch.yml'), '--row', 'dsh-talk', '--port', '9');
 check('e2e reports incomplete coverage, not success', r.code === 3, 'exit=' + r.code);
 
 // Setup wizard: a plan is printed and nothing is written without --yes.
@@ -167,8 +167,9 @@ check('setup prints a five-step plan', r.code === 0 && /"deps"/.test(r.out) && /
 // They are skipped (and reported as skipped, not passed) everywhere else.
 
 // A case whose fixture is missing must FAIL, not quietly pass because the tool errored out.
-const FIXTURES = ['ast-fixture', 'conflict-fixture', 'gate-fixture', 'import-fixture',
-  'manage-fixture', 'probe-fixture', 'risk-fixture', 'scan-fixture', 'slot-fixture', 'ui-fixture', 'watch-fixture'];
+const FIXTURES = ['anchor-fixture', 'ast-fixture', 'config-fixture', 'conflict-fixture', 'e2e-fixture',
+  'fuse-fixture', 'gate-fixture', 'home-fixture', 'import-fixture', 'manage-fixture', 'probe-fixture',
+  'risk-fixture', 'scan-fixture', 'slot-fixture', 'supply-chain-fixture', 'ui-fixture', 'watch-fixture'];
 for (const f of FIXTURES) {
   check('fixture exists: ' + f, existsSync(join(root, 'tests', f)), 'tests/' + f);
 }
