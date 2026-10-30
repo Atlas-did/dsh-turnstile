@@ -1,0 +1,5 @@
+- insert:
+    - id: demo-anchor-widget
+      name: demo-anchor-widget
+      config:
+        anchor: bottom-right

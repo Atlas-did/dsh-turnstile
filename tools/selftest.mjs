@@ -1,7 +1,7 @@
 // Self-test for the gate itself: every scanner must still catch its fixture.
 // usage: node tools/selftest.mjs
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -123,6 +123,21 @@ if (process.env.DSH_RUNTIME_NODE_MODULES || existsSync(join(root, 'node_modules/
 } else {
   skipped++;
   console.log('  SKIP  fix plans an npm alias, dry   (no runtime node_modules to resolve the official version)');
+}
+
+// Lab loop: install adds rows, uninstall removes them again (on a temp copy, never the live profile).
+{
+  const tmp = join(root, 'tests/.lab-tmp');
+  mkdirSync(tmp, { recursive: true });
+  writeFileSync(join(tmp, 'package.json'), JSON.stringify({ name: 'lab-tmp', private: true, dependencies: {}, dsh: { profile: { bundles: [] } } }, null, 2));
+  writeFileSync(join(tmp, 'cordis.patch.yml'), '[]\n');
+  r = run('tools/lab.mjs', tmp, '--install', join(root, 'plugins/demo-anchor-widget'), '--anchor', 'top-left');
+  const installed = r.code === 0 && JSON.parse(readFileSync(join(tmp, 'package.json'), 'utf8')).dsh.profile.bundles.indexOf('demo-anchor-widget') !== -1;
+  check('lab install adds the bundle and a row', installed, 'exit=' + r.code);
+  r = run('tools/lab.mjs', tmp, '--uninstall', 'demo-anchor-widget');
+  const gone = r.code === 0 && JSON.parse(readFileSync(join(tmp, 'package.json'), 'utf8')).dsh.profile.bundles.indexOf('demo-anchor-widget') === -1;
+  check('lab uninstall removes it again', gone, 'exit=' + r.code);
+  rmSync(tmp, { recursive: true, force: true });
 }
 
 // E2E must degrade to exit 3 (coverage incomplete) when there is no panel, never exit 0.
