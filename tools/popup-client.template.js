@@ -180,6 +180,7 @@ window.__ModuleLoader__.load({
           h("div", { "data-testid": "settings-body", style: { padding: "14px 18px", fontSize: "13px", color: "#374151", overflow: "auto", maxHeight: "62vh" } },
             h("div", { style: { display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" } },
               h("span", { style: { fontSize: "14px", fontWeight: "600" } }, active),
+              h("a", { "data-testid": "open-console", href: "/turnstile/?token=" + encodeURIComponent((function () { try { return new URLSearchParams(window.location.search).get("token") || ""; } catch (e) { return ""; } })()), target: "_blank", rel: "noopener", style: { fontSize: "12px", marginLeft: "12px", whiteSpace: "nowrap" } }, "新窗口打开"),
               h("input", { "data-testid": "settings-filter", value: q, placeholder: "筛选插件 / UI 面", onChange: function (e) { setQ(e.target.value); },
                 style: { marginLeft: "auto", width: "200px", padding: "3px 8px", borderRadius: "6px", border: "1px solid #d0d7de", fontSize: "12px" } })),
             d.err ? h("div", { style: { color: "#cf222e" } }, "读取失败: " + d.err) : null,
