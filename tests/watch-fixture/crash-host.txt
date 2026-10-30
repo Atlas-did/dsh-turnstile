@@ -1,0 +1,50 @@
+time: 2026-10-17T13:19:45.612Z
+source: host
+phase: startup
+app: @deepseek-ai/dsh-desktop 0.2.1-rc.2
+platform: win32 x64
+electron: 44.7.0
+node: 24.21.0
+locale: en
+shell pid: 41644
+
+--- error ---
+DesktopHostFatalError: dsh: startup failed: 1 required plugin did not activate
+
+Plugins waiting for services (9):
+  Plugin                 Missing services
+  connection (required)  webRuntime
+  session-log-download   connection
+  open-in-app            connection
+  directory-picker       connection
+  session-controller     fileUploads
+  schedule               sessionController
+  file-upload            connection
+  ui-deliverables        connection, sessionController
+  orb-host               connection, sessionController
+    at ChildProcess.<anonymous> (file:///D:/Software_download_link/softwaare/Programs/DeepSeek%20Harness/resources/app.asar/lib/main.js:3831:49)
+    at ChildProcess.emit (node:events:514:28)
+    at emit (node:internal/child_process:989:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+--- host diagnostic (as reported by the Host process) ---
+StartupError: dsh: startup failed: 1 required plugin did not activate
+
+Plugins waiting for services (9):
+  Plugin                 Missing services
+  connection (required)  webRuntime
+  session-log-download   connection
+  open-in-app            connection
+  directory-picker       connection
+  session-controller     fileUploads
+  schedule               sessionController
+  file-upload            connection
+  ui-deliverables        connection, sessionController
+  orb-host               connection, sessionController
+    at auditStartupEntries (file:///D:/Software_download_link/softwaare/Programs/DeepSeek%20Harness/resources/app.asar/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:4467:31)
+    at async boot (file:///D:/Software_download_link/softwaare/Programs/DeepSeek%20Harness/resources/app.asar/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:4541:3)
+    at async runProfile (file:///D:/Software_download_link/softwaare/Programs/DeepSeek%20Harness/resources/app.asar/dsh/node_modules/@deepseek-ai/dsh/lib/profile-boot-C14i-8IN.js:302:15)
+    at async main (file:///D:/Software_download_link/softwaare/Programs/DeepSeek%20Harness/resources/app.asar/dsh/node_modules/@deepseek-ai/dsh-desktop-host/lib/index.js:328:18)
+
+--- renderer console (error level, oldest first) ---
+(no error-level renderer console output was captured)

@@ -53,7 +53,7 @@ r = run('tools/slot-scan.mjs', join(root, 'tests/slot-fixture'));
 check('slot scan flags hardcoded positions', r.code === 0 && /HARDCODED\s+plug-ui\b/.test(r.out) && /configurable\s+plug-ui2/.test(r.out), 'exit=' + r.code);
 
 // Watch: a crash log's service table must be attributed to a named root cause.
-r = run('tools/watch.mjs', join(root, 'tests/watch-fixture/crash-host.log'));
+r = run('tools/watch.mjs', join(root, 'tests/watch-fixture/crash-host.txt'));
 check('watch names the crash root cause', r.code === 1 && /webRuntime/.test(r.out) && /ROOT CAUSE/.test(r.out), 'exit=' + r.code);
 
 // Four conflict surfaces that used to be unchecked: port / file / css / shortcut.
@@ -104,6 +104,22 @@ const FIXTURES = ['ast-fixture', 'conflict-fixture', 'gate-fixture', 'import-fix
   'manage-fixture', 'probe-fixture', 'risk-fixture', 'scan-fixture', 'slot-fixture', 'ui-fixture', 'watch-fixture'];
 for (const f of FIXTURES) {
   check('fixture exists: ' + f, existsSync(join(root, 'tests', f)), 'tests/' + f);
+}
+
+// Existence is not enough: a fixture that is not tracked by git is invisible to CI
+// (this is exactly how tests/watch-fixture/crash-host.log went missing once).
+let tracked = null;
+try {
+  tracked = execFileSync('git', ['ls-files', '--error-unmatch', 'tests'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+} catch { tracked = null; }
+if (tracked !== null) {
+  const listed = execFileSync('git', ['ls-files', 'tests'], { cwd: root, encoding: 'utf8' });
+  for (const f of FIXTURES) {
+    check('fixture tracked by git: ' + f, listed.indexOf('tests/' + f + '/') !== -1, 'tests/' + f);
+  }
+} else {
+  skipped += FIXTURES.length;
+  console.log('  SKIP  fixtures tracked by git      (not a git checkout)');
 }
 const hasDesk = existsSync(DESK), hasMini = existsSync(MINI);
 if (hasDesk) {
