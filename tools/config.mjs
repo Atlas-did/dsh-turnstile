@@ -22,6 +22,18 @@ export const DSH_BIN = resolveDshBin();
 export function profileDir(name, home = DSH_HOME) { return join(home, 'profiles', name); }
 
 /**
+ * Where tools write their own state (reports, history, maps).
+ * A globally installed package lives in a read-only tree, so state belongs next to the user's
+ * DSH home first; the package directory is only a fallback for a bare git clone.
+ */
+export function stateDir() {
+  if (process.env.DSH_TURNSTILE_STATE) return process.env.DSH_TURNSTILE_STATE;
+  const home = process.env.DSH_HOME;
+  if (home) return join(home, 'turnstile-state');
+  return join(ROOT, 'state');
+}
+
+/**
  * Resolve a dependency from the repo first, then from a nearby DSH install.
  * Lets the tools run straight after `git clone` without any install step.
  */

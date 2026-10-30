@@ -96,6 +96,10 @@ if (process.env.DSH_RUNTIME_NODE_MODULES || existsSync(join(root, 'node_modules/
   console.log('  SKIP  fix plans an npm alias, dry   (no runtime node_modules to resolve the official version)');
 }
 
+// Setup wizard: a plan is printed and nothing is written without --yes.
+r = run('tools/setup.mjs', '--home', join(root, 'tests/home-fixture/home'), '--json');
+check('setup prints a five-step plan', r.code === 0 && /"deps"/.test(r.out) && /"mode"/.test(r.out), 'exit=' + r.code);
+
 // Environment-specific cases: only meaningful on a machine that actually has these profiles.
 // They are skipped (and reported as skipped, not passed) everywhere else.
 
