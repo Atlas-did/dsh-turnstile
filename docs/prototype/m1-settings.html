@@ -1,0 +1,52 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>Turnstile 插件体检 — 设置页原型</title>
+<style>
+*{box-sizing:border-box} body{margin:0;font:12px/1.5 ui-sans-serif,system-ui,'PingFang SC','Microsoft YaHei';color:#1f2328;background:#f6f7f9}
+.app{display:grid;grid-template-rows:auto 1fr auto;height:100vh}
+.bar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border-bottom:1px solid #d8dee4}
+.bar h1{font-size:13px;margin:0 12px 0 0;font-weight:600}
+.btn{font:inherit;padding:4px 10px;border:1px solid #d0d7de;border-radius:6px;background:#f6f8fa;cursor:pointer}
+.btn.primary{background:#1f6feb;border-color:#1f6feb;color:#fff}
+.filter{margin-left:auto;display:flex;align-items:center;gap:6px}
+.filter input{width:220px;padding:4px 8px;border:1px solid #d0d7de;border-radius:6px;font:inherit}
+.main{display:grid;grid-template-columns:180px 1fr;min-height:0}
+.nav{background:#fff;border-right:1px solid #d8dee4;padding:8px 0}
+.nav a{display:block;padding:6px 14px;color:#24292f;text-decoration:none;font-size:12.5px}
+.nav a.on{background:#eef4ff;border-left:3px solid #1f6feb;padding-left:11px;font-weight:600}
+.content{display:grid;grid-template-rows:1fr 190px;min-height:0;background:#fff}
+.tablewrap{overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:5px 10px;border-bottom:1px solid #eaeef2;text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:#f6f8fa;font-weight:600;color:#57606a;border-bottom:1px solid #d8dee4}
+td.num{text-align:right;font-variant-numeric:tabular-nums;font-family:ui-monospace,monospace}
+tr.sel td{background:#eef4ff}
+tr.off td:first-child::before{content:'×';color:#cf222e;margin-right:6px;font-weight:700}
+tr.on td:first-child::before{content:'·';color:#1a7f37;margin-right:6px;font-weight:700}
+.tag{font-size:11px;padding:0 5px;border:1px solid #d0d7de;border-radius:4px;color:#57606a}
+.tag.bad{color:#cf222e;border-color:#ffcecb;background:#fff5f5}
+.tag.warn{color:#9a6700;border-color:#f5e3a3;background:#fffbeb}
+.insp{border-top:1px solid #d8dee4;overflow:auto;padding:10px 14px}
+.insp h2{font-size:12px;margin:0 0 8px;color:#57606a;font-weight:600}
+.grid{display:grid;grid-template-columns:120px 1fr;gap:4px 14px;font-size:12px}
+.grid .k{color:#57606a} .grid .v{font-family:ui-monospace,monospace;color:#1f2328}
+.status{display:flex;gap:16px;padding:5px 12px;background:#f6f8fa;border-top:1px solid #d8dee4;color:#57606a;font-size:11.5px}
+</style></head><body><div class="app">
+<div class="bar"><h1>插件体检</h1><button class="btn primary">重新体检</button><button class="btn">打开架构图</button><button class="btn">导出报告</button>
+<div class="filter"><span>筛选</span><input placeholder="插件名 / UI 面 / 状态"></div></div>
+<div class="main"><nav class="nav"><a class="on" href="#">概览</a><a href="#">架构图</a><a href="#">占用</a><a href="#">插件</a><a href="#">控制台</a></nav>
+<div class="content"><div class="tablewrap"><table><thead><tr><th>插件</th><th>版本</th><th>状态</th><th class="num">UI 面</th><th>位置</th><th>行 id</th></tr></thead><tbody>
+<tr class="on sel"><td>dsh-univer-office</td><td>1.2.0</td><td><span class="tag">启用</span></td><td class="num">6</td><td><span class="tag warn">硬编码</span></td><td>univer-office</td></tr>
+<tr class="off"><td>dsh-context</td><td>0.77.0</td><td><span class="tag bad">停用</span></td><td class="num">3</td><td><span class="tag warn">硬编码</span></td><td>dsh-context</td></tr>
+<tr class="on"><td>dsh-genui</td><td>0.3.1</td><td><span class="tag">启用</span></td><td class="num">4</td><td><span class="tag warn">硬编码</span></td><td>genui</td></tr>
+<tr class="on"><td>dsh-mimir</td><td>0.9.4</td><td><span class="tag">启用</span></td><td class="num">4</td><td><span class="tag warn">硬编码</span></td><td>mimir</td></tr>
+<tr class="on"><td>dsh-talk</td><td>0.3.15</td><td><span class="tag bad">引擎跳过</span></td><td class="num">1</td><td><span class="tag">bottom-right</span></td><td>talk</td></tr>
+<tr class="on"><td>turnstile-popup</td><td>0.0.3</td><td><span class="tag">启用</span></td><td class="num">3</td><td><span class="tag warn">硬编码</span></td><td>turnstile-popup</td></tr>
+</tbody></table></div>
+<div class="insp"><h2>dsh-univer-office — 属性</h2><div class="grid">
+<div class="k">行 id</div><div class="v">univer-office</div>
+<div class="k">状态</div><div class="v">启用（未被引擎跳过）</div>
+<div class="k">UI 面</div><div class="v">ui-chat, ui-conversation, ui-renderer, ui-settings, ui-session, ui-settings-plugins</div>
+<div class="k">位置</div><div class="v">未声明 anchor（硬编码，改配置无效）</div>
+<div class="k">建议</div><div class="v">向作者提 issue：暴露 slot/anchor/order</div>
+</div></div></div></div>
+<div class="status"><span>26 个插件</span><span>停用 2</span><span>引擎跳过 1</span><span>11 处争用</span><span>闸门 12 项 · clear</span><span style="margin-left:auto">最近体检 20:07 · 8.8s</span></div>
+</div></body></html>
