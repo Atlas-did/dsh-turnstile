@@ -159,6 +159,7 @@ try {
     ok('locate action enters the exact plugin architecture node', (await text('.arch-current')).includes('plug-alpha'));
     await click('[data-testid="inspector-properties"]');
     ok('property tab switches back to values', (await text('#inspector')).includes('1.4.0'));
+    ok('properties come from the model (row id present)', (await text('#inspector')).includes('行 id'));
 
 
     await click('[data-testid="breadcrumb-profile"]');
