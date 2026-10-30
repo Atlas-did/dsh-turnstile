@@ -79,6 +79,11 @@ console.log('snapshot: ' + snapPath);
 console.log('  pid ' + snap.pid + '  entries ' + (snap.total || entries.length) + '  active ' + (snap.active || activeNames.size));
 if (snap.appliedAtUptimeSeconds != null) console.log('  probe applied ' + snap.appliedAtUptimeSeconds + 's after process start');
 if (snap.bootActive != null) console.log('  active when probe applied: ' + snap.bootActive + ' -> now ' + (snap.active || activeNames.size));
+if ((snap.providedAtRuntime || []).length) {
+  console.log('');
+  console.log('services provided at runtime (' + snap.providedAtRuntime.length + '):');
+  for (const p of snap.providedAtRuntime.slice(0, 20)) console.log('  ' + String(p.atUptime).padStart(7) + 's  ' + p.service);
+}
 if ((snap.activatedSinceBoot || []).length) {
   console.log('  deferred activations since boot: ' + snap.activatedSinceBoot.length + ' (' + snap.activatedSinceBoot.slice(0, 5).join(', ') + ')');
 }
