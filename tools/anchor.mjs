@@ -18,9 +18,37 @@ for (let i = 0; i < argv.length; i++) {
 }
 const pkgName = val('--package');
 const anchor = val('--anchor');
-if (!dir || !pkgName || !anchor) { console.error('usage: node tools/anchor.mjs <profileDir> --package <pkg> --anchor <value> [--apply]'); process.exit(2); }
+const suggestMode = argv.includes('--suggest');
+if (!dir || !pkgName || (!anchor && !suggestMode)) {
+  console.error('usage: node tools/anchor.mjs <profileDir> --package <pkg> --anchor <value> [--apply]');
+  console.error('       node tools/anchor.mjs <profileDir> --package <pkg> --suggest');
+  process.exit(2);
+}
 const clear = anchor === 'clear' || anchor === 'none';
-if (!clear && !isValidAnchor(anchor)) { console.error('anchor must be 1-40 chars of [A-Za-z0-9_.:-] (or "clear")'); process.exit(2); }
+if (!suggestMode && !clear && !isValidAnchor(anchor)) { console.error('anchor must be 1-40 chars of [A-Za-z0-9_.:-] (or "clear")'); process.exit(2); }
+
+// --suggest: collect anchor values the plugin itself mentions, so the UI can offer real
+// choices without us inventing a fixed list.
+if (suggestMode) {
+  const base = join(dir, 'node_modules', pkgName);
+  const found = new Set();
+  // Docs may write a bare token; code must quote it. Otherwise `anchor = current.seq` looks
+  // like an anchor value, which is exactly the kind of false suggestion that erodes trust.
+  const scan = (p, quotedOnly) => {
+    try {
+      const t = readFileSync(p, 'utf8');
+      const quoted = /anchor\s*[:=]\s*['\"]([A-Za-z0-9_.:-]{2,40})['\"]/g;
+      const bare = /anchor\s*[:=]\s*([A-Za-z][A-Za-z0-9_-]{1,39})\b/g;
+      let m;
+      while ((m = quoted.exec(t))) found.add(m[1]);
+      if (!quotedOnly) while ((m = bare.exec(t))) if (m[1].indexOf('.') === -1) found.add(m[1]);
+    } catch { /* ignore */ }
+  };
+  for (const rel of ['README.md', 'readme.md', 'cordis.patch.yml', 'package.json']) scan(join(base, rel), false);
+  scan(join(base, 'lib/index.js'), true);
+  console.log(JSON.stringify({ package: pkgName, suggestions: [...found].sort() }, null, 2));
+  process.exit(0);
+}
 
 const patchPath = join(dir, 'cordis.patch.yml');
 if (!existsSync(patchPath)) { console.error('no cordis.patch.yml in ' + dir); process.exit(2); }

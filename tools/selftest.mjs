@@ -83,6 +83,10 @@ check('anchor accepts a custom token', r.code === 0 && /anchor: bottom-center/.t
 r = run('tools/anchor.mjs', join(root, 'tests/anchor-fixture'), '--package', 'plug-anchor', '--anchor', 'bad value!');
 check('anchor refuses a YAML-breaking value', r.code === 2, 'exit=' + r.code);
 
+// Suggestions come from the plugin's own docs, never from a fixed list we invent.
+r = run('tools/anchor.mjs', join(root, 'tests/anchor-fixture'), '--package', 'plug-anchor', '--suggest');
+check('anchor suggests what the plugin documents', r.code === 0 && /bottom-right/.test(r.out), 'exit=' + r.code);
+
 // Occupancy: two plugins on one surface, one of them hardcoded, must be flagged contested.
 r = run('tools/occupancy.mjs', join(root, 'tests/slot-fixture'));
 check('occupancy flags the contested corner', r.code === 0 && /!\s+ui-settings/.test(r.out), 'exit=' + r.code);

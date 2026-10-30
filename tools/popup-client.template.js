@@ -67,6 +67,11 @@ window.__ModuleLoader__.load({
             });
           });
         }
+        function loadAnchorOptions(row) {
+          api("anchor-options?package=" + encodeURIComponent(row.name)).then(function (d) {
+            setPicked(function (cur) { return cur && cur.name === row.name ? Object.assign({}, cur, { anchorOptions: d.suggestions || [] }) : cur; });
+          }).catch(function () {});
+        }
         function setAnchor(row, anchor) {
           setBusy(row.name);
           api("anchor", {
@@ -104,7 +109,7 @@ window.__ModuleLoader__.load({
                 return p ? " · 硬编码位置 " + (p.findings || []).length : "";
               })()) : null,
           rows.map(function (r) {
-            return h("div", { key: r.name, "data-testid": "row-" + r.name, onClick: function () { setPicked(picked && picked.name === r.name ? null : r); var el = document.querySelector('[data-testid=\"panel\"]'); if (el) el.scrollTop = 0; }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
+            return h("div", { key: r.name, "data-testid": "row-" + r.name, onClick: function () { var same = picked && picked.name === r.name; setPicked(same ? null : r); if (!same) loadAnchorOptions(r); var el = document.querySelector('[data-testid=\"panel\"]'); if (el) el.scrollTop = 0; }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
               h("span", { style: { width: "12px", color: r.disabled ? "#f85149" : "#3fb950" } }, r.disabled ? "×" : "·"),
               h("span", { style: { flex: 1, fontFamily: "ui-monospace,monospace" } }, r.name),
               (r.ui && r.ui.length) ? h("span", { title: (r.ui || []).join(", "), style: { color: "#58a6ff", fontSize: "11px" } }, "ui" + r.ui.length) : null,
@@ -146,11 +151,14 @@ window.__ModuleLoader__.load({
                 h("span", null, "位置:"),
                 h("input", {
                   defaultValue: cur || "",
+                  list: "anchor-opts-" + picked.name.replace(/[^\w-]/g, "_"),
                   placeholder: "例如 bottom-right",
                   disabled: Boolean(busy),
                   onKeyDown: function (e) { if (e.key === "Enter") setAnchor(picked, e.target.value.trim()); },
                   style: { flex: 1, minWidth: 0, background: "#161b22", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "6px", fontSize: "11.5px", padding: "1px 5px" }
                 }),
+                h("datalist", { id: "anchor-opts-" + picked.name.replace(/[^\w-]/g, "_") },
+                  (picked.anchorOptions || []).map(function (a) { return h("option", { key: a, value: a }); })),
                 h("button", { onClick: function (e) { var v = e.target.parentNode.querySelector("input"); setAnchor(picked, v.value.trim()); },
                   style: { padding: "1px 6px", borderRadius: "6px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "11.5px" } }, "设"),
                 h("button", { onClick: function () { setAnchor(picked, ""); },
