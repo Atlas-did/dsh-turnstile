@@ -100,6 +100,14 @@
       : 'node tools/anchor.mjs ' + quote(dir) + ' --package ' + quote(op.package) + ' --anchor ' + quote(op.anchor || 'clear') + ' --apply').join('\n') || '# 没有命令';
   }
   function diffCode() {
+    // Classification lives in lib/diff-state.js (unit tested); this function only formats it.
+    const D = window.TurnstileDiff;
+    if (D && D.classifyDiff) {
+      const c = D.classifyDiff(ds.preview?.before || '', ds.preview?.after || '');
+      if (c.tooBig) return '文件较大，请使用 Patch YAML 标签查看完整生成结果。';
+      ds.diffSummary = c.summary;
+      return c.lines.map((l) => l.marker + ' ' + l.text).join('\n');
+    }
     const a = (ds.preview?.before || '').split('\n'), b = (ds.preview?.after || '').split('\n');
     if (a.length * b.length > 160000) return '文件较大，请使用 Patch YAML 标签查看完整生成结果。';
     const dp = Array.from({ length: a.length + 1 }, () => new Uint16Array(b.length + 1));

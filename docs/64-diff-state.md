@@ -72,3 +72,28 @@ designer e2e  29/29
 selftest      67 passed / 6 skipped
 package tests 8 + 5 + 7 + 7 + 7 + 8
 ```
+## Update: the designer diff now uses it (2026-10-31 later)
+
+`classifyDiff(beforeText, afterText)` moved into `lib/diff-state.js` (pure, unit tested) and
+`console-designer.js` now formats its output instead of computing its own LCS:
+
+```js
+const c = D.classifyDiff(ds.preview?.before || '', ds.preview?.after || '');
+if (c.tooBig) return '文件较大，请使用 Patch YAML 标签查看完整生成结果。';
+return c.lines.map((l) => l.marker + ' ' + l.text).join('\n');
+```
+
+The fallback path (no `TurnstileDiff`) is the original code, so the page still works if the module
+fails to load - and that is exactly how the previous round's missing `<script>` tag was caught.
+
+New tests:
+
+| Suite | Adds |
+|---|---|
+| `test/diff-classify.test.mjs` | 7 checks: added/removed counts, identical texts, ROW vs CONFIG kind, marker/code agreement, huge input refused, empty input safe |
+| `designer e2e` | +1: the diff view marks changed lines (`^[-+] `) and leaves unchanged lines (`^  `) |
+
+Designer suite 29 -> **30/30**; console 60/60; panel 29/29; self-test 67 passed / 6 skipped; package
+tests now 8 + 5 + 7 + 7 + 7 + 8 + 7 = 49 checks.
+
+Status change: **diff codes are now produced by the page**, not just by the module.

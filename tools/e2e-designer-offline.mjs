@@ -54,6 +54,9 @@ try {
   await click('[data-testid="editor-cli"]');
   ok('CLI target emits a real manage command', (await text('[data-testid="generated-code"]')).includes('tools/manage.mjs') && (await text('[data-testid="generated-code"]')).includes('--disable'));
   await click('[data-testid="editor-diff"]');
+  // The diff is classified by lib/diff-state.js: changed lines carry a marker, unchanged do not.
+  const diffText = await text('[data-testid="generated-code"]').catch(() => '');
+  ok('diff view marks changed lines only', /^[-+] /m.test(diffText) && /^ {2}/m.test(diffText), diffText.slice(0, 60));
   ok('Diff target marks the inserted line', (await text('[data-testid="generated-code"]')).includes('+   disabled: true'));
   await click('[data-testid="editor-designer"]');
   await click('[data-testid="designer-undo"]');

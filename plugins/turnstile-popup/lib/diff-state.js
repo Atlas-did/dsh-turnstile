@@ -48,6 +48,40 @@ export function describe(code) {
   return parts.join(' · ');
 }
 
+
+/**
+ * Turn two texts into coded diff lines. Kept here (not in the page) so it can be unit tested:
+ * the page only renders what this returns.
+ */
+export function classifyDiff(beforeText, afterText, limit = 160000) {
+  const a = String(beforeText || '').split('\n');
+  const b = String(afterText || '').split('\n');
+  if (a.length * b.length > limit) return { tooBig: true, lines: [], summary: null };
+  const dp = Array.from({ length: a.length + 1 }, () => new Uint16Array(b.length + 1));
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const lines = [];
+  let i = 0; let j = 0;
+  const kindOf = (text) => (/^- id:/.test(text) || /^\s*- id:/.test(text) ? KIND.ROW : KIND.CONFIG);
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { lines.push({ code: codeOf({ change: CHANGE.NONE, kind: kindOf(a[i]) }), marker: ' ', text: a[i] }); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) lines.push({ code: codeOf({ change: CHANGE.REMOVED, kind: kindOf(a[i]) }), marker: '-', text: a[i++] });
+    else lines.push({ code: codeOf({ change: CHANGE.ADDED, kind: kindOf(b[j]) }), marker: '+', text: b[j++] });
+  }
+  while (i < a.length) lines.push({ code: codeOf({ change: CHANGE.REMOVED, kind: kindOf(a[i]) }), marker: '-', text: a[i++] });
+  while (j < b.length) lines.push({ code: codeOf({ change: CHANGE.ADDED, kind: kindOf(b[j]) }), marker: '+', text: b[j++] });
+  const summary = { added: 0, removed: 0, same: 0 };
+  for (const l of lines) {
+    if (is(l.code, CHANGE, CHANGE.ADDED)) summary.added++;
+    else if (is(l.code, CHANGE, CHANGE.REMOVED)) summary.removed++;
+    else summary.same++;
+  }
+  return { tooBig: false, lines, summary };
+}
+
 if (typeof window !== 'undefined') {
-  window.TurnstileDiff = { CHANGE, KIND, SIDE, CONFIDENCE, codeOf, is, isKnown, hasChange, describe };
+  window.TurnstileDiff = { CHANGE, KIND, SIDE, CONFIDENCE, codeOf, is, isKnown, hasChange, describe, classifyDiff };
 }

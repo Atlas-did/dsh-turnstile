@@ -20,6 +20,15 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
   return createServer(async (req, res) => {
     const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
     const json = (code, value) => { res.statusCode = code; res.setHeader('content-type', 'application/json; charset=utf-8'); res.end(JSON.stringify(value)); };
+    if (pathname === '/turnstile/diff-state.js') {
+      const src = readFileSync(join(root, 'plugins', 'turnstile-popup', 'lib', 'diff-state.js'), 'utf8')
+        .replace(/\bexport\s+(function|const|class)/g, '$1')
+        .replace(/^if \(typeof window[\s\S]*$/m, '');
+      res.setHeader('content-type', 'text/javascript; charset=utf-8');
+      res.setHeader('cache-control', 'no-store');
+      res.end(src + '\nwindow.TurnstileDiff = { CHANGE: CHANGE, KIND: KIND, SIDE: SIDE, CONFIDENCE: CONFIDENCE, codeOf: codeOf, is: is, isKnown: isKnown, hasChange: hasChange, describe: describe, classifyDiff: classifyDiff };\n');
+      return;
+    }
     if (pathname === '/turnstile/inspector-model.js') {
       const src = readFileSync(join(root, 'plugins', 'turnstile-popup', 'lib', 'inspector-model.js'), 'utf8')
         .replace(/\bexport\s+(function|const|class)/g, '$1')
