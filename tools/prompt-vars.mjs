@@ -4,6 +4,8 @@
 // usage: node tools/prompt-vars.mjs <profileDir>
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
+silenceWhenJson();
 
 const ALLOWED = new Set(['provider', 'model']);
 const dir = process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop';
@@ -62,10 +64,26 @@ for (const name of deps) {
 }
 
 console.log('profile: ' + dir + '   (persona sections may only use: ' + [...ALLOWED].join(', ') + ')');
-if (!rows.length) { console.log('OK: every persona section uses registered variables'); process.exit(0); }
+if (!rows.length) {
+  if (wantsJson()) { emitJson('prompt-vars', [], 0); process.exit(0); }
+  console.log('OK: every persona section uses registered variables');
+  process.exit(0);
+}
 const agg = new Map();
 for (const r of rows) { const k = r.name + ' :: ' + r.file; agg.set(k, (agg.get(k) || 0) + 1); }
 for (const [k, n] of agg) console.log('RISK  ' + k + '  (' + n + ')');
 console.log('');
 console.log('summary: ' + rows.length + ' unsupported reference(s)');
+if (wantsJson()) {
+  const findings = rows.map((r) => ({
+    severity: 'error',
+    plugin: r.name,
+    resource: r.file,
+    message: 'unsupported prompt variable reference',
+    evidence: { file: 'node_modules/' + r.name + '/' + r.file },
+    fix: { kind: 'literal', snippet: 'use only provider/model, or replace the variable with a literal' },
+  }));
+  emitJson('prompt-vars', findings, rows.length ? 7 : 0);
+  process.exit(rows.length ? 7 : 0);
+}
 process.exit(7);

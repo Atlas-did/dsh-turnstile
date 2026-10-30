@@ -5,6 +5,8 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { importsOf } from './scan.mjs';
+import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
+silenceWhenJson();
 
 const dir = process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop';
 const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
@@ -90,4 +92,16 @@ const counts = rows.reduce((acc, r) => { acc[r.level] = (acc[r.level] || 0) + 1;
 console.log('');
 console.log('import evidence: ' + lastEvidence);
 console.log('summary: ' + JSON.stringify(counts));
+if (wantsJson()) {
+  const findings = rows.filter((r) => r.level !== 'GREEN').map((r) => ({
+    severity: r.level === 'RED' ? 'error' : 'warning',
+    plugin: r.name + '@' + (r.version || '?'),
+    resource: r.why,
+    message: r.level,
+    evidence: { file: 'node_modules/' + r.name + '/package.json', importEvidence: lastEvidence },
+    ...(r.alias ? { fix: { kind: 'npm-alias', snippet: r.alias } } : {}),
+  }));
+  emitJson('risk', findings, counts.RED ? 6 : 0);
+  process.exit(counts.RED ? 6 : 0);
+}
 process.exitCode = counts.RED ? 6 : 0;

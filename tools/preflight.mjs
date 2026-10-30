@@ -1,13 +1,10 @@
 #!/usr/bin/env node
-// Preflight gate for a DSH profile: run every known failure-surface check before a plugin
-// is allowed near the main environment.
+// Preflight gate for a DSH profile: run every failure-surface check in parallel, consume each
+// checker's --json envelope when it provides one, and fall back to text for the rest.
 //
 // usage: node tools/preflight.mjs <profileDir> [--only a,b] [--skip c] [--json] [--no-record] [--self-check]
 // exit:  0 all clear | 1 at least one blocking finding
-// env:   DSH_CHECK_TIMEOUT=30000   per-check budget in ms (was 240s serial before)
-//
-// Checks run in PARALLEL with an individual timeout: one slow or hung checker can no longer
-// stall the whole gate (a phone/proot run used to hit a 180s wall and time out).
+// env:   DSH_CHECK_TIMEOUT=30000   per-check budget in ms
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync, writeFileSync, unlinkSync } from 'node:fs';
@@ -59,15 +56,28 @@ if (isFlag('--self-check')) {
   }
 }
 
+function parseEnvelope(stdout) {
+  try {
+    const j = JSON.parse(String(stdout));
+    return j && j.checker ? j : null;
+  } catch { return null; }
+}
+
 async function one(c) {
   const started = Date.now();
+  const args = [join(root, c.script), dir, '--json'];
   try {
-    const { stdout, stderr } = await run(process.execPath, [join(root, c.script), dir], { timeout, maxBuffer: 32 * 1024 * 1024 });
-    return { name: c.name, hint: c.hint, exit: 0, ok: true, out: String(stdout), ms: Date.now() - started };
+    const { stdout } = await run(process.execPath, args, { timeout, maxBuffer: 32 * 1024 * 1024 });
+    const j = parseEnvelope(stdout);
+    return { name: c.name, hint: c.hint, exit: 0, ok: true, ms: Date.now() - started, structured: Boolean(j), findings: j ? j.findings : [], out: j ? '' : String(stdout) };
   } catch (e) {
     const code = typeof e.code === 'number' ? e.code : (e.killed ? 'timeout' : 'error');
-    const out = String((e.stdout || '') + (e.stderr || ''));
-    return { name: c.name, hint: c.hint, exit: code, ok: false, out, ms: Date.now() - started, timedOut: e.killed === true };
+    const j = parseEnvelope(String(e.stdout || ''));
+    return {
+      name: c.name, hint: c.hint, exit: code, ok: false, ms: Date.now() - started,
+      timedOut: e.killed === true, structured: Boolean(j), findings: j ? j.findings : [],
+      out: j ? '' : String((e.stdout || '') + (e.stderr || '')),
+    };
   }
 }
 
@@ -80,7 +90,8 @@ if (isFlag('--json')) {
     timeoutMs: timeout,
     checks: results.map((r) => ({
       name: r.name, ok: r.ok, exit: r.exit, ms: r.ms, timedOut: Boolean(r.timedOut),
-      summary: (r.out.trim().split('\n').pop() || '').slice(0, 200),
+      structured: r.structured, findings: r.findings,
+      summary: r.structured ? '' : (r.out.trim().split('\n').pop() || '').slice(0, 200),
     })),
     result: failed.length ? 'blocked' : 'clear',
     exit: failed.length ? 1 : 0,
@@ -88,8 +99,11 @@ if (isFlag('--json')) {
 } else {
   for (const r of results) {
     const tag = r.ok ? 'PASS' : (r.timedOut ? 'TIMEOUT' : 'FAIL');
-    const last = (r.out.trim().split('\n').pop() || '').slice(0, 90);
-    console.log('  ' + tag.padEnd(8) + r.name.padEnd(18) + String(r.ms).padStart(6) + 'ms  ' + last);
+    const n = (r.findings || []).length;
+    const detail = r.structured
+      ? (n ? n + ' finding(s), e.g. ' + r.findings.slice(0, 2).map((f) => f.message + ' @ ' + (f.plugin || '?')).join('; ') : 'no findings')
+      : (r.out.trim().split('\n').pop() || '').slice(0, 90);
+    console.log('  ' + tag.padEnd(8) + r.name.padEnd(18) + String(r.ms).padStart(6) + 'ms  ' + detail);
     if (!r.ok) console.log('           hint: ' + r.hint);
   }
   console.log('');
@@ -100,8 +114,7 @@ if (!failed.length && !isFlag('--no-record')) {
   const tmp = join(root, 'state', '.preflight-' + process.pid + '.txt');
   try {
     writeFileSync(tmp, results.map((r) => r.name + ': ' + (r.ok ? 'ok' : 'fail')).join('\n'));
-    const h = await run(process.execPath, [join(root, 'tools/history.mjs'), 'record', dir, 'clear', tmp], { timeout: 30000 });
-    void h;
+    await run(process.execPath, [join(root, 'tools/history.mjs'), 'record', dir, 'clear', tmp], { timeout: 30000 });
   } catch { /* recording is best-effort */ }
   try { unlinkSync(tmp); } catch { /* ignore */ }
 }

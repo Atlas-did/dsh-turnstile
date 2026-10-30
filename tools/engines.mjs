@@ -13,6 +13,8 @@ const compatPath = join(dir, 'compatibility.json');
 const compat = existsSync(compatPath) ? JSON.parse(readFileSync(compatPath, 'utf8')) : {};
 
 import { checkCompatibility, runtimeVersion, usingHostEvaluator } from './version.mjs';
+import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
+silenceWhenJson();
 // Compatibility is decided by the host's own evaluator when it is reachable — we do not
 // reimplement semver here. `checkCompatibility` returns null when the plugin loads.
 
@@ -34,10 +36,22 @@ for (const b of bundles) {
 
 const skipped = rows.filter((r) => r.verdict === 'SKIPPED');
 const exempted = rows.filter((r) => r.verdict === 'loads (exempted)');
-console.log(JSON.stringify({
-  profile: dir, runtime, bundles: bundles.length,
-  skipped: skipped.map((r) => r.name + '@' + r.version + '  engines=' + r.engine),
-  exempted: exempted.map((r) => r.name + '@' + r.version),
-  ok: skipped.length === 0,
-}, null, 2));
+const engineFindings = skipped.map((r) => ({
+  severity: 'error',
+  plugin: r.name + '@' + r.version,
+  resource: r.engine,
+  message: 'engines.dsh excludes the running runtime: the loader will SKIP this plugin silently',
+  evidence: { file: 'node_modules/' + r.name + '/package.json' },
+  fix: { kind: 'engines-widen', snippet: 'widen engines.dsh locally via pnpm patch if the author has not caught up' },
+}));
+if (wantsJson()) {
+  emitJson('engines', engineFindings, skipped.length ? 5 : 0);
+} else {
+  console.log(JSON.stringify({
+    profile: dir, runtime, bundles: bundles.length,
+    skipped: skipped.map((r) => r.name + '@' + r.version + '  engines=' + r.engine),
+    exempted: exempted.map((r) => r.name + '@' + r.version),
+    ok: skipped.length === 0,
+  }, null, 2));
+}
 process.exitCode = skipped.length ? 5 : 0;

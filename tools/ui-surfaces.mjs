@@ -3,8 +3,11 @@
 // Flags a UI surface touched by >= threshold plugins: that is where a parent button belongs.
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
+silenceWhenJson();
 const profileDir = process.argv[2];
-const threshold = Number(process.argv[3] || process.env.DSH_UI_THRESHOLD || 10);
+const positional = process.argv.slice(3).filter((a) => !a.startsWith('--'));
+const threshold = Number(positional[0] || process.env.DSH_UI_THRESHOLD || 10);
 if (!profileDir) { console.error('usage: node tools/ui-surfaces.mjs <profileDir> [threshold]'); process.exit(2); }
 const pj = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'));
 const bundles = pj.dsh?.profile?.bundles || [];
@@ -28,10 +31,23 @@ const rows = [...surfaces.entries()].map(([ui, s]) => [ui, [...s].sort()]).sort(
 console.log('profile: ' + profileDir + '   bundles: ' + bundles.length);
 console.log('ui surface' + ' '.repeat(18) + 'plugins');
 let hot = 0;
+const surfaces_above = [];
 for (const [ui, who] of rows) {
   const flag = who.length > threshold ? '  <-- 超过阈值，建议收进母按钮' : '';
-  if (who.length > threshold) hot++;
+  if (who.length > threshold) { hot++; surfaces_above.push([ui, who]); }
   console.log('  ' + ui.padEnd(26) + String(who.length).padStart(2) + '  ' + who.join(', ') + flag);
 }
 console.log('surfaces above threshold (' + threshold + '): ' + hot);
+if (wantsJson()) {
+  const findings = surfaces_above.map(([ui, who]) => ({
+    severity: 'error',
+    plugin: who[0],
+    resource: ui,
+    message: who.length + ' plugins inject this surface (threshold ' + threshold + ')',
+    evidence: { file: 'package.json', plugins: who },
+    fix: { kind: 'group', snippet: 'collapse these plugins under one parent entry, or raise DSH_UI_THRESHOLD deliberately' },
+  }));
+  emitJson('ui-surface', findings, hot > 0 ? 11 : 0);
+  process.exit(hot > 0 ? 11 : 0);
+}
 process.exit(hot > 0 ? 11 : 0);

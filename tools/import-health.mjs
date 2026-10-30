@@ -7,6 +7,8 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
+silenceWhenJson();
 
 const dir = process.argv[2] || ((process.env.DSH_HOME || '') + '/profiles/desktop');
 const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
@@ -53,4 +55,15 @@ console.log('HARD (真正的缺陷): ' + hard.length);
 hard.forEach(r => console.log('  ! ' + r.d + ' :: ' + r.load));
 console.log('HOST/env (不是缺陷): ' + rows.filter(r => /^(HOST|env)/.test(String(r.load))).length);
 console.log('installed but NOT bundled: ' + rows.filter(r => r.b === false).length);
+if (wantsJson()) {
+  const findings = hard.map((r) => ({
+    severity: 'error',
+    plugin: r.d,
+    resource: r.load,
+    message: 'module cannot be resolved even before restart',
+    evidence: { file: r.d + '/package.json' },
+  }));
+  emitJson('import-health', findings, hard.length ? 5 : 0);
+  process.exit(hard.length ? 5 : 0);
+}
 process.exitCode = hard.length ? 5 : 0;

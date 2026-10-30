@@ -8,6 +8,8 @@ import { join } from 'node:path';
 import { ROOT } from './config.mjs';
 import { ctxUsage } from './scan.mjs';
 import { runtimeVersion } from './version.mjs';
+import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
+silenceWhenJson();
 
 const dir = process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop';
 const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
@@ -139,6 +141,18 @@ const uniq = rows.filter(r => { const k = r.kind + '|' + r.plugin + '|' + r.deta
 const order = { 'ctx-assign': 0, 'service-dup': 1, 'dep-divergence': 2, 'fixed-port': 3, 'state-file': 4 };
 uniq.sort((a, b) => (order[a.kind] - order[b.kind]) || String(a.plugin).localeCompare(String(b.plugin)));
 console.log('profile: ' + dir + '  (known services: ' + known.size + ' via ' + knowledgeSource + '; ctx evidence: ' + ctxEvidence + ')');
+if (wantsJson()) {
+  const findings = uniq.map((r) => ({
+    severity: r.kind === 'dep-divergence' ? 'warning' : 'error',
+    plugin: r.plugin,
+    resource: r.detail,
+    message: r.kind,
+    evidence: { file: 'profile' },
+  }));
+  const code = uniq.some((r) => r.kind !== 'dep-divergence') ? 6 : 0;
+  emitJson('conflict', findings, code);
+  process.exit(code);
+}
 if (!uniq.length) { console.log('no conflict patterns found'); process.exit(0); }
 console.log('KIND'.padEnd(16) + 'PLUGIN'.padEnd(30) + 'DETAIL'.padEnd(46) + 'SPREAD');
 for (const r of uniq) console.log(String(r.kind).padEnd(16) + String(r.plugin).slice(0, 29).padEnd(30) + String(r.detail).slice(0, 45).padEnd(46) + r.contagious);
