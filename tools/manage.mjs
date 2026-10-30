@@ -150,8 +150,18 @@ async function menuMode() {
 /** pure: return the patch text with row `rowId` disabled (off=true) or enabled (off=false) */
 function toggleInPatch(text, rowId, off) {
   if (off) {
-    const emptyRe = /^\[\]\s*$/m;
     const block = '- id: ' + rowId + '\n  disabled: true';
+    // Idempotent: a row already disabled must not gain a second block (that was a real bug:
+    // two clicks of "disable" produced two `- id: talk` entries and the file kept growing).
+    const lines0 = text.split(/\r?\n/);
+    const at = lines0.findIndex((l) => new RegExp('^-\\s*id:\\s*' + rowId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$').test(l));
+    if (at !== -1) {
+      let end = lines0.length;
+      for (let i = at + 1; i < lines0.length; i++) { if (/^-\s/.test(lines0[i])) { end = i; break; } }
+      const next = lines0.slice(0, at).concat(block.split('\n'), lines0.slice(end));
+      return next.join('\n');
+    }
+    const emptyRe = /^\[\]\s*$/m;
     return emptyRe.test(text) ? text.replace(emptyRe, block) : text.replace(/\s*$/, '') + '\n' + block + '\n';
   }
   const lines = text.split(/\r?\n/);

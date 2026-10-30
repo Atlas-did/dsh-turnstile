@@ -54,7 +54,19 @@ window.__ModuleLoader__.load({
           setSlots(globalSlotsSnapshot());
           api("occupancy").then(setOcc).catch(function () {});
         }, []);
-        function reload() { return api("plugins").then(function (d) { setRows(visible(d.rows)); }); }
+        function reload() {
+          return api("plugins").then(function (d) {
+            var next = visible(d.rows);
+            setRows(next);
+            // The property panel holds a snapshot row: refresh it, or the toggle keeps sending
+            // the same direction because it reads a stale `disabled`.
+            setPicked(function (cur) {
+              if (!cur) return null;
+              for (var i = 0; i < next.length; i++) if (next[i].name === cur.name) return next[i];
+              return null;
+            });
+          });
+        }
         function setAnchor(row, anchor) {
           setBusy(row.name);
           api("anchor", {
@@ -74,13 +86,13 @@ window.__ModuleLoader__.load({
           }).then(reload).catch(function (e) { console.warn("turnstile toggle failed", e); })
             .then(function () { setBusy(""); });
         }
-        if (!open) return h("button", { onClick: function () { setOpen(true); }, style: { position: "fixed", right: "18px", bottom: "18px", zIndex: 9999, padding: "6px 10px", borderRadius: "8px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "12px" } }, "插件 " + rows.length);
+        if (!open) return h("button", { onClick: function () { setOpen(true); }, style: { position: "fixed", right: "18px", top: "64px", zIndex: 2147483000, padding: "6px 10px", borderRadius: "8px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "12px" } }, "插件 " + rows.length);
         var off = rows.filter(function (r) { return r.disabled; }).length;
         var sk = rows.filter(function (r) { return r.engineSkipped; }).length;
         var hot = {};
         rows.forEach(function (r) { (r.ui || []).forEach(function (u) { hot[u] = (hot[u] || 0) + 1; }); });
         var crowded = Object.keys(hot).filter(function (u) { return hot[u] >= 3; }).length;
-        return h("div", { style: { position: "fixed", right: "18px", bottom: "18px", zIndex: 9999, width: "330px", maxHeight: "50vh", overflow: "auto", display: "flex", flexDirection: "column", background: "#0e1116", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "10px", padding: "12px 14px", fontFamily: "ui-sans-serif,system-ui" } },
+        return h("div", { "data-testid": "panel", style: { position: "fixed", right: "18px", top: "64px", zIndex: 2147483000, width: "330px", maxHeight: "50vh", overflow: "auto", display: "flex", flexDirection: "column", background: "#0e1116", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "10px", padding: "12px 14px", fontFamily: "ui-sans-serif,system-ui" } },
           h("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "6px" } },
             h("strong", { style: { fontSize: "13px" } }, "mini · 插件 " + rows.length),
             h("button", { onClick: function () { setOpen(false); }, style: { background: "none", border: 0, color: "#8b96a5", cursor: "pointer" } }, "×")),
@@ -92,7 +104,7 @@ window.__ModuleLoader__.load({
                 return p ? " · 硬编码位置 " + (p.findings || []).length : "";
               })()) : null,
           rows.map(function (r) {
-            return h("div", { key: r.name, onClick: function () { setPicked(picked && picked.name === r.name ? null : r); }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
+            return h("div", { key: r.name, "data-testid": "row-" + r.name, onClick: function () { setPicked(picked && picked.name === r.name ? null : r); var el = document.querySelector('[data-testid=\"panel\"]'); if (el) el.scrollTop = 0; }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
               h("span", { style: { width: "12px", color: r.disabled ? "#f85149" : "#3fb950" } }, r.disabled ? "×" : "·"),
               h("span", { style: { flex: 1, fontFamily: "ui-monospace,monospace" } }, r.name),
               (r.ui && r.ui.length) ? h("span", { title: (r.ui || []).join(", "), style: { color: "#58a6ff", fontSize: "11px" } }, "ui" + r.ui.length) : null,
@@ -117,7 +129,7 @@ window.__ModuleLoader__.load({
                 h("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", fontFamily: "ui-monospace,monospace", fontSize: "11px" } }, s.surface),
                 h("span", { style: { color: "#8b96a5", fontSize: "11px" } }, s.count + " 个 · 硬编码 " + s.hardcoded.length));
             })) : null,
-          picked ? h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", lineHeight: "1.7", color: "#b8c2cf" } },
+          picked ? h("div", { "data-testid": "detail", style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", lineHeight: "1.7", color: "#b8c2cf" } },
             h("div", { style: { fontFamily: "ui-monospace,monospace", color: "#d7dee8" } }, picked.name),
             h("div", null, "行 id: " + (picked.row || "(未声明)")),
             h("div", null, "状态: " + (picked.disabled ? "已停用" : "启用") + (picked.engineSkipped ? " · 引擎跳过" : "")),
@@ -145,7 +157,7 @@ window.__ModuleLoader__.load({
                   style: { padding: "1px 6px", borderRadius: "6px", border: "1px solid #30363d", background: "transparent", color: "#8b96a5", cursor: "pointer", fontSize: "11.5px" } }, "清"));
             })(),
             h("div", { style: { marginTop: "6px", display: "flex", gap: "8px" } },
-              h("button", { onClick: function () { if (!busy) flip(picked); }, style: { padding: "2px 8px", borderRadius: "6px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "11.5px" } }, picked.disabled ? "启用" : "停用"),
+              h("button", { "data-testid": "toggle", onClick: function () { if (!busy) flip(picked); }, style: { padding: "2px 8px", borderRadius: "6px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "11.5px" } }, picked.disabled ? "启用" : "停用"),
               h("button", { onClick: function () { setPicked(null); }, style: { padding: "2px 8px", borderRadius: "6px", border: "1px solid #30363d", background: "transparent", color: "#8b96a5", cursor: "pointer", fontSize: "11.5px" } }, "收起"))
           ) : null);
       }
