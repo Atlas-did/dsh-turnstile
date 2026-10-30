@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { makePlan, applyPlan, describePlan } from "./txn.js";
 import { collectConsoleData } from "./console-data.js";
 import { readViewState, writeViewState } from "./view-state.js";
+import { toggleText } from "./toggle-text.js";
 import { designerTransaction } from "./designer-ops.js";
 import { beginOperation, settleOperation, recoverJournal } from "./journal.js";
 
@@ -211,6 +212,11 @@ function readRows(dir) {
 }
 
 function toggle(text, rowId, disable) {
+  // The rules live in lib/toggle-text.js so they can be unit tested.
+  return toggleText(text, rowId, disable);
+}
+
+function toggleLegacy(text, rowId, disable) {
   let next = text;
   if (disable) {
     const lines0 = text.split(/\r?\n/);
