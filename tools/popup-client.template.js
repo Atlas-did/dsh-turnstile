@@ -31,6 +31,7 @@ window.__ModuleLoader__.load({
         var rs = React.useState(visible(FALLBACK.rows)), rows = rs[0], setRows = rs[1];
         var bs = React.useState(""), busy = bs[0], setBusy = bs[1];
         var rp = React.useState(null), report = rp[0], setReport = rp[1];
+        var sel = React.useState(null), picked = sel[0], setPicked = sel[1];
         React.useEffect(function () {
           api("plugins").then(function (d) { setRows(visible(d.rows)); }).catch(function () {});
           api("report").then(setReport).catch(function () {});
@@ -51,7 +52,7 @@ window.__ModuleLoader__.load({
         var hot = {};
         rows.forEach(function (r) { (r.ui || []).forEach(function (u) { hot[u] = (hot[u] || 0) + 1; }); });
         var crowded = Object.keys(hot).filter(function (u) { return hot[u] >= 3; }).length;
-        return h("div", { style: { position: "fixed", right: "18px", bottom: "18px", zIndex: 9999, width: "330px", maxHeight: "50vh", overflow: "auto", background: "#0e1116", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "10px", padding: "12px 14px", fontFamily: "ui-sans-serif,system-ui" } },
+        return h("div", { style: { position: "fixed", right: "18px", bottom: "18px", zIndex: 9999, width: "330px", maxHeight: "50vh", overflow: "auto", display: "flex", flexDirection: "column", background: "#0e1116", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "10px", padding: "12px 14px", fontFamily: "ui-sans-serif,system-ui" } },
           h("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "6px" } },
             h("strong", { style: { fontSize: "13px" } }, "mini · 插件 " + rows.length),
             h("button", { onClick: function () { setOpen(false); }, style: { background: "none", border: 0, color: "#8b96a5", cursor: "pointer" } }, "×")),
@@ -63,12 +64,21 @@ window.__ModuleLoader__.load({
                 return p ? " · 硬编码位置 " + (p.findings || []).length : "";
               })()) : null,
           rows.map(function (r) {
-            return h("div", { key: r.name, onClick: function () { if (!busy) flip(r); }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
+            return h("div", { key: r.name, onClick: function () { setPicked(picked && picked.name === r.name ? null : r); }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
               h("span", { style: { width: "12px", color: r.disabled ? "#f85149" : "#3fb950" } }, r.disabled ? "×" : "·"),
               h("span", { style: { flex: 1, fontFamily: "ui-monospace,monospace" } }, r.name),
               (r.ui && r.ui.length) ? h("span", { title: (r.ui || []).join(", "), style: { color: "#58a6ff", fontSize: "11px" } }, "ui" + r.ui.length) : null,
               r.engineSkipped ? h("span", { style: { color: "#d29922", fontSize: "11px" } }, "skip") : null);
-          }));
+          }),
+          picked ? h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", lineHeight: "1.7", color: "#b8c2cf" } },
+            h("div", { style: { fontFamily: "ui-monospace,monospace", color: "#d7dee8" } }, picked.name),
+            h("div", null, "行 id: " + (picked.row || "(未声明)")),
+            h("div", null, "状态: " + (picked.disabled ? "已停用" : "启用") + (picked.engineSkipped ? " · 引擎跳过" : "")),
+            h("div", null, "UI 面: " + ((picked.ui && picked.ui.length) ? picked.ui.join(", ") : "无（宿主侧或自绘）")),
+            h("div", { style: { marginTop: "6px", display: "flex", gap: "8px" } },
+              h("button", { onClick: function () { if (!busy) flip(picked); }, style: { padding: "2px 8px", borderRadius: "6px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "11.5px" } }, picked.disabled ? "启用" : "停用"),
+              h("button", { onClick: function () { setPicked(null); }, style: { padding: "2px 8px", borderRadius: "6px", border: "1px solid #30363d", background: "transparent", color: "#8b96a5", cursor: "pointer", fontSize: "11.5px" } }, "收起"))
+          ) : null);
       }
       ctx.slots.inject("shell.overlay", function () {
         return ctx.slots.register({ name: "shell.overlay", id: "turnstile.plugin-list" }, Card);
