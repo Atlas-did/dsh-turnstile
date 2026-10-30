@@ -20,10 +20,14 @@ const isFlag = (name) => argv.includes(name);
 const CHECKS = [
   { name: 'dependency-risk', script: 'tools/risk.mjs', hint: 'RED = imports a peer-only non-official package' },
   { name: 'conflict-surface', script: 'tools/conflict.mjs', hint: 'ctx overwrite / duplicate service / port / version split' },
-  { name: 'engine-gate', script: 'tools/engines.mjs', hint: 'plugins the loader will skip' },
+  { name: 'engine-gate', script: 'tools/engines.mjs', hint: 'plugins the loader will skip', advisory: true },
   { name: 'prompt-vars', script: 'tools/prompt-vars.mjs', hint: 'persona text using unregistered variables' },
   { name: 'import-health', script: 'tools/import-health.mjs', hint: 'a module cannot be resolved even before restart' },
   { name: 'ui-surface', script: 'tools/ui-surfaces.mjs', hint: 'too many plugins injecting one UI surface (DSH_UI_THRESHOLD, default 10)' },
+  { name: 'port-conflict', script: 'tools/port-scan.mjs', hint: 'two plugins claim the same fixed port' },
+  { name: 'file-conflict', script: 'tools/file-scan.mjs', hint: 'two plugins write the same absolute path' },
+  { name: 'shortcut-conflict', script: 'tools/shortcut-scan.mjs', hint: 'two plugins register the same shortcut' },
+  { name: 'css-collision', script: 'tools/css-scan.mjs', hint: 'advisory: global CSS class defined by more than one plugin', advisory: true },
 ];
 
 const only = (flagValue('--only') || '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -46,6 +50,17 @@ if (!dir) { console.error('usage: node tools/preflight.mjs <profileDir> [--only 
 if (!existsSync(join(dir, 'package.json'))) { console.error('not a profile (no package.json): ' + dir); process.exit(2); }
 
 const timeout = Number(process.env.DSH_CHECK_TIMEOUT || 30000);
+
+if (isFlag('--regen')) {
+  // Keep the service knowledge aligned with the runtime instead of silently judging
+  // a profile with a stale allowlist.
+  try {
+    const { stdout } = await run(process.execPath, [join(root, 'tools/knowledge-gen.mjs')], { timeout: 120000 });
+    process.stdout.write(stdout);
+  } catch (e) {
+    console.log('regen skipped: ' + String((e && e.message) || e).slice(0, 120));
+  }
+}
 
 if (isFlag('--self-check')) {
   try { await run(process.execPath, [join(root, 'tools/selftest.mjs')], { timeout: 600000 }); }
@@ -82,7 +97,10 @@ async function one(c) {
 }
 
 const results = await Promise.all(selected.map(one));
-const failed = results.filter((r) => !r.ok);
+// A check marked advisory can report findings without blocking the gate (e.g. an engine skip
+// means "this plugin will not load", not "your profile is broken").
+const blocking = results.filter((r) => !r.ok && !selected.find((c) => c.name === r.name)?.advisory);
+const failed = blocking;
 
 if (isFlag('--json')) {
   console.log(JSON.stringify({
@@ -98,7 +116,8 @@ if (isFlag('--json')) {
   }, null, 2));
 } else {
   for (const r of results) {
-    const tag = r.ok ? 'PASS' : (r.timedOut ? 'TIMEOUT' : 'FAIL');
+    const advisory = Boolean(selected.find((c) => c.name === r.name)?.advisory);
+    const tag = r.ok ? 'PASS' : (r.timedOut ? 'TIMEOUT' : (advisory ? 'WARN' : 'FAIL'));
     const n = (r.findings || []).length;
     const detail = r.structured
       ? (n ? n + ' finding(s), e.g. ' + r.findings.slice(0, 2).map((f) => f.message + ' @ ' + (f.plugin || '?')).join('; ') : 'no findings')

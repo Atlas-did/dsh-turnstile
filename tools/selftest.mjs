@@ -47,6 +47,19 @@ check('manage menu toggles without writing', /\[ \]/.test(r.out) && !/已写入/
 r = run('tools/conflict.mjs', join(root, 'tests/conflict-fixture'));
 check('conflict ignores commented ctx writes', r.code === 0 && !/ctx\.fs/.test(r.out) && /ctx evidence: ast/.test(r.out), 'exit=' + r.code);
 
+// Four conflict surfaces that used to be unchecked: port / file / css / shortcut.
+r = run('tools/port-scan.mjs', join(root, 'tests/scan-fixture'));
+check('port scan catches duplicate port', r.code === 9 && /34567/.test(r.out), 'exit=' + r.code);
+
+r = run('tools/file-scan.mjs', join(root, 'tests/scan-fixture'));
+check('file scan catches shared path', r.code === 9 && /state\.json/.test(r.out), 'exit=' + r.code);
+
+r = run('tools/shortcut-scan.mjs', join(root, 'tests/scan-fixture'));
+check('shortcut scan catches duplicate key', r.code === 9 && /ctrl\+k/.test(r.out), 'exit=' + r.code);
+
+r = run('tools/css-scan.mjs', join(root, 'tests/scan-fixture'));
+check('css scan catches shared class', /panel/.test(r.out), 'exit=' + r.code);
+
 r = run('tools/probe.mjs', join(root, 'tests/probe-fixture'), '--strict');
 check('probe sees computed registration', r.code === 7 && /sharedStore/.test(r.out), 'exit=' + r.code);
 
@@ -69,7 +82,7 @@ let skipped = 0, envRun = 0;
 
 // A case whose fixture is missing must FAIL, not quietly pass because the tool errored out.
 const FIXTURES = ['ast-fixture', 'conflict-fixture', 'gate-fixture', 'import-fixture',
-  'manage-fixture', 'probe-fixture', 'risk-fixture', 'ui-fixture'];
+  'manage-fixture', 'probe-fixture', 'risk-fixture', 'scan-fixture', 'ui-fixture'];
 for (const f of FIXTURES) {
   check('fixture exists: ' + f, existsSync(join(root, 'tests', f)), 'tests/' + f);
 }

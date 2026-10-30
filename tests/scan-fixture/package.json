@@ -1,0 +1,14 @@
+{
+  "name": "scan-fixture",
+  "private": true,
+  "dependencies": {
+    "plug-http-a": "1.0.0",
+    "plug-http-b": "1.0.0",
+    "plug-state-a": "1.0.0",
+    "plug-state-b": "1.0.0",
+    "plug-css-a": "1.0.0",
+    "plug-css-b": "1.0.0",
+    "plug-key-a": "1.0.0",
+    "plug-key-b": "1.0.0"
+  }
+}
