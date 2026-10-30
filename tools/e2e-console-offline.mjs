@@ -13,6 +13,8 @@ const stateDir = join(root, 'state');
 mkdirSync(stateDir, { recursive: true });
 const tmp = mkdtempSync(join(stateDir, '.console-e2e-'));
 const profileDir = join(tmp, 'console-fixture');
+// A fixture must not remember a developer's interactive session: start from default view state.
+try { rmSync(join(profileDir, '.turnstile', 'turnstile-view.json'), { force: true }); } catch {}
 copyTreeSafe(join(root, 'tests', 'console-fixture'), profileDir);
 const patchPath = join(profileDir, 'cordis.patch.yml');
 const steps = [], pageErrors = [];
@@ -53,11 +55,12 @@ try {
       let box = { width: 0, height: 0 };
       for (let attempt = 0; attempt < 3 && (!box.width || !box.height); attempt++) {
         await loc.scrollIntoViewIfNeeded().catch(() => {});
+        // A live re-render can detach the node between lookup and measurement; retry instead of throwing.
         box = await loc.evaluate((el) => {
           el.scrollIntoView({ block: 'center', inline: 'center' });
           const r = el.getBoundingClientRect();
           return { x: r.x, y: r.y, width: r.width, height: r.height };
-        });
+        }).catch(() => ({ width: 0, height: 0 }));
         if (!box.width || !box.height) await page.waitForTimeout(120);
       }
       if (!box.width || !box.height) throw new Error('no clickable coordinates: ' + String(target));
@@ -150,6 +153,7 @@ try {
     await page.waitForFunction(() => !document.querySelector('[data-testid="console-refresh"]').disabled);
     ok('F5 performs a real snapshot refresh', (await text('#connection')) === '数据已读取');
     await click('[data-testid="inspector-actions"]');
+    console.log('  debug inspector: ' + (await text('#inspector')).replace(/\n/g, ' | ').slice(0, 150));
     ok('actions are separate from properties', (await count('[data-testid="action-locate"]')) === 1);
     await click('[data-testid="action-locate"]');
     ok('locate action enters the exact plugin architecture node', (await text('.arch-current')).includes('plug-alpha'));

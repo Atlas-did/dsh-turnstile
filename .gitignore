@@ -24,3 +24,6 @@ shots/
 !tests/**/home/**
 *.e2e-backup
 .bak-*
+
+# runtime view state must never be committed inside a fixture
+tests/**/.turnstile/turnstile-view.json
