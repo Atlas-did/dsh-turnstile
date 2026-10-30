@@ -423,19 +423,22 @@ window.__ModuleLoader__.load({
               h("strong", { style: { fontSize: "13px" } }, "mini · 插件 " + rows.length)),
             h("button", { "data-testid": "drag-mode", onClick: function () { setDragMode(!dragMode); },
               style: { marginLeft: "6px", padding: "0 6px", borderRadius: "6px", border: "1px solid " + (dragMode ? "#58a6ff" : "#30363d"), background: dragMode ? "rgba(88,166,255,0.15)" : "transparent", color: dragMode ? "#58a6ff" : "#8b96a5", cursor: "pointer", fontSize: "11px" } }, dragMode ? "拖动中" : "拖动"),
-            h("input", { "data-testid": "filter", value: filter, placeholder: "筛选插件…", onChange: function (e) { setFilter(e.target.value); },
+            h("input", { "data-testid": "search", value: filter, placeholder: "筛选插件…", onChange: function (e) { setFilter(e.target.value); },
               style: { marginLeft: "6px", width: "96px", padding: "1px 6px", borderRadius: "6px", border: "1px solid #30363d", background: "#0b0e13", color: "#d7dee8", fontSize: "11px" } }),
             h("button", { "data-testid": "inspect", onClick: function () { setInspectMode(!inspectMode); setInspectMsg(""); },
               style: { marginLeft: "4px", padding: "0 6px", borderRadius: "6px", border: "1px solid " + (inspectMode ? "#d29922" : "#30363d"), background: inspectMode ? "rgba(210,153,34,0.15)" : "transparent", color: inspectMode ? "#d29922" : "#8b96a5", cursor: "pointer", fontSize: "11px" } }, inspectMode ? "检查中" : "检查"),
             h("button", { onClick: function () { setOpen(false); }, style: { background: "none", border: 0, color: "#8b96a5", cursor: "pointer" } }, "×")),
           h("div", { style: { order: -2, color: "#8b96a5", fontSize: "11.5px", marginBottom: "6px" } }, "停用 " + off + " · 引擎跳过 " + sk + " · 挤爆的 UI 面 " + crowded + " · 点一行切换"),
-          report ? h("div", { style: { order: -1, fontSize: "11.5px", marginBottom: "8px", color: "#8b96a5" } },
-            "闸门 " + (report.checks || []).length + " 项 · 阻塞 " + ((report.blocking || []).length) + " · " + (report.result || "?")
+          report ? h("div", { "data-testid": "gate-badge", style: { order: -1, fontSize: "11.5px", marginBottom: "8px", color: "#8b96a5" } },
+            "闸门 " + (report.checks || []).length + " 项 · " + ((report.blocking || []).length) + " 项阻塞 · " + (report.result || "?")
             + (function () {
                 var p = (report.checks || []).filter(function (c) { return c.name === "ui-placement"; })[0];
                 return p ? " · 硬编码位置 " + (p.findings || []).length : "";
               })()) : null,
-          section("list", "插件列表 · " + rows.filter(function (r) { return keep(r.id) || keep(r.name); }).length + " / " + rows.length, rows.filter(function (r) { return keep(r.id) || keep(r.name); }).map(function (r) {
+          section("list", "插件列表 · " + rows.filter(function (r) { return keep(r.id) || keep(r.name); }).length + " / " + rows.length,
+            rows.filter(function (r) { return keep(r.id) || keep(r.name); }).length === 0
+              ? h("div", { "data-testid": "empty-list", style: { color: "#8b96a5", fontSize: "11.5px" } }, "没有匹配的插件")
+              : rows.filter(function (r) { return keep(r.id) || keep(r.name); }).map(function (r) {
             return h("div", { key: r.name, "data-testid": "row-" + r.name, draggable: dragMode, onDragStart: function () { setDragging(r.name); }, onClick: function () { var same = picked && picked.name === r.name; setPicked(same ? null : r); if (!same) loadAnchorOptions(r); var el = document.querySelector('[data-testid=\"panel\"]'); if (el) el.scrollTop = 0; }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
               h("span", { style: { width: "12px", color: r.disabled ? "#f85149" : "#3fb950" } }, r.disabled ? "×" : "·"),
               h("span", { style: { flex: 1, fontFamily: "ui-monospace,monospace" } }, r.name),

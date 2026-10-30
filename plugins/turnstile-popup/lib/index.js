@@ -1,7 +1,11 @@
 // Host side: GET /turnstile/plugins and POST /turnstile/toggle.
 // The browser cannot write files, so every change happens here with a backup.
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { makePlan, applyPlan, describePlan } from "./txn.js";
+import { collectConsoleData } from "./console-data.js";
+import { designerTransaction } from "./designer-ops.js";
 import { beginOperation, settleOperation, recoverJournal } from "./journal.js";
 
 const STATE_DIR = () => process.env.DSH_TURNSTILE_STATE || join(process.env.DSH_TURNSTILE_HOME || process.cwd(), "state");
@@ -245,6 +249,54 @@ export function apply(ctx, config) {
     ctx.logger && ctx.logger.warn && ctx.logger.warn("turnstile: recovery-required " + JSON.stringify(recovery));
   }
 
+  // ---- full-window console (from the user's build; same profile, same data) ----
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/console",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      const here = dirname(fileURLToPath(import.meta.url));
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+      res.end(readFileSync(join(here, "console.html"), "utf8"));
+    },
+  }), "turnstile: GET /turnstile/console");
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/console-designer.js",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      const here = dirname(fileURLToPath(import.meta.url));
+      res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
+      res.end(readFileSync(join(here, "console-designer.js"), "utf8"));
+    },
+  }), "turnstile: GET /turnstile/console-designer.js");
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/console-data",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      try { sendJson(res, 200, collectConsoleData(dir)); }
+      catch (e) { sendJson(res, 500, { error: String((e && e.message) || e).slice(0, 160) }); }
+    },
+  }), "turnstile: GET /turnstile/console-data");
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/designer",
+    handler: async (req, res) => {
+      if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
+      if (!requestRejection(req, res)) return;
+      try {
+        let body = "";
+        for await (const chunk of req) body += chunk;
+        const args = JSON.parse(body || "{}");
+        const result = designerTransaction(dir, args.operations, { dryRun: args.dryRun !== false, expected: args.expected }, readRows(dir));
+        sendJson(res, 200, result);
+      } catch (e) { sendJson(res, e.status || 400, { error: String((e && e.message) || e).slice(0, 180) }); }
+    },
+  }), "turnstile: POST /turnstile/designer");
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
     path: "/turnstile/plugins",

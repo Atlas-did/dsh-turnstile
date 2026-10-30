@@ -1,0 +1,6 @@
+{
+  "runs": [
+    { "at": "2026-10-30T20:10:00.000Z", "profile": "console-fixture", "result": "clear", "exit": 0, "checks": [] },
+    { "at": "2026-10-30T21:15:00.000Z", "profile": "console-fixture", "result": "blocked", "exit": 1, "checks": [{ "name": "prompt-vars", "ok": false }] }
+  ]
+}

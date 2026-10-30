@@ -1,0 +1,6 @@
+{
+  "checker": "occupancy",
+  "surfaces": [
+    { "surface": "ui-settings", "count": 2, "plugins": ["plug-alpha", "plug-gamma"], "hardcoded": ["plug-gamma"], "contested": true, "anchors": { "plug-alpha": "bottom-right" } }
+  ]
+}

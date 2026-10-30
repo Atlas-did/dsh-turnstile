@@ -1,0 +1,5 @@
+{
+  "name": "console-fixture",
+  "private": true,
+  "dsh": { "profile": { "bundles": ["plug-alpha", "plug-beta", "plug-gamma"] } }
+}

@@ -1,0 +1,10 @@
+{
+  "profile": "console-fixture",
+  "result": "blocked",
+  "blocking": ["prompt-vars"],
+  "checks": [
+    { "name": "prompt-vars", "ok": false, "ms": 12, "findings": [{ "severity": "error", "plugin": "plug-alpha", "resource": "alpha-row", "message": "unsupported variable ${UNKNOWN}", "evidence": { "file": "cordis.patch.yml", "line": 2 }, "fix": { "snippet": "replace ${UNKNOWN}" } }] },
+    { "name": "dependency-risk", "ok": true, "ms": 8, "findings": [] },
+    { "name": "ui-placement", "ok": true, "ms": 5, "findings": [{ "severity": "warning", "plugin": "plug-gamma", "resource": "ui-settings", "message": "shared surface" }] }
+  ]
+}

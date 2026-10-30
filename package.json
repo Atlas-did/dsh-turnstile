@@ -12,7 +12,15 @@
   "scripts": {
     "selftest": "node tools/selftest.mjs",
     "doctor": "node tools/doctor.mjs",
-    "map": "node tools/gate-map.mjs"
+    "map": "node tools/gate-map.mjs",
+    "dev": "node tools/console-server.mjs",
+    "test:console": "node tools/e2e-console-offline.mjs",
+    "test:designer": "node tools/e2e-designer-offline.mjs",
+    "test:panel": "node tools/e2e-panel-offline.mjs"
+  },
+  "devDependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "dependencies": {
     "js-yaml": "^4.1.0",

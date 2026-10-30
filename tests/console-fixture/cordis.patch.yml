@@ -1,0 +1,8 @@
+- id: alpha-row
+  name: plug-alpha
+  config:
+    anchor: bottom-right
+    order: 20
+- id: beta-row
+  name: plug-beta
+  disabled: true
