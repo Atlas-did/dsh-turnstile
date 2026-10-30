@@ -68,3 +68,24 @@ designer e2e  29/29
 selftest      67 passed / 6 skipped
 package tests 8 + 5 + 7 + 7 + 7
 ```
+## Update: the actions page is now wired (2026-10-31 later)
+
+The reverted attempt tried to replace the whole inspector. The smaller change works: the existing
+`renderInspector` keeps its markup and testids, and only the patch action now consults the model -
+a plugin with no config row gets a **disabled** button plus a visible reason instead of a click that
+fails:
+
+```js
+const rowless = !(s.plugin.rows || []).length;
+if (rowless) { b.disabled = true; b.dataset.reason = '没有配置行，无法写补丁'; }
+```
+
+New e2e checks (console suite 57 -> **59/59**):
+
+| Check | Result |
+|---|---|
+| row-less plugin disables the patch action | `button.disabled === true` |
+| disabled action explains itself | inspector shows `没有配置行` |
+
+So the split is now: **properties page unchanged, actions page model-aware**. The rest of the model
+(surface fuse, check findings) still lives only in the unit tests.

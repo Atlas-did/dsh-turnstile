@@ -160,6 +160,7 @@ try {
     await click('[data-testid="inspector-properties"]');
     ok('property tab switches back to values', (await text('#inspector')).includes('1.4.0'));
 
+
     await click('[data-testid="breadcrumb-profile"]');
     const drill = [
       ['plugin:0', 'plug-alpha'],
@@ -223,6 +224,17 @@ try {
     rmSync(patchPath);
     const noPatchResponse = await page.request.post(base + '/turnstile/toggle', { data: { package: 'plug-alpha', disable: true, dryRun: false } });
     ok('first disable creates a missing patch without a backup error', noPatchResponse.ok() && /disabled: true/.test(readFileSync(patchPath, 'utf8')));
+    // A plugin with no config row cannot be patched: the action must be disabled and say why.
+    await click('[data-testid="nav-plugins"]');
+    await page.locator('[data-testid="global-search"]').fill('');
+    const statusSel = page.locator('[data-testid="plugin-status"]').first();
+    if (await statusSel.count()) await statusSel.selectOption('all').catch(() => {});
+    await page.waitForTimeout(300);
+    await click('[data-testid="plugin-plug-gamma"]');
+    await click('[data-testid="inspector-actions"]');
+    const rowless = page.locator('[data-testid="action-toggle"]').first();
+    ok('row-less plugin disables the patch action', (await rowless.isDisabled()) === true);
+    ok('disabled action explains itself', (await text('[data-testid="action-reason"]')).includes('没有配置行'));
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {
