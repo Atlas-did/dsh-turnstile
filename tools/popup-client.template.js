@@ -30,8 +30,10 @@ window.__ModuleLoader__.load({
         var st = React.useState(true), open = st[0], setOpen = st[1];
         var rs = React.useState(visible(FALLBACK.rows)), rows = rs[0], setRows = rs[1];
         var bs = React.useState(""), busy = bs[0], setBusy = bs[1];
+        var rp = React.useState(null), report = rp[0], setReport = rp[1];
         React.useEffect(function () {
           api("plugins").then(function (d) { setRows(visible(d.rows)); }).catch(function () {});
+          api("report").then(setReport).catch(function () {});
         }, []);
         function reload() { return api("plugins").then(function (d) { setRows(visible(d.rows)); }); }
         function flip(row) {
@@ -53,7 +55,13 @@ window.__ModuleLoader__.load({
           h("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "6px" } },
             h("strong", { style: { fontSize: "13px" } }, "mini · 插件 " + rows.length),
             h("button", { onClick: function () { setOpen(false); }, style: { background: "none", border: 0, color: "#8b96a5", cursor: "pointer" } }, "×")),
-          h("div", { style: { color: "#8b96a5", fontSize: "11.5px", marginBottom: "8px" } }, "停用 " + off + " · 引擎跳过 " + sk + " · 挤爆的 UI 面 " + crowded + " · 点一行切换"),
+          h("div", { style: { color: "#8b96a5", fontSize: "11.5px", marginBottom: "6px" } }, "停用 " + off + " · 引擎跳过 " + sk + " · 挤爆的 UI 面 " + crowded + " · 点一行切换"),
+          report ? h("div", { style: { fontSize: "11.5px", marginBottom: "8px", color: "#8b96a5" } },
+            "闸门 " + (report.checks || []).length + " 项 · 阻塞 " + ((report.blocking || []).length) + " · " + (report.result || "?")
+            + (function () {
+                var p = (report.checks || []).filter(function (c) { return c.name === "ui-placement"; })[0];
+                return p ? " · 硬编码位置 " + (p.findings || []).length : "";
+              })()) : null,
           rows.map(function (r) {
             return h("div", { key: r.name, onClick: function () { if (!busy) flip(r); }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
               h("span", { style: { width: "12px", color: r.disabled ? "#f85149" : "#3fb950" } }, r.disabled ? "×" : "·"),

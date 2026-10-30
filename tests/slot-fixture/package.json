@@ -1,0 +1,3 @@
+{ "name": "slot-fixture", "private": true,
+  "dependencies": { "plug-ui": "1.0.0", "plug-ui2": "1.0.0" },
+  "dsh": { "profile": { "bundles": ["plug-ui", "plug-ui2"] } } }

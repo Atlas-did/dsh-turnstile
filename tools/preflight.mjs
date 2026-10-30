@@ -28,6 +28,7 @@ const CHECKS = [
   { name: 'file-conflict', script: 'tools/file-scan.mjs', hint: 'two plugins write the same absolute path' },
   { name: 'shortcut-conflict', script: 'tools/shortcut-scan.mjs', hint: 'two plugins register the same shortcut' },
   { name: 'css-collision', script: 'tools/css-scan.mjs', hint: 'advisory: global CSS class defined by more than one plugin', advisory: true },
+  { name: 'ui-placement', script: 'tools/slot-scan.mjs', hint: 'advisory: client plugins whose UI position is hardcoded (no slot/anchor/order)', advisory: true },
 ];
 
 const only = (flagValue('--only') || '').split(',').map((s) => s.trim()).filter(Boolean);
