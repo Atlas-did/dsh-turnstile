@@ -30,6 +30,7 @@ function run(script, ...args) {
 const cases = [];
 const check = (name, pass, detail) => cases.push({ name, pass, detail });
 
+let skipped = 0, envRun = 0;
 let r = run('tools/risk.mjs', join(root, 'tests/risk-fixture'));
 check('risk catches RED fixture', r.code === 6 && /plug-red\s+1\.0\.0\s+RED/.test(r.out), 'exit=' + r.code);
 
@@ -54,10 +55,6 @@ check('slot scan flags hardcoded positions', r.code === 0 && /HARDCODED\s+plug-u
 // Watch: a crash log's service table must be attributed to a named root cause.
 r = run('tools/watch.mjs', join(root, 'tests/watch-fixture/crash-host.log'));
 check('watch names the crash root cause', r.code === 1 && /webRuntime/.test(r.out) && /ROOT CAUSE/.test(r.out), 'exit=' + r.code);
-
-// Fix planner: a dry run must name the alias and write nothing.
-r = run('tools/fix.mjs', join(root, 'tests/risk-fixture'));
-check('fix plans an npm alias, dry', r.code === 4 && /npm:@deepseek-ai\/schemastery/.test(r.out), 'exit=' + r.code);
 
 // Four conflict surfaces that used to be unchecked: port / file / css / shortcut.
 r = run('tools/port-scan.mjs', join(root, 'tests/scan-fixture'));
@@ -88,9 +85,19 @@ check('prompt-vars catches YAML + JS', r.code === 7 && /plug-bad/.test(r.out) &&
 r = run('tools/preflight.mjs', join(root, 'tests/gate-fixture'), '--no-record');
 check('preflight blocks the fixture', r.code === 1, 'exit=' + r.code);
 
+// Fix planner: a dry run must name the alias. The alias hint needs a runtime to copy the
+// official version from, so without one this counts as an environment case, never a pass.
+if (process.env.DSH_RUNTIME_NODE_MODULES || existsSync(join(root, 'node_modules/@deepseek-ai'))) {
+  envRun++;
+  r = run('tools/fix.mjs', join(root, 'tests/risk-fixture'));
+  check('fix plans an npm alias, dry', r.code === 4 && /npm:@deepseek-ai\/schemastery/.test(r.out), 'exit=' + r.code);
+} else {
+  skipped++;
+  console.log('  SKIP  fix plans an npm alias, dry   (no runtime node_modules to resolve the official version)');
+}
+
 // Environment-specific cases: only meaningful on a machine that actually has these profiles.
 // They are skipped (and reported as skipped, not passed) everywhere else.
-let skipped = 0, envRun = 0;
 
 // A case whose fixture is missing must FAIL, not quietly pass because the tool errored out.
 const FIXTURES = ['ast-fixture', 'conflict-fixture', 'gate-fixture', 'import-fixture',
