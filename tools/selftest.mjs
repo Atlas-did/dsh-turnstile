@@ -76,6 +76,13 @@ r = run('tools/anchor.mjs', join(root, 'tests/anchor-fixture'), '--package', 'pl
 check('anchor dry-run shows the change', r.code === 0 && /anchor: bottom-left/.test(r.out), 'exit=' + r.code);
 check('anchor dry-run writes nothing', readFileSync(anchorPatch, 'utf8') === anchorBefore, 'file changed');
 
+// The value space belongs to the plugin: any short token is fine, garbage is refused.
+r = run('tools/anchor.mjs', join(root, 'tests/anchor-fixture'), '--package', 'plug-anchor', '--anchor', 'bottom-center');
+check('anchor accepts a custom token', r.code === 0 && /anchor: bottom-center/.test(r.out), 'exit=' + r.code);
+
+r = run('tools/anchor.mjs', join(root, 'tests/anchor-fixture'), '--package', 'plug-anchor', '--anchor', 'bad value!');
+check('anchor refuses a YAML-breaking value', r.code === 2, 'exit=' + r.code);
+
 // Occupancy: two plugins on one surface, one of them hardcoded, must be flagged contested.
 r = run('tools/occupancy.mjs', join(root, 'tests/slot-fixture'));
 check('occupancy flags the contested corner', r.code === 0 && /!\s+ui-settings/.test(r.out), 'exit=' + r.code);

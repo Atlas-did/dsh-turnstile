@@ -55,6 +55,16 @@ window.__ModuleLoader__.load({
           api("occupancy").then(setOcc).catch(function () {});
         }, []);
         function reload() { return api("plugins").then(function (d) { setRows(visible(d.rows)); }); }
+        function setAnchor(row, anchor) {
+          setBusy(row.name);
+          api("anchor", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ package: row.name, anchor: anchor })
+          }).then(function () { return api("occupancy"); }).then(setOcc).catch(function (e) {
+            console.warn("turnstile anchor failed", e);
+          }).then(function () { setBusy(""); });
+        }
         function flip(row) {
           setBusy(row.name);
           api("toggle", {
@@ -112,6 +122,28 @@ window.__ModuleLoader__.load({
             h("div", null, "行 id: " + (picked.row || "(未声明)")),
             h("div", null, "状态: " + (picked.disabled ? "已停用" : "启用") + (picked.engineSkipped ? " · 引擎跳过" : "")),
             h("div", null, "UI 面: " + ((picked.ui && picked.ui.length) ? picked.ui.join(", ") : "无（宿主侧或自绘）")),
+            (function () {
+              var cur = null;
+              try {
+                (occ && occ.surfaces || []).forEach(function (s) {
+                  if (s.anchors && s.anchors[picked.name]) cur = s.anchors[picked.name];
+                });
+              } catch (e) { /* ignore */ }
+              // Free-form: the plugin owns the value space, we only refuse YAML-breaking text.
+              return h("div", { style: { display: "flex", gap: "4px", alignItems: "center", marginTop: "2px" } },
+                h("span", null, "位置:"),
+                h("input", {
+                  defaultValue: cur || "",
+                  placeholder: "例如 bottom-right",
+                  disabled: Boolean(busy),
+                  onKeyDown: function (e) { if (e.key === "Enter") setAnchor(picked, e.target.value.trim()); },
+                  style: { flex: 1, minWidth: 0, background: "#161b22", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "6px", fontSize: "11.5px", padding: "1px 5px" }
+                }),
+                h("button", { onClick: function (e) { var v = e.target.parentNode.querySelector("input"); setAnchor(picked, v.value.trim()); },
+                  style: { padding: "1px 6px", borderRadius: "6px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "11.5px" } }, "设"),
+                h("button", { onClick: function () { setAnchor(picked, ""); },
+                  style: { padding: "1px 6px", borderRadius: "6px", border: "1px solid #30363d", background: "transparent", color: "#8b96a5", cursor: "pointer", fontSize: "11.5px" } }, "清"));
+            })(),
             h("div", { style: { marginTop: "6px", display: "flex", gap: "8px" } },
               h("button", { onClick: function () { if (!busy) flip(picked); }, style: { padding: "2px 8px", borderRadius: "6px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "11.5px" } }, picked.disabled ? "启用" : "停用"),
               h("button", { onClick: function () { setPicked(null); }, style: { padding: "2px 8px", borderRadius: "6px", border: "1px solid #30363d", background: "transparent", color: "#8b96a5", cursor: "pointer", fontSize: "11.5px" } }, "收起"))

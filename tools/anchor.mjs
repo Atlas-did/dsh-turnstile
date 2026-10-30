@@ -5,7 +5,9 @@
 import { readFileSync, existsSync, writeFileSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const ANCHORS = ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center'];
+// The value space belongs to the plugin, not to us: any short token is accepted.
+// (We only refuse things that would break the YAML line.)
+const isValidAnchor = (v) => typeof v === 'string' && v.length > 0 && v.length <= 40 && /^[A-Za-z0-9_.:-]+$/.test(v);
 const argv = process.argv.slice(2);
 const val = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
 const apply = argv.includes('--apply');
@@ -17,7 +19,8 @@ for (let i = 0; i < argv.length; i++) {
 const pkgName = val('--package');
 const anchor = val('--anchor');
 if (!dir || !pkgName || !anchor) { console.error('usage: node tools/anchor.mjs <profileDir> --package <pkg> --anchor <value> [--apply]'); process.exit(2); }
-if (!ANCHORS.includes(anchor)) { console.error('anchor must be one of: ' + ANCHORS.join(', ')); process.exit(2); }
+const clear = anchor === 'clear' || anchor === 'none';
+if (!clear && !isValidAnchor(anchor)) { console.error('anchor must be 1-40 chars of [A-Za-z0-9_.:-] (or "clear")'); process.exit(2); }
 
 const patchPath = join(dir, 'cordis.patch.yml');
 if (!existsSync(patchPath)) { console.error('no cordis.patch.yml in ' + dir); process.exit(2); }
@@ -58,15 +61,16 @@ const childIndent = ' '.repeat(rowIndent + 2);
 const leafIndent = ' '.repeat(rowIndent + 4);
 const configIdx = lines.findIndex((l, i) => i > rowIdx && i < end && l.trim() === 'config:');
 const next = lines.slice();
-if (configIdx === -1) {
+if (configIdx === -1 && !clear) {
   next.splice(rowIdx + 1, 0, childIndent + 'config:', leafIndent + 'anchor: ' + anchor);
-} else {
+} else if (configIdx !== -1) {
   let anchorIdx = -1;
   for (let i = configIdx + 1; i < end; i++) {
     if (/^\s*anchor:/.test(next[i])) { anchorIdx = i; break; }
     if (next[i].trim() && (next[i].match(/^\s*/) || [''])[0].length <= rowIndent + 2) break;
   }
-  if (anchorIdx === -1) next.splice(configIdx + 1, 0, leafIndent + 'anchor: ' + anchor);
+  if (clear) { if (anchorIdx !== -1) next.splice(anchorIdx, 1); }
+  else if (anchorIdx === -1) next.splice(configIdx + 1, 0, leafIndent + 'anchor: ' + anchor);
   else next[anchorIdx] = leafIndent + 'anchor: ' + anchor;
 }
 

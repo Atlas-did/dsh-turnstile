@@ -1,0 +1,6 @@
+- insert:
+    - id: plug-anchor
+      name: plug-anchor
+      config:
+        anchor: bottom-center-2
+        slot: shell.overlay

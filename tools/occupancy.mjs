@@ -41,10 +41,41 @@ for (const name of bundles) {
   }
 }
 
+// Current anchors, read from the profile patch (that is where config lives).
+const anchors = {};
+{
+  const patchPath = join(dir, 'cordis.patch.yml');
+  if (existsSync(patchPath)) {
+    const blocks = readFileSync(patchPath, 'utf8').split(/^-\s*id:/m).slice(1);
+    for (const b of blocks) {
+      const id = (b.match(/^\s*([\w.@/-]+)/) || [])[1] || '';
+      const a = (b.match(/^\s*anchor:\s*([\w-]+)\s*$/m) || [])[1] || null;
+      if (id) anchors[id] = a;
+    }
+  }
+}
+const rowOf = {};
+for (const name of bundles) {
+  if (name.indexOf('@deepseek-ai/') === 0) continue;
+  const pj = join(dir, 'node_modules', name, 'package.json');
+  if (!existsSync(pj)) continue;
+  const j = JSON.parse(readFileSync(pj, 'utf8'));
+  const rel = j.dsh && j.dsh.bundle && j.dsh.bundle.patch;
+  if (!rel) continue;
+  const pf = join(dir, 'node_modules', name, String(rel).replace(/^\.\//, ''));
+  if (!existsSync(pf)) continue;
+  const t = readFileSync(pf, 'utf8');
+  const m = t.match(/-\s*id:\s*([\w.@/-]+)/);
+  if (m) rowOf[name] = m[1];
+}
+
 const rows = [...surfaces.entries()].map(([surface, list]) => {
   const hardcoded = list.filter((l) => !l.configurable).map((l) => l.plugin);
   const contested = list.length > 1 && hardcoded.length > 0;
-  return { surface, count: list.length, hardcoded, plugins: list.map((l) => l.plugin), contested };
+  return {
+    surface, count: list.length, hardcoded, plugins: list.map((l) => l.plugin), contested,
+    anchors: Object.fromEntries(list.map((l) => [l.plugin, anchors[rowOf[l.plugin]] || null])),
+  };
 }).sort((a, b) => b.count - a.count || a.surface.localeCompare(b.surface));
 
 const findings = rows.filter((r) => r.contested).map((r) => ({
