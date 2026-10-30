@@ -1,0 +1,12 @@
+{
+  "name": "sc-clean",
+  "private": true,
+  "dependencies": {
+    "safe-pkg": "1.0.0"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": []
+    }
+  }
+}

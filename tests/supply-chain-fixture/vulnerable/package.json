@@ -1,0 +1,12 @@
+{
+  "name": "sc-vulnerable",
+  "private": true,
+  "dependencies": {
+    "left-pad-ish": "1.0.0"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": []
+    }
+  }
+}

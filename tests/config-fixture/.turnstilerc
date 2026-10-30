@@ -1,0 +1,8 @@
+{
+  "officialScopes": [
+    "@acme/"
+  ],
+  "ui": {
+    "threshold": 2
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "vulns": [
+        {
+          "id": "GHSA-xxxx-yyyy-zzzz",
+          "summary": "Prototype pollution in merge helper",
+          "affected": [
+            {
+              "package": {
+                "name": "left-pad-ish"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
