@@ -1,7 +1,8 @@
 {
   "name": "turnstile-popup",
   "version": "0.0.3",
-  "private": true,
+  "description": "Install-time gate and plugin inspector for DeepSeek Harness: occupancy map, verdicts, and a full-page console.",
+  "license": "MIT",
   "type": "module",
   "main": "./lib/index.js",
   "exports": {
@@ -9,25 +10,29 @@
     "./client": "./lib/client.js",
     "./cordis.patch.yml": "./cordis.patch.yml"
   },
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    },
-  "compatibility": {
-    "node": ">=20",
-    "dsh": ">=0.2.1-rc.3 <0.3.0",
-    "dshReleases": {
-      "0.2.1-rc.3": "compatible",
-      "0.2.1-rc.4": "unknown",
-      "0.2.1-rc.5": "unknown",
-      "0.2.2-alpha.2": "unknown"
-    }
+  "files": ["lib", "cordis.patch.yml", "README.md"],
+  "keywords": ["dsh", "dsh-plugin", "deepseek-harness", "diagnostics", "occupancy"],
+  "engines": { "node": ">=20" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Atlas-did/dsh-turnstile.git",
+    "directory": "plugins/turnstile-popup"
   },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
     "client": {
       "platform": "web",
-      "inject": [
-        "@deepseek-ai/dsh-client-ui-slots"
-      ]
+      "inject": ["@deepseek-ai/dsh-client-ui-slots"]
+    },
+    "compatibility": {
+      "node": ">=20",
+      "dsh": ">=0.2.1-rc.3 <0.3.0",
+      "dshReleases": {
+        "0.2.1-rc.3": "compatible",
+        "0.2.1-rc.4": "unknown",
+        "0.2.1-rc.5": "unknown",
+        "0.2.2-alpha.2": "unknown"
+      }
     }
   }
 }
