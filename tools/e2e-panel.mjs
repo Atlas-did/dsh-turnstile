@@ -32,7 +32,14 @@ const waitPatch = async (predicate, timeoutMs = 8000) => {
 };
 const ok = (name, pass, detail) => { steps.push({ name, pass, detail }); console.log((pass ? '  PASS  ' : '  FAIL  ') + name + (detail ? '   ' + detail : '')); };
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+let browser = null;
+try {
+  browser = await chromium.launch({ channel: 'msedge', headless: true });
+} catch (e) {
+  console.log('SKIP: no browser available (' + String(e.message).slice(0, 80) + ')');
+  console.log('coverage incomplete: exit 3');
+  process.exit(3);
+}
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await page.goto('http://127.0.0.1:' + port + '/?token=' + token, { waitUntil: 'domcontentloaded' }).catch(() => {});

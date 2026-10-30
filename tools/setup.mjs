@@ -49,6 +49,10 @@ steps.push({ id: 'map', title: 'look at the topology, not the log',
   detail: 'node tools/gate-map.mjs ' + profile + '  -> state/gate-map-' + profile + '.html',
   command: 'node tools/gate-map.mjs ' + profile });
 
+steps.push({ id: 'e2e', title: 'prove the panel actually works (real clicks, no JS dispatch)',
+  detail: 'node tools/e2e-panel.mjs --log <dsh log> --patch <profile>/cordis.patch.yml --row <a harmless plugin>',
+  command: 'node tools/e2e-panel.mjs --log <dsh log> --patch ' + join(target, 'cordis.patch.yml') + ' --row dsh-talk' });
+
 steps.push({ id: 'mode', title: 'enter manage-mini mode in a new conversation',
   detail: 'paste the block from docs/43-manage-mini-mode.md; it tells the agent the read-only checks, the write rules and the reporting shape',
   command: null });

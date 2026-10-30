@@ -114,6 +114,10 @@ if (process.env.DSH_RUNTIME_NODE_MODULES || existsSync(join(root, 'node_modules/
   console.log('  SKIP  fix plans an npm alias, dry   (no runtime node_modules to resolve the official version)');
 }
 
+// E2E must degrade to exit 3 (coverage incomplete) when there is no panel, never exit 0.
+r = run('tools/e2e-panel.mjs', '--log', join(root, 'tests/e2e-fixture/mini.log'), '--patch', join(root, 'tests/e2e-fixture/cordis.patch.yml'), '--row', 'dsh-talk', '--port', '9');
+check('e2e reports incomplete coverage, not success', r.code === 3, 'exit=' + r.code);
+
 // Setup wizard: a plan is printed and nothing is written without --yes.
 r = run('tools/setup.mjs', '--home', join(root, 'tests/home-fixture/home'), '--json');
 check('setup prints a five-step plan', r.code === 0 && /"deps"/.test(r.out) && /"mode"/.test(r.out), 'exit=' + r.code);
