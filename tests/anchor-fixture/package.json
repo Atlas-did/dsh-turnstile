@@ -1,0 +1,14 @@
+{
+  "name": "anchor-fixture",
+  "private": true,
+  "dependencies": {
+    "plug-anchor": "1.0.0"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "plug-anchor"
+      ]
+    }
+  }
+}

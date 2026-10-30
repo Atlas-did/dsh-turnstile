@@ -1,7 +1,7 @@
 // Self-test for the gate itself: every scanner must still catch its fixture.
 // usage: node tools/selftest.mjs
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -68,6 +68,13 @@ check('shortcut scan catches duplicate key', r.code === 9 && /ctrl\+k/.test(r.ou
 
 r = run('tools/css-scan.mjs', join(root, 'tests/scan-fixture'));
 check('css scan catches shared class', /panel/.test(r.out), 'exit=' + r.code);
+
+// Anchor: the dry run must show the change and leave the file untouched.
+const anchorPatch = join(root, 'tests/anchor-fixture/cordis.patch.yml');
+const anchorBefore = readFileSync(anchorPatch, 'utf8');
+r = run('tools/anchor.mjs', join(root, 'tests/anchor-fixture'), '--package', 'plug-anchor', '--anchor', 'bottom-left');
+check('anchor dry-run shows the change', r.code === 0 && /anchor: bottom-left/.test(r.out), 'exit=' + r.code);
+check('anchor dry-run writes nothing', readFileSync(anchorPatch, 'utf8') === anchorBefore, 'file changed');
 
 // Occupancy: two plugins on one surface, one of them hardcoded, must be flagged contested.
 r = run('tools/occupancy.mjs', join(root, 'tests/slot-fixture'));
