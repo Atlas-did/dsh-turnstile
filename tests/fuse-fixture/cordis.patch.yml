@@ -1,0 +1,9 @@
+- insert:
+    - id: fuse-a
+      name: fuse-a
+      config:
+        anchor: bottom-right
+    - id: fuse-b
+      name: fuse-b
+      config:
+        anchor: bottom-right

@@ -41,7 +41,12 @@ if (suggestMode) {
       const bare = /anchor\s*[:=]\s*([A-Za-z][A-Za-z0-9_-]{1,39})\b/g;
       let m;
       while ((m = quoted.exec(t))) found.add(m[1]);
-      if (!quotedOnly) while ((m = bare.exec(t))) if (m[1].indexOf('.') === -1) found.add(m[1]);
+      if (!quotedOnly) {
+        while ((m = bare.exec(t))) if (m[1].indexOf('.') === -1) found.add(m[1]);
+        // docs often write "anchor: a   # or b" - the alternate is a real documented value
+        const alt = /anchor\s*[:=].{0,60}?\bor\s+([A-Za-z][A-Za-z0-9_-]{1,39})\b/g;
+        while ((m = alt.exec(t))) if (m[1].indexOf('.') === -1) found.add(m[1]);
+      }
     } catch { /* ignore */ }
   };
   for (const rel of ['README.md', 'readme.md', 'cordis.patch.yml', 'package.json']) scan(join(base, rel), false);

@@ -1,0 +1,16 @@
+{
+  "name": "fuse-fixture",
+  "private": true,
+  "dependencies": {
+    "fuse-a": "1.0.0",
+    "fuse-b": "1.0.0"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "fuse-a",
+        "fuse-b"
+      ]
+    }
+  }
+}

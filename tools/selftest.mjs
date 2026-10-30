@@ -83,6 +83,13 @@ check('anchor accepts a custom token', r.code === 0 && /anchor: bottom-center/.t
 r = run('tools/anchor.mjs', join(root, 'tests/anchor-fixture'), '--package', 'plug-anchor', '--anchor', 'bad value!');
 check('anchor refuses a YAML-breaking value', r.code === 2, 'exit=' + r.code);
 
+// Fusion: distinct positions when both plugins document them; refuse when one cannot move.
+r = run('tools/fuse.mjs', join(root, 'tests/fuse-fixture'), '--surface', 'ui-settings');
+check('fuse assigns distinct documented anchors', r.code === 0 && /fuse-b\s+bottom-right\s+->\s+bottom-left/.test(r.out), 'exit=' + r.code);
+
+r = run('tools/fuse.mjs', join(root, 'tests/slot-fixture'), '--surface', 'ui-settings');
+check('fuse refuses when a plugin cannot move', r.code === 3, 'exit=' + r.code);
+
 // Suggestions come from the plugin's own docs, never from a fixed list we invent.
 r = run('tools/anchor.mjs', join(root, 'tests/anchor-fixture'), '--package', 'plug-anchor', '--suggest');
 check('anchor suggests what the plugin documents', r.code === 0 && /bottom-right/.test(r.out), 'exit=' + r.code);

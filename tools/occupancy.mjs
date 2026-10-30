@@ -46,7 +46,7 @@ const anchors = {};
 {
   const patchPath = join(dir, 'cordis.patch.yml');
   if (existsSync(patchPath)) {
-    const blocks = readFileSync(patchPath, 'utf8').split(/^-\s*id:/m).slice(1);
+    const blocks = readFileSync(patchPath, 'utf8').split(/^\s*-\s*id:/m).slice(1);
     for (const b of blocks) {
       const id = (b.match(/^\s*([\w.@/-]+)/) || [])[1] || '';
       const a = (b.match(/^\s*anchor:\s*([\w-]+)\s*$/m) || [])[1] || null;
