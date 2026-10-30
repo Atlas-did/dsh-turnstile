@@ -5,6 +5,104 @@ import { join } from "node:path";
 
 export const inject = ["webServer"];
 
+// Devtools-style activity: counts of what the panel asked for, plus a tail of the host log.
+const activity = { startedAt: new Date().toISOString(), calls: {}, logPath: process.env.DSH_TURNSTILE_LOG || '' };
+const bump = (name) => { activity.calls[name] = (activity.calls[name] || 0) + 1; };
+
+// Standalone console: a full browser page, because a 330px panel cannot hold a table + inspector.
+const CONSOLE_HTML = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>Turnstile 插件体检</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:13px/1.5 ui-sans-serif,system-ui,"Microsoft YaHei";color:#1f2328;background:#f6f7f9}
+.top{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#fff;border-bottom:1px solid #d8dee4}
+.top h1{font-size:14px;margin:0 14px 0 0}
+.btn{font:inherit;padding:4px 10px;border:1px solid #d0d7de;border-radius:6px;background:#f6f8fa;cursor:pointer}
+.q{margin-left:auto;display:flex;gap:6px;align-items:center}
+.q input{width:260px;padding:4px 8px;border:1px solid #d0d7de;border-radius:6px;font:inherit}
+.main{display:grid;grid-template-columns:170px 1fr;height:calc(100vh - 46px)}
+nav{background:#fff;border-right:1px solid #d8dee4;padding:6px 0}
+nav div{padding:7px 16px;cursor:pointer;font-size:13px}
+nav div.on{background:#eff6ff;color:#1f6feb;font-weight:600;border-left:3px solid #1f6feb;padding-left:13px}
+section{overflow:auto;padding:14px 18px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:6px 10px;border-bottom:1px solid #eef1f4;text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:#f6f8fa;color:#57606a;font-weight:600;border-bottom:1px solid #d8dee4}
+td.n{text-align:right;font-family:ui-monospace,monospace}
+tr.on{background:#eff6ff}
+.mono{font-family:ui-monospace,monospace}
+.grid{display:grid;grid-template-columns:110px 1fr;gap:3px 14px;font-size:12.5px}
+.grid .k{color:#57606a}
+.delta{color:#57606a;font-size:12px;margin-bottom:10px}
+iframe{width:100%;height:calc(100vh - 140px);border:1px solid #d8dee4;border-radius:8px;background:#fff}
+pre{font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap;word-break:break-all;margin:0}
+</style></head><body>
+<div class="top"><h1>插件体检</h1>
+<button class="btn" onclick="load(true)">重新体检</button>
+<button class="btn" onclick="location.reload()">刷新</button>
+<span class="q"><span>筛选</span><input id="q" placeholder="插件 / UI 面 / 状态" oninput="render()"></span></div>
+<div class="main"><nav id="nav"></nav><section id="body"></section></div>
+<script>
+const TOKEN = new URLSearchParams(location.search).get('token') || '';
+const PAGES = ['概览','架构图','占用','插件','控制台'];
+let page = '概览', D = { rows: [], occ: null, act: null, delta: null }, Q = '';
+const api = (p) => fetch('/turnstile/' + p + (p.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(TOKEN)).then(r => r.json());
+const hit = (t) => !Q || String(t || '').toLowerCase().includes(Q.toLowerCase());
+function el(tag, attrs, html) { const e = document.createElement(tag); if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]); if (html != null) e.innerHTML = html; return e; }
+async function load(update) {
+  const [p, o, a] = await Promise.all([api('plugins' + (update === true ? '' : '?update=0')), api('occupancy'), api('activity')]);
+  D.rows = p.rows || []; D.delta = p.delta || null; D.occ = o; D.act = a;
+  render();
+}
+function nav() { const n = document.getElementById('nav'); n.innerHTML = ''; PAGES.forEach(p => { const d = el('div', null, p); if (p === page) d.className = 'on'; d.onclick = () => { page = p; render(); }; n.appendChild(d); }); }
+function table(cols, rows) {
+  let h = '<table><thead><tr>' + cols.map(c => '<th' + (c.n ? ' style="text-align:right"' : '') + '>' + c.t + '</th>').join('') + '</tr></thead><tbody>';
+  h += rows.join('');
+  return h + '</tbody></table>';
+}
+function render() {
+  nav(); const b = document.getElementById('body');
+  const rows = D.rows.filter(r => hit(r.name) || (r.ui || []).some(hit));
+  const surf = ((D.occ && D.occ.surfaces) || []).filter(s => hit(s.surface) || (s.plugins || []).some(hit));
+  const dl = D.delta && !D.delta.firstRun ? (function () { const p = []; if (D.delta.added.length) p.push('+' + D.delta.added.length + ' 新装'); if (D.delta.removed.length) p.push('-' + D.delta.removed.length + ' 卸载'); if (D.delta.toggled.length) p.push(D.delta.toggled.length + ' 状态变更'); return '自上次查看: ' + (p.length ? p.join(' · ') : '无变化'); })() : (D.delta ? '首次查看，已记下基线' : '');
+  if (page === '概览') {
+    b.innerHTML = '<div class="delta">' + dl + '</div><div class="grid"><span class="k">插件</span><span>' + D.rows.length + '</span><span class="k">UI 面</span><span>' + ((D.occ && D.occ.surfaces || []).length) + '</span><span class="k">争用</span><span>' + ((D.occ && D.occ.surfaces || []).filter(s => s.contested).length) + '</span><span class="k">停用</span><span>' + D.rows.filter(r => r.disabled).length + '</span></div>';
+  } else if (page === '占用') {
+    b.innerHTML = '<div class="delta">' + dl + '</div>' + table([{ t: 'UI 面' }, { t: '插件数', n: 1 }, { t: '硬编码', n: 1 }, { t: '插件' }], surf.map(s => '<tr><td class="mono">' + s.surface + '</td><td class="n">' + s.count + '</td><td class="n" style="color:' + ((s.hardcoded || []).length ? '#9a6700' : '#57606a') + '">' + ((s.hardcoded || []).length) + '</td><td style="color:#57606a;font-size:11.5px;max-width:520px;overflow:hidden;text-overflow:ellipsis" title="' + (s.plugins || []).join(', ') + '">' + (s.plugins || []).join(', ') + '</td></tr>'));
+  } else if (page === '插件') {
+    b.innerHTML = '<div class="delta">' + dl + '</div>' + table([{ t: '插件' }, { t: '状态' }, { t: 'UI 面', n: 1 }, { t: '行 id' }], rows.map(r => { let a = null; ((D.occ && D.occ.surfaces) || []).forEach(s => { if (s.anchors && s.anchors[r.name]) a = s.anchors[r.name]; }); return '<tr' + (r.disabled ? '' : '') + '><td class="mono">' + (r.disabled ? '× ' : '· ') + r.name + '</td><td style="color:' + (r.disabled ? '#cf222e' : (r.engineSkipped ? '#9a6700' : '#1a7f37')) + '">' + (r.disabled ? '停用' : (r.engineSkipped ? '引擎跳过' : '启用')) + '</td><td class="n">' + ((r.ui || []).length) + '</td><td class="mono">' + (a || '硬编码') + '</td></tr>'; }));
+  } else if (page === '控制台') {
+    b.innerHTML = '<div class="delta">' + (D.act ? '面板请求: ' + Object.keys(D.act.calls || {}).map(k => k + '×' + D.act.calls[k]).join('   ') : '') + '</div><pre>' + ((D.act && D.act.tail || []).join(String.fromCharCode(10)) || (D.act && D.act.note) || '') + '</pre>';
+  } else {
+    b.innerHTML = '<div class="delta">由 occupancy 数据生成 · <a href="/turnstile/arch?token=' + encodeURIComponent(TOKEN) + '" target="_blank">新窗口打开</a></div><iframe src="/turnstile/arch?token=' + encodeURIComponent(TOKEN) + '"></iframe>';
+  }
+}
+load(false);
+</script></body></html>`;
+
+// Delta since the previous look: Process Explorer's colour-by-change, applied to plugin rows.
+const seenPath = () => {
+  const base = process.env.DSH_TURNSTILE_STATE || join(process.env.DSH_TURNSTILE_HOME || process.cwd(), "state");
+  return join(base, "turnstile-seen.json");
+};
+function computeDelta(rows) {
+  const now = {};
+  for (const r of rows) now[r.name] = r.disabled ? "off" : (r.engineSkipped ? "skip" : "on");
+  let prev = null;
+  try { prev = JSON.parse(readFileSync(seenPath(), "utf8")); } catch (e) { prev = null; }
+  const delta = { firstRun: !prev, at: prev ? prev.at : null, added: [], removed: [], toggled: [] };
+  if (prev && prev.rows) {
+    for (const k of Object.keys(now)) {
+      if (!(k in prev.rows)) delta.added.push(k);
+      else if (prev.rows[k] !== now[k]) delta.toggled.push({ name: k, from: prev.rows[k], to: now[k] });
+    }
+    for (const k of Object.keys(prev.rows)) if (!(k in now)) delta.removed.push(k);
+  }
+  try { writeFileSync(seenPath(), JSON.stringify({ at: new Date().toISOString(), rows: now }, null, 2)); } catch (e) { /* read-only state dir */ }
+  return delta;
+}
+
+
 const sendJson = (res, code, body) => {
   res.statusCode = code;
   res.setHeader("content-type", "application/json; charset=utf-8");
@@ -108,7 +206,10 @@ export function apply(ctx, config) {
     path: "/turnstile/plugins",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
-      sendJson(res, 200, { profile, rows: readRows(dir) });
+      bump("plugins");
+      const rowsNow = readRows(dir);
+      const peek = String(req.url || "").indexOf("update=0") !== -1;
+      sendJson(res, 200, { profile, rows: rowsNow, delta: peek ? null : computeDelta(rowsNow) });
     }
   }), "turnstile: GET /turnstile/plugins");
 
@@ -118,7 +219,7 @@ export function apply(ctx, config) {
     path: "/turnstile/report",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
-      const file = join(process.env.DSH_TURNSTILE_HOME || process.cwd(), "state", "report-" + profile + ".json");
+      const file = join(process.env.DSH_TURNSTILE_HOME || "C:/Users/finef/Desktop/mini-harness/oss/dsh-turnstile", "state", "report-" + profile + ".json");
       if (!existsSync(file)) return sendJson(res, 404, { error: "no-report", file });
       try {
         sendJson(res, 200, JSON.parse(readFileSync(file, "utf8")));
@@ -140,6 +241,110 @@ export function apply(ctx, config) {
       catch (e) { sendJson(res, 500, { error: String((e && e.message) || e).slice(0, 160) }); }
     },
   }), "turnstile: GET /turnstile/occupancy");
+
+  // Serve the generated architecture diagram so a settings page can embed it.
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      bump("console-page");
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+      res.end(CONSOLE_HTML);
+    },
+  }), "turnstile: GET /turnstile/ (full-page console)");
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/arch",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      bump("arch");
+      const base = process.env.DSH_TURNSTILE_STATE || join(process.env.DSH_TURNSTILE_HOME || process.cwd(), "state");
+      const file = join(base, "arch", "graph.html");
+      if (!existsSync(file)) return sendJson(res, 404, { error: "no diagram", hint: "node tools/arch-graph.mjs <profile> --archify <path>", expected: file });
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+      res.end(readFileSync(file));
+    },
+  }), "turnstile: GET /turnstile/arch");
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/activity",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      bump("activity");
+      let tail = [];
+      let note = "";
+      const p = activity.logPath;
+      if (!p) note = "未设置 DSH_TURNSTILE_LOG";
+      else if (!existsSync(p)) note = "日志不存在: " + p;
+      else {
+        try {
+          const lines = readFileSync(p, "utf8").split(/\r?\n/).filter(Boolean).slice(-40);
+          tail = lines.filter((l) => /error|fail|warn|activate|fatal|preset/i.test(l)).slice(-12).map((l) => l.slice(0, 160));
+          if (!tail.length) note = "最近 40 行没有异常或激活记录";
+        } catch (e) { note = String((e && e.message) || e).slice(0, 120); }
+      }
+      sendJson(res, 200, { startedAt: activity.startedAt, calls: activity.calls, logPath: p, tail, note });
+    },
+  }), "turnstile: GET /turnstile/activity");
+
+  // Does this plugin accept a position at all, and which values does it document?
+  // Drag mode needs this before it can promise anything.
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/anchor-support",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      const u = new URL(String(req.url), "http://localhost");
+      const pkg = u.searchParams.get("package") || "";
+      const row = readRows(dir).find((r) => r.name === pkg);
+      if (!row) return sendJson(res, 404, { error: "no-package" });
+      const base = join(dir, "node_modules", pkg);
+      let rowText = "";
+      try {
+        const j = JSON.parse(readFileSync(join(base, "package.json"), "utf8"));
+        const rel = j.dsh && j.dsh.bundle && j.dsh.bundle.patch;
+        if (rel) rowText = readFileSync(join(base, String(rel).replace(/^\.\//, "")), "utf8");
+      } catch { /* ignore */ }
+      const configurable = /\b(slot|anchor|order)\s*:/.test(rowText);
+      const values = new Set();
+      for (const rel of ["README.md", "readme.md", "cordis.patch.yml", "package.json"]) {
+        try {
+          const t = readFileSync(join(base, rel), "utf8");
+          const quoted = /anchor\s*[:=]\s*['"]([A-Za-z0-9_.:-]{2,40})['"]/g;
+          const bare = /anchor\s*[:=]\s*([A-Za-z][A-Za-z0-9_-]{1,39})\b/g;
+          let m;
+          while ((m = quoted.exec(t))) values.add(m[1]);
+          while ((m = bare.exec(t))) if (m[1].indexOf(".") === -1) values.add(m[1]);
+        } catch { /* ignore */ }
+      }
+      sendJson(res, 200, { package: pkg, configurable, row: row.row || "", values: [...values].sort() });
+    },
+  }), "turnstile: GET /turnstile/anchor-support");
+
+  // Fusion (mode A): ask the CLI to resolve a contested surface. One implementation, not two.
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/fuse",
+    handler: async (req, res) => {
+      if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      let args = {};
+      try { args = JSON.parse(body || "{}"); } catch { return sendJson(res, 400, { error: "json" }); }
+      if (!args.surface) return sendJson(res, 400, { error: "surface" });
+      // Applying a fusion writes another plugin's config, so it stays a CLI action with a backup.
+      // This endpoint only returns the command: the package spawns no subprocess.
+      sendJson(res, 200, {
+        ok: false,
+        cli: true,
+        output: "融合写回需要命令行执行（会改另一个插件的配置并留 .bak）：\n" +
+          "node tools/fuse.mjs <profile> --surface " + String(args.surface) + " --apply",
+      });
+    },
+  }), "turnstile: POST /turnstile/fuse");
 
   // Anchor options the plugin itself declares (docs/patch/readme), so the UI can suggest
   // without inventing a fixed list. An empty list means: type whatever the plugin expects.
