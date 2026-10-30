@@ -72,16 +72,34 @@ window.__ModuleLoader__.load({
 
       function SettingsSection() {
         var tab = React.useState("概览"), active = tab[0], setActive = tab[1];
-        var data = React.useState({ rows: [], occ: null, err: "" }), d = data[0], setData = data[1];
+        var data = React.useState({ rows: [], occ: null, err: "", delta: null }), d = data[0], setData = data[1];
+        var selRow = React.useState(null), chosen = selRow[0], setChosen = selRow[1];
         var act = React.useState(null), activity = act[0], setActivity = act[1];
         React.useEffect(function () {
           Promise.all([api("plugins").catch(function () { return null; }), api("occupancy").catch(function () { return null; }), api("activity").catch(function () { return null; })])
             .then(function (res) {
-              setData({ rows: (res[0] && res[0].rows) || [], occ: res[1], err: "" });
+              setData({ rows: (res[0] && res[0].rows) || [], occ: res[1], err: "", delta: res[0] ? res[0].delta : null });
               setActivity(res[2] || null);
             })
             .catch(function (e) { setData({ rows: [], occ: null, err: String(e && e.message || e) }); });
         }, []);
+        var delta = d.delta || null;
+        var deltaLine = "";
+        if (delta && !delta.firstRun) {
+          var parts = [];
+          if (delta.added.length) parts.push("+" + delta.added.length + " 新装");
+          if (delta.removed.length) parts.push("-" + delta.removed.length + " 卸载");
+          if (delta.toggled.length) parts.push(delta.toggled.length + " 状态变更");
+          deltaLine = parts.length ? ("自上次查看: " + parts.join(" · ")) : "自上次查看: 无变化";
+        } else if (delta && delta.firstRun) {
+          deltaLine = "首次查看，已记下基线";
+        }
+        function deltaMark(name) {
+          if (!delta || delta.firstRun) return "";
+          if (delta.added.indexOf(name) !== -1) return "＋";
+          if (delta.toggled.some(function (t) { return t.name === name; })) return "⟳";
+          return "";
+        }
         var pages = ["概览", "架构图", "占用", "插件", "控制台"];
         var rows = d.rows || [];
         var surfaces = (d.occ && d.occ.surfaces) || [];
@@ -99,8 +117,8 @@ window.__ModuleLoader__.load({
         if (active === "插件") {
           content = table([{ title: "插件" }, { title: "状态" }, { title: "UI 面", num: true }, { title: "位置" }],
             rows.map(function (r) {
-              return h("tr", { key: r.name, "data-testid": "srow-" + r.name },
-                cell(h("span", null, (r.disabled ? "× " : "· ") + r.name), { fontFamily: "ui-monospace,monospace" }),
+              return h("tr", { key: r.name, "data-testid": "srow-" + r.name, onClick: function () { setChosen(chosen && chosen.name === r.name ? null : r); }, style: { cursor: "pointer", background: chosen && chosen.name === r.name ? "#eff6ff" : "transparent" } },
+                cell(h("span", null, deltaMark(r.name) + (r.disabled ? "× " : "· ") + r.name), { fontFamily: "ui-monospace,monospace", color: deltaMark(r.name) === "＋" ? "#0969da" : undefined }),
                 cell(r.disabled ? "停用" : (r.engineSkipped ? "引擎跳过" : "启用"), { color: r.disabled ? "#cf222e" : (r.engineSkipped ? "#9a6700" : "#1a7f37") }),
                 cell(((r.ui && r.ui.length) || 0), { textAlign: "right", fontFamily: "ui-monospace,monospace" }),
                 (function () {
@@ -140,6 +158,18 @@ window.__ModuleLoader__.load({
             ? "共 " + rows.length + " 个插件，" + surfaces.length + " 个 UI 面（" + surfaces.filter(function (s) { return s.contested; }).length + " 处争用）"
             : "骨架阶段：这一页还没有接数据。");
         }
+        var detail = null;
+        if (chosen) {
+          var anchorVal = null;
+          surfaces.forEach(function (s) { if (s.anchors && s.anchors[chosen.name]) anchorVal = s.anchors[chosen.name]; });
+          detail = h("div", { "data-testid": "sp-detail", style: { marginTop: "10px", padding: "10px 12px", background: "#f6f8fa", borderRadius: "8px", fontSize: "12px" } },
+            h("div", { style: { fontWeight: "600", marginBottom: "6px", fontFamily: "ui-monospace,monospace" } }, chosen.name),
+            h("div", { style: { display: "grid", gridTemplateColumns: "90px 1fr", rowGap: "2px" } },
+              h("span", { style: { color: "#57606a" } }, "行 id"), h("span", null, chosen.row || "(未声明)"),
+              h("span", { style: { color: "#57606a" } }, "状态"), h("span", null, chosen.disabled ? "停用" : (chosen.engineSkipped ? "引擎跳过" : "启用")),
+              h("span", { style: { color: "#57606a" } }, "UI 面"), h("span", null, ((chosen.ui && chosen.ui.length) || 0) + " 个"),
+              h("span", { style: { color: "#57606a" } }, "位置"), h("span", null, anchorVal || "硬编码（改配置无效）")));
+        }
         return h("div", { "data-testid": "settings-shell", style: { display: "grid", gridTemplateColumns: "150px 1fr", minHeight: "440px" } },
           h("div", { style: { borderRight: "1px solid #e5e7eb", padding: "8px 0" } },
             pages.map(function (p) {
@@ -148,6 +178,8 @@ window.__ModuleLoader__.load({
           h("div", { "data-testid": "settings-body", style: { padding: "14px 18px", fontSize: "13px", color: "#374151", overflow: "auto", maxHeight: "62vh" } },
             h("div", { style: { fontSize: "14px", fontWeight: "600", marginBottom: "10px" } }, active),
             d.err ? h("div", { style: { color: "#cf222e" } }, "读取失败: " + d.err) : null,
+            deltaLine ? h("div", { "data-testid": "delta-line", style: { fontSize: "12px", color: "#57606a", marginBottom: "8px" } }, deltaLine) : null,
+            detail,
             content));
       }
 
@@ -305,14 +337,15 @@ window.__ModuleLoader__.load({
             isOpen ? h("div", { style: { marginTop: "4px", fontSize: "11.5px", color: "#b8c2cf" } }, body) : null);
         }
         React.useEffect(function () {
-          api("plugins").then(function (d) { setRows(visible(d.rows)); }).catch(function () {});
+          // peek: the floating panel must not consume the settings page's "since last look" baseline.
+          api("plugins?update=0").then(function (d) { setRows(visible(d.rows)); }).catch(function () {});
           api("report").then(setReport).catch(function () {});
           setSlots(globalSlotsSnapshot());
           api("occupancy").then(setOcc).catch(function () {});
           api("activity").then(setActivity).catch(function () {});
         }, []);
         function reload() {
-          return api("plugins").then(function (d) {
+          return api("plugins?update=0").then(function (d) {
             var next = visible(d.rows);
             setRows(next);
             // The property panel holds a snapshot row: refresh it, or the toggle keeps sending
