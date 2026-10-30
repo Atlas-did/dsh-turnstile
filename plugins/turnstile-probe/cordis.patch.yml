@@ -1,0 +1,5 @@
+- insert:
+    - id: turnstile-probe
+      name: turnstile-probe
+      config:
+        profile: mini
