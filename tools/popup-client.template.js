@@ -70,6 +70,21 @@ window.__ModuleLoader__.load({
           h("svg", { width: "100%", height: height, viewBox: "0 0 306 " + height }, nodes));
       }
 
+      // Three zones, per docs/51: navigate | list | inspect. Empty for now - the point of this
+      // step is to prove the page appears inside the native settings shell.
+      function SettingsSection() {
+        var tab = React.useState("概览"), active = tab[0], setActive = tab[1];
+        var pages = ["概览", "架构图", "占用", "插件", "控制台"];
+        return h("div", { "data-testid": "settings-shell", style: { display: "grid", gridTemplateColumns: "160px 1fr", minHeight: "420px" } },
+          h("div", { style: { borderRight: "1px solid #e5e7eb", padding: "8px 0" } },
+            pages.map(function (p) {
+              return h("div", { key: p, onClick: function () { setActive(p); }, style: { padding: "6px 14px", fontSize: "13px", cursor: "pointer", color: active === p ? "#1f6feb" : "#374151", fontWeight: active === p ? "600" : "400", background: active === p ? "#eff6ff" : "transparent" } }, p);
+            })),
+          h("div", { "data-testid": "settings-body", style: { padding: "16px 20px", fontSize: "13px", color: "#374151" } },
+            h("div", { style: { fontSize: "14px", fontWeight: "600", marginBottom: "8px" } }, active),
+            h("div", { "data-testid": "settings-stub" }, "骨架阶段：这一页还没有接数据。")));
+      }
+
       function Card() {
         var st = React.useState(true), open = st[0], setOpen = st[1];
         var rs = React.useState(visible(FALLBACK.rows)), rows = rs[0], setRows = rs[1];
@@ -415,6 +430,17 @@ window.__ModuleLoader__.load({
 
       ctx.slots.inject("shell.overlay", function () {
         return ctx.slots.register({ name: "shell.overlay", id: "turnstile.plugin-list" }, Card);
+      });
+
+      // M1: a real settings page, not a floating panel. Registered the same way
+      // dsh-better-sidebar registers its 侧边卡片 section.
+      ctx.slots.inject("settings.section", function () {
+        return ctx.slots.register({
+          name: "settings.section",
+          id: "turnstile",
+          order: 120,
+          label: function () { return "插件体检"; },
+        }, SettingsSection);
       });
     };
     return module.exports;
