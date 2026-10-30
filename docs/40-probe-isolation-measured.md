@@ -58,3 +58,23 @@ The tagline "Install-time gate **and sandbox**" must become "Install-time gate, 
 best-effort isolated probe". The measured limits above go in the Boundaries section verbatim,
 including the network sentence - hiding it would be the same false-green this project exists to
 prevent.
+
+---
+
+## Addendum: the full stack was proven on a scratch plugin (same session)
+
+Before writing `probe.mjs`, the three layers were tested end to end on a throwaway plugin:
+
+| Setup | Result |
+|---|---|
+| plain `node worker.mjs plug/lib/index.js` | `apply()` ran, plugin wrote a file |
+| `node --permission --allow-fs-read=<dir>` | **`apply()` still ran and `ctx.provide` was recorded**, `writeFileSync` returned `ERR_ACCESS_DENIED` |
+| same, plus worker stubs on `dns.lookup`, `net.connect`, `http.get` | plugin's `http.get` threw `ERR_TURNSTILE_NET` before any connection |
+
+The important line is the second: **confinement does not break observation.** A plugin under the
+permission model still loads, still receives `ctx`, and still reports what it registers - which
+is the entire point of the probe. That was the open risk, and it is closed.
+
+So the implementation is a wiring job, not a research job: `--permission --allow-fs-read=<profile>`,
+stub the network modules in the worker bootstrap, strip the environment, and stamp the evidence
+level from what was actually applied.
