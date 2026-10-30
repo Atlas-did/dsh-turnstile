@@ -46,11 +46,11 @@ window.__ModuleLoader__.load({
         var bs = React.useState(""), busy = bs[0], setBusy = bs[1];
         var rp = React.useState(null), report = rp[0], setReport = rp[1];
         var sel = React.useState(null), picked = sel[0], setPicked = sel[1];
-        var sl = React.useState(null), slots = sl[0], setSlots = sl[1];
+        var sl = React.useState([]), slots = sl[0], setSlots = sl[1];
         React.useEffect(function () {
           api("plugins").then(function (d) { setRows(visible(d.rows)); }).catch(function () {});
           api("report").then(setReport).catch(function () {});
-          setSlots(slotTree());
+          setSlots(globalSlotsSnapshot());
         }, []);
         function reload() { return api("plugins").then(function (d) { setRows(visible(d.rows)); }); }
         function flip(row) {
@@ -90,11 +90,11 @@ window.__ModuleLoader__.load({
             h("div", { style: { color: "#d7dee8" } }, "slot 树 · " + slots.length + " 个注册"),
             (function () {
               var bySlot = {};
-              slots.forEach(function (s) { bySlot[s.slot] = (bySlot[s.slot] || 0) + 1; });
+              slots.forEach(function (s) { bySlot[s.slot] = s.count; });
               return Object.keys(bySlot).sort().slice(0, 12).map(function (k) {
-                return h("div", { key: k, style: { display: "flex", gap: "6px" } },
-                  h("span", { style: { flex: 1, fontFamily: "ui-monospace,monospace" } }, k),
-                  h("span", { style: { color: "#8b96a5" } }, bySlot[k]));
+                return h("div", { key: k, style: { display: "flex", gap: "6px", whiteSpace: "nowrap", overflow: "hidden", lineHeight: "1.5" } },
+                  h("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", fontFamily: "ui-monospace,monospace", fontSize: "11px" } }, k),
+                  h("span", { style: { color: "#8b96a5", fontSize: "11px" } }, bySlot[k]));
               });
             })()) : null,
           picked ? h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", lineHeight: "1.7", color: "#b8c2cf" } },
@@ -107,6 +107,37 @@ window.__ModuleLoader__.load({
               h("button", { onClick: function () { setPicked(null); }, style: { padding: "2px 8px", borderRadius: "6px", border: "1px solid #30363d", background: "transparent", color: "#8b96a5", cursor: "pointer", fontSize: "11.5px" } }, "收起"))
           ) : null);
       }
+
+      // Global slots snapshot.
+      // SlotRegistry.entries() is scoped to the calling plugin, but the shared store behind every
+      // scope (_core.records) holds the whole tree: slot node -> { declaredBy, entries, ... }.
+      // This polyfills the API we are proposing upstream (see docs/34-proposal-*).
+      function globalSlotsSnapshot() {
+        var out = [];
+        try {
+          var recs = ctx.slots && ctx.slots._core && ctx.slots._core.records;
+          if (!recs || typeof recs.forEach !== "function") return out;
+          recs.forEach(function (node, slot) {
+            var ids = [];
+            try {
+              var es = node && node.entries;
+              if (es && typeof es.forEach === "function") {
+                es.forEach(function (e) { ids.push(String((e && (e.id || e.key || e.name)) || "?")); });
+              } else if (Array.isArray(es)) {
+                es.forEach(function (e) { ids.push(String((e && (e.id || e.key || e.name)) || "?")); });
+              }
+            } catch (e) { /* ignore */ }
+            out.push({
+              slot: String(slot),
+              declaredBy: String((node && node.declaredBy) || ""),
+              count: ids.length,
+              entries: ids.slice(0, 30)
+            });
+          });
+        } catch (e) { /* never break the panel */ }
+        return out.sort(function (a, b) { return b.count - a.count || a.slot.localeCompare(b.slot); });
+      }
+      try { window.__DSH_SLOTS_SNAPSHOT__ = globalSlotsSnapshot; } catch (e) { /* ignore */ }
 
       ctx.slots.inject("shell.overlay", function () {
         return ctx.slots.register({ name: "shell.overlay", id: "turnstile.plugin-list" }, Card);
