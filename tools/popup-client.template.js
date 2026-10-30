@@ -84,6 +84,34 @@ window.__ModuleLoader__.load({
         // Drag-to-corner: rows become draggable, corner zones accept the drop, and we never
         // pretend a plugin can move when it does not declare a position.
         var dm = React.useState(false), dragMode = dm[0], setDragMode = dm[1];
+        var im = React.useState(false), inspectMode = im[0], setInspectMode = im[1];
+        var ir = React.useState(""), inspectMsg = ir[0], setInspectMsg = ir[1];
+        // Element inspection: the DOM tags plugins with data-plugin, so a click names the owner.
+        React.useEffect(function () {
+          if (!inspectMode) return undefined;
+          function onPick(e) {
+            try {
+              var el = document.elementFromPoint(e.clientX, e.clientY);
+              var owner = el && el.closest ? el.closest("[data-plugin]") : null;
+              var pkg = owner ? owner.getAttribute("data-plugin") : "";
+              var tid = el && el.getAttribute ? (el.getAttribute("data-testid") || "") : "";
+              var surf = null;
+              (occ && occ.surfaces || []).forEach(function (s) {
+                if (pkg && s.plugins && s.plugins.indexOf(pkg) !== -1) surf = s;
+              });
+              var anchor = surf && surf.anchors ? surf.anchors[pkg] : null;
+              var cls = el && el.className ? String(el.className).split(" ").slice(0, 2).join(".") : "";
+              var where = el ? el.tagName.toLowerCase() + (cls ? "." + cls : "") : "?";
+              setInspectMsg(pkg
+                ? pkg + (tid ? " · " + tid : "") + (surf ? "  →  " + surf.surface + "  位置=" + (anchor || "硬编码") : "")
+                : "<" + where + ">" + (tid ? " · " + tid : "") + "（宿主未给该渲染节点打插件标记）");
+              e.preventDefault();
+              e.stopPropagation();
+            } catch (err) { /* never break the page */ }
+          }
+          document.addEventListener("click", onPick, true);
+          return function () { document.removeEventListener("click", onPick, true); };
+        }, [inspectMode, occ]);
         var dg = React.useState(null), dragging = dg[0], setDragging = dg[1];
         function dropOn(zone) {
           var name = dragging;
@@ -222,6 +250,8 @@ window.__ModuleLoader__.load({
               h("strong", { style: { fontSize: "13px" } }, "mini · 插件 " + rows.length)),
             h("button", { "data-testid": "drag-mode", onClick: function () { setDragMode(!dragMode); },
               style: { marginLeft: "6px", padding: "0 6px", borderRadius: "6px", border: "1px solid " + (dragMode ? "#58a6ff" : "#30363d"), background: dragMode ? "rgba(88,166,255,0.15)" : "transparent", color: dragMode ? "#58a6ff" : "#8b96a5", cursor: "pointer", fontSize: "11px" } }, dragMode ? "拖动中" : "拖动"),
+            h("button", { "data-testid": "inspect", onClick: function () { setInspectMode(!inspectMode); setInspectMsg(""); },
+              style: { marginLeft: "4px", padding: "0 6px", borderRadius: "6px", border: "1px solid " + (inspectMode ? "#d29922" : "#30363d"), background: inspectMode ? "rgba(210,153,34,0.15)" : "transparent", color: inspectMode ? "#d29922" : "#8b96a5", cursor: "pointer", fontSize: "11px" } }, inspectMode ? "检查中" : "检查"),
             h("button", { onClick: function () { setOpen(false); }, style: { background: "none", border: 0, color: "#8b96a5", cursor: "pointer" } }, "×")),
           h("div", { style: { order: -2, color: "#8b96a5", fontSize: "11.5px", marginBottom: "6px" } }, "停用 " + off + " · 引擎跳过 " + sk + " · 挤爆的 UI 面 " + crowded + " · 点一行切换"),
           report ? h("div", { style: { order: -1, fontSize: "11.5px", marginBottom: "8px", color: "#8b96a5" } },
@@ -247,6 +277,7 @@ window.__ModuleLoader__.load({
                   h("span", { style: { color: "#8b96a5", fontSize: "11px" } }, bySlot[k]));
               });
             })()] : null),
+          inspectMsg ? h("div", { "data-testid": "inspect-result", style: { order: -1, fontSize: "11px", color: "#58a6ff", marginBottom: "4px", wordBreak: "break-all" } }, inspectMsg) : null,
           fuseMsg ? h("div", { style: { order: -1, fontSize: "11px", color: "#d29922", marginBottom: "4px" } }, fuseMsg) : null,
           h(Topology, { occ: occ }),
           occ && occ.surfaces && occ.surfaces.length ? h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", color: "#b8c2cf" } },
