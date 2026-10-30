@@ -39,3 +39,12 @@ For (4): report the deepest slot entry found, not the first `RootEntry` - walk u
 2. Move the graph out of the panel; the panel keeps a summary line (fixes 1 and 3 together).
 3. Inline property grid for the selected row (fixes the "detail is a sentence" complaint).
 4. Crosshair: deepest entry + hover highlight.
+## 进展 22:52 - 第 1、2 条已修
+
+- 面板加了筛选框：输入 `univer` 后列表标题变成 `插件列表 · 1 / 26`，占用区同步过滤；
+- 拓扑图从面板移除，换一行摘要 `14 个 UI 面 · 争用 11 处 · 拓扑见设置页`；
+- 面板高度改为 `calc(100vh - 140px)`，底部不再被裁；
+- mini quicktest 10/10，selftest 67 项通过。
+
+仍然没解决：筛选框只有 96px 宽、标题行有点挤（`mini · 插件 26 拖动 univer 检查 ×`）；
+第 3 条（内联属性网格）和第 4 条（准星取最深条目）还没做。

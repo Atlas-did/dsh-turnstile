@@ -87,6 +87,12 @@ window.__ModuleLoader__.load({
         var im = React.useState(false), inspectMode = im[0], setInspectMode = im[1];
         var ir = React.useState(""), inspectMsg = ir[0], setInspectMsg = ir[1];
         var av = React.useState(null), activity = av[0], setActivity = av[1];
+        // One filter box, filtering as you type: the list is always the answer to the query (Everything's model).
+        var fv = React.useState(""), filter = fv[0], setFilter = fv[1];
+        function keep(text) {
+          if (!filter) return true;
+          return String(text || "").toLowerCase().indexOf(filter.toLowerCase()) !== -1;
+        }
         // Crosshair: like Process Explorer's target, but the "window handle" here is the React
         // fiber. Every slot entry renders through RootEntry, whose props carry slotKey + options.id.
         function ownerAtPoint(x, y) {
@@ -271,13 +277,15 @@ window.__ModuleLoader__.load({
         var hot = {};
         rows.forEach(function (r) { (r.ui || []).forEach(function (u) { hot[u] = (hot[u] || 0) + 1; }); });
         var crowded = Object.keys(hot).filter(function (u) { return hot[u] >= 3; }).length;
-        return h("div", { "data-testid": "panel", style: { position: "fixed", left: pos ? pos.x : undefined, top: pos ? pos.y : "64px", right: pos ? "auto" : "18px", zIndex: 2147483000, width: "330px", maxHeight: "50vh", overflow: "auto", display: "flex", flexDirection: "column", background: "#0e1116", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "10px", padding: "12px 14px", fontFamily: "ui-sans-serif,system-ui" } },
+        return h("div", { "data-testid": "panel", style: { position: "fixed", left: pos ? pos.x : undefined, top: pos ? pos.y : "64px", right: pos ? "auto" : "18px", zIndex: 2147483000, width: "360px", maxHeight: "calc(100vh - 140px)", overflow: "auto", display: "flex", flexDirection: "column", background: "#0e1116", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "10px", padding: "12px 14px", fontFamily: "ui-sans-serif,system-ui" } },
           zones(),
           h("div", { style: { order: -3, display: "flex", justifyContent: "space-between", marginBottom: "6px" } },
             h("span", { "data-testid": "drag-handle", onMouseDown: beginDrag, title: "拖动面板", style: { cursor: "grab", userSelect: "none" } },
               h("strong", { style: { fontSize: "13px" } }, "mini · 插件 " + rows.length)),
             h("button", { "data-testid": "drag-mode", onClick: function () { setDragMode(!dragMode); },
               style: { marginLeft: "6px", padding: "0 6px", borderRadius: "6px", border: "1px solid " + (dragMode ? "#58a6ff" : "#30363d"), background: dragMode ? "rgba(88,166,255,0.15)" : "transparent", color: dragMode ? "#58a6ff" : "#8b96a5", cursor: "pointer", fontSize: "11px" } }, dragMode ? "拖动中" : "拖动"),
+            h("input", { "data-testid": "filter", value: filter, placeholder: "筛选插件…", onChange: function (e) { setFilter(e.target.value); },
+              style: { marginLeft: "6px", width: "96px", padding: "1px 6px", borderRadius: "6px", border: "1px solid #30363d", background: "#0b0e13", color: "#d7dee8", fontSize: "11px" } }),
             h("button", { "data-testid": "inspect", onClick: function () { setInspectMode(!inspectMode); setInspectMsg(""); },
               style: { marginLeft: "4px", padding: "0 6px", borderRadius: "6px", border: "1px solid " + (inspectMode ? "#d29922" : "#30363d"), background: inspectMode ? "rgba(210,153,34,0.15)" : "transparent", color: inspectMode ? "#d29922" : "#8b96a5", cursor: "pointer", fontSize: "11px" } }, inspectMode ? "检查中" : "检查"),
             h("button", { onClick: function () { setOpen(false); }, style: { background: "none", border: 0, color: "#8b96a5", cursor: "pointer" } }, "×")),
@@ -288,7 +296,7 @@ window.__ModuleLoader__.load({
                 var p = (report.checks || []).filter(function (c) { return c.name === "ui-placement"; })[0];
                 return p ? " · 硬编码位置 " + (p.findings || []).length : "";
               })()) : null,
-          section("list", "插件列表 · " + rows.length, rows.map(function (r) {
+          section("list", "插件列表 · " + rows.filter(function (r) { return keep(r.id) || keep(r.name); }).length + " / " + rows.length, rows.filter(function (r) { return keep(r.id) || keep(r.name); }).map(function (r) {
             return h("div", { key: r.name, "data-testid": "row-" + r.name, draggable: dragMode, onDragStart: function () { setDragging(r.name); }, onClick: function () { var same = picked && picked.name === r.name; setPicked(same ? null : r); if (!same) loadAnchorOptions(r); var el = document.querySelector('[data-testid=\"panel\"]'); if (el) el.scrollTop = 0; }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
               h("span", { style: { width: "12px", color: r.disabled ? "#f85149" : "#3fb950" } }, r.disabled ? "×" : "·"),
               h("span", { style: { flex: 1, fontFamily: "ui-monospace,monospace" } }, r.name),
@@ -314,10 +322,11 @@ window.__ModuleLoader__.load({
               (activity.tail || []).map(function (l, i) {
                 return h("div", { key: i, style: { fontFamily: "ui-monospace,monospace", fontSize: "10.5px", color: /error|fatal|fail/i.test(l) ? "#f85149" : "#b8c2cf", wordBreak: "break-all" } }, l);
               })) : null),
-          h(Topology, { occ: occ }),
+          occ && occ.surfaces ? h("div", { "data-testid": "topo-summary", style: { order: -1, marginBottom: "6px", color: "#8b96a5", fontSize: "11px" } },
+            occ.surfaces.length + " 个 UI 面 · 争用 " + occ.surfaces.filter(function (s) { return s.contested; }).length + " 处 · 拓扑见设置页（未裁切，可缩放）") : null,
           occ && occ.surfaces && occ.surfaces.length ? h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", color: "#b8c2cf" } },
             h("div", { style: { color: "#d7dee8" } }, "角落占用 · " + occ.findings.length + " 处争用"),
-            occ.surfaces.filter(function (s) { return s.contested; }).slice(0, 5).map(function (s) {
+            occ.surfaces.filter(function (s) { return keep(s.surface) || (s.plugins || []).some(keep); }).slice(0, 8).map(function (s) {
               return h("div", { key: s.surface, style: { display: "flex", gap: "6px", whiteSpace: "nowrap", overflow: "hidden" } },
                 h("span", { style: { color: "#f85149" } }, "!"),
                 h("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", fontFamily: "ui-monospace,monospace", fontSize: "11px" } }, s.surface),
