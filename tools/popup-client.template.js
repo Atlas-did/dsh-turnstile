@@ -73,10 +73,12 @@ window.__ModuleLoader__.load({
       function SettingsSection() {
         var tab = React.useState("概览"), active = tab[0], setActive = tab[1];
         var data = React.useState({ rows: [], occ: null, err: "" }), d = data[0], setData = data[1];
+        var act = React.useState(null), activity = act[0], setActivity = act[1];
         React.useEffect(function () {
-          Promise.all([api("plugins").catch(function () { return null; }), api("occupancy").catch(function () { return null; })])
+          Promise.all([api("plugins").catch(function () { return null; }), api("occupancy").catch(function () { return null; }), api("activity").catch(function () { return null; })])
             .then(function (res) {
               setData({ rows: (res[0] && res[0].rows) || [], occ: res[1], err: "" });
+              setActivity(res[2] || null);
             })
             .catch(function (e) { setData({ rows: [], occ: null, err: String(e && e.message || e) }); });
         }, []);
@@ -116,6 +118,23 @@ window.__ModuleLoader__.load({
                 cell((s.hardcoded && s.hardcoded.length) || 0, { textAlign: "right", color: (s.hardcoded && s.hardcoded.length) ? "#9a6700" : "#57606a" }),
                 cell((s.plugins || []).join(", "), { maxWidth: "300px", overflow: "hidden", textOverflow: "ellipsis", color: "#57606a", fontSize: "11.5px" }));
             }));
+        } else if (active === "控制台") {
+          content = h("div", { "data-testid": "console-view" },
+            h("div", { style: { color: "#57606a", marginBottom: "8px" } }, activity
+              ? "面板请求: " + Object.keys(activity.calls || {}).map(function (k) { return k + "×" + activity.calls[k]; }).join("   ")
+              : "读取中…"),
+            activity && activity.note ? h("div", { style: { color: "#9a6700", marginBottom: "8px" } }, activity.note) : null,
+            (activity && activity.tail || []).length
+              ? h("div", { style: { fontFamily: "ui-monospace,monospace", fontSize: "11.5px", lineHeight: "1.7" } }, activity.tail.map(function (l, i) { return h("div", { key: i, style: { color: /error|fatal|fail/i.test(l) ? "#cf222e" : "#57606a" } }, l); }))
+              : h("div", { style: { color: "#8b96a5" } }, "最近 40 行没有异常或激活记录。"));
+        } else if (active === "架构图") {
+          var tk = "";
+          try { tk = new URLSearchParams(window.location.search).get("token") || ""; } catch (e) { tk = ""; }
+          content = h("div", null,
+            h("div", { style: { marginBottom: "8px", display: "flex", gap: "8px", alignItems: "center" } },
+              h("a", { href: "/turnstile/arch?token=" + encodeURIComponent(tk), target: "_blank", rel: "noopener", style: { fontSize: "12px", whiteSpace: "nowrap" } }, "在新窗口打开"),
+              h("span", { style: { color: "#8b96a5", fontSize: "11.5px" } }, "由 occupancy 数据生成；没有图时先跑 tools/arch-graph.mjs")),
+            h("iframe", { src: "/turnstile/arch?token=" + encodeURIComponent(tk), style: { width: "100%", height: "56vh", border: "1px solid #d8dee4", borderRadius: "8px", background: "#fff" } }));
         } else {
           content = h("div", { "data-testid": "settings-stub" }, active === "概览"
             ? "共 " + rows.length + " 个插件，" + surfaces.length + " 个 UI 面（" + surfaces.filter(function (s) { return s.contested; }).length + " 处争用）"
