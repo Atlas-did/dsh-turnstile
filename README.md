@@ -4,6 +4,47 @@
 
 Every plugin must pass through one at a time — like a turnstile.
 
+## Quick start (what to run, in order)
+
+Everything is read-only unless a command says otherwise. `<profile>` is a DSH profile directory
+(for example `~/.dsh/profiles/desktop`); omit the path where a tool auto-detects it.
+
+```bash
+# 1. Install-time gate: 12 checks in parallel, per-check timeout (default 30s)
+node tools/preflight.mjs <profile>
+
+#    narrow it while iterating
+node tools/preflight.mjs <profile> --only risk,port
+node tools/preflight.mjs <profile> --skip css
+
+#    refresh the ctx-service allowlist when the runtime moved
+node tools/preflight.mjs <profile> --regen
+
+# 2. What would it suggest fixing? (nothing is written without --apply)
+node tools/preflight.mjs <profile> --fix
+node tools/preflight.mjs <profile> --fix --apply    # writes npm aliases, keeps a .bak
+
+# 3. Machine-readable output for a panel/CI
+cat state/report-<profile>.json
+node tools/preflight.mjs <profile> --json
+
+# 4. After a restart: did it actually activate?
+node tools/runtime-diff.mjs state/runtime-<profile>.json --profile <profile>
+
+# 5. It crashed - who was waiting for what?
+node tools/watch.mjs <host log> --last 12
+node tools/watch.mjs <host log> --follow --exit-on-crash
+
+# 6. Toggle a plugin without hand-editing YAML
+node tools/manage.mjs <profile> --list
+node tools/manage.mjs <profile> --disable <package> --yes
+node tools/manage.mjs <profile> --enable  <package> --yes
+```
+
+A green run means: each checker ran, each one finished inside its timeout, and none reported a
+blocking finding. Advisory checks (`engine-gate`, `css-collision`, `ui-placement`) print `WARN`
+and do not block - a skipped plugin is a fact about that plugin, not a broken profile.
+
 ---
 
 ## Why this exists
