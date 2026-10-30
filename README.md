@@ -1,8 +1,11 @@
 # dsh-turnstile
 
-**Install-time gate and sandbox for DeepSeek Harness plugins.** Catch a plugin before it breaks your environment.
+**An install-time gate and inspection toolkit for DeepSeek Harness plugins.** Catch a plugin
+before it breaks your environment, and see who occupies which part of the interface.
 
-Every plugin must pass through one at a time — like a turnstile.
+Every plugin must pass through one at a time - like a turnstile.
+
+> New here? Start with [INSTALL.md](INSTALL.md) (requirements, first run, exit codes, uninstall).
 
 ## Quick start (what to run, in order)
 

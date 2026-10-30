@@ -118,7 +118,7 @@ export function apply(ctx, config) {
     path: "/turnstile/report",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
-      const file = join(process.env.DSH_TURNSTILE_HOME || "C:/Users/finef/Desktop/mini-harness/oss/dsh-turnstile", "state", "report-" + profile + ".json");
+      const file = join(process.env.DSH_TURNSTILE_HOME || process.cwd(), "state", "report-" + profile + ".json");
       if (!existsSync(file)) return sendJson(res, 404, { error: "no-report", file });
       try {
         sendJson(res, 200, JSON.parse(readFileSync(file, "utf8")));

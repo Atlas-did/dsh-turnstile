@@ -2,7 +2,7 @@
   "dshVersion": "0.2.1-rc.3",
   "generatedAt": "2026-10-30T05:08:23.871Z",
   "generator": "tools/knowledge-gen.mjs",
-  "runtimeNodeModules": "C:/Users/finef/Desktop/mini-harness/runtime/node_modules",
+  "runtimeNodeModules": "<DSH runtime>/node_modules",
   "packagesScanned": 297,
   "services": [
     {
