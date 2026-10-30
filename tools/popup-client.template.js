@@ -86,6 +86,7 @@ window.__ModuleLoader__.load({
         var dm = React.useState(false), dragMode = dm[0], setDragMode = dm[1];
         var im = React.useState(false), inspectMode = im[0], setInspectMode = im[1];
         var ir = React.useState(""), inspectMsg = ir[0], setInspectMsg = ir[1];
+        var av = React.useState(null), activity = av[0], setActivity = av[1];
         // Element inspection: the DOM tags plugins with data-plugin, so a click names the owner.
         React.useEffect(function () {
           if (!inspectMode) return undefined;
@@ -187,6 +188,7 @@ window.__ModuleLoader__.load({
           api("report").then(setReport).catch(function () {});
           setSlots(globalSlotsSnapshot());
           api("occupancy").then(setOcc).catch(function () {});
+          api("activity").then(setActivity).catch(function () {});
         }, []);
         function reload() {
           return api("plugins").then(function (d) {
@@ -279,6 +281,13 @@ window.__ModuleLoader__.load({
             })()] : null),
           inspectMsg ? h("div", { "data-testid": "inspect-result", style: { order: -1, fontSize: "11px", color: "#58a6ff", marginBottom: "4px", wordBreak: "break-all" } }, inspectMsg) : null,
           fuseMsg ? h("div", { style: { order: -1, fontSize: "11px", color: "#d29922", marginBottom: "4px" } }, fuseMsg) : null,
+          section("console", "控制台 · 最近 " + ((activity && activity.tail && activity.tail.length) || 0) + " 条",
+            activity ? h("div", null,
+              h("div", { style: { color: "#8b96a5", fontSize: "11px" } }, "面板请求: " + Object.keys(activity.calls || {}).map(function (k) { return k + "×" + activity.calls[k]; }).join("  ")),
+              activity.note ? h("div", { style: { color: "#8b96a5", fontSize: "11px" } }, activity.note) : null,
+              (activity.tail || []).map(function (l, i) {
+                return h("div", { key: i, style: { fontFamily: "ui-monospace,monospace", fontSize: "10.5px", color: /error|fatal|fail/i.test(l) ? "#f85149" : "#b8c2cf", wordBreak: "break-all" } }, l);
+              })) : null),
           h(Topology, { occ: occ }),
           occ && occ.surfaces && occ.surfaces.length ? h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", color: "#b8c2cf" } },
             h("div", { style: { color: "#d7dee8" } }, "角落占用 · " + occ.findings.length + " 处争用"),
