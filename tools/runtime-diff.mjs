@@ -77,6 +77,11 @@ for (const b of declared) {
 if (wantsJson()) { emitJson('runtime-diff', findings, findings.length ? 1 : 0); process.exit(findings.length ? 1 : 0); }
 console.log('snapshot: ' + snapPath);
 console.log('  pid ' + snap.pid + '  entries ' + (snap.total || entries.length) + '  active ' + (snap.active || activeNames.size));
+if (snap.appliedAtUptimeSeconds != null) console.log('  probe applied ' + snap.appliedAtUptimeSeconds + 's after process start');
+if (snap.bootActive != null) console.log('  active when probe applied: ' + snap.bootActive + ' -> now ' + (snap.active || activeNames.size));
+if ((snap.activatedSinceBoot || []).length) {
+  console.log('  deferred activations since boot: ' + snap.activatedSinceBoot.length + ' (' + snap.activatedSinceBoot.slice(0, 5).join(', ') + ')');
+}
 if (declared.length) {
   console.log('  declared in profile: ' + declared.length + '  active: ' + declared.filter((b) => isActive(b)).length);
 }
