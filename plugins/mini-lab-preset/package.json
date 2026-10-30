@@ -1,0 +1,8 @@
+{
+  "name": "mini-lab-preset",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./lib/index.js",
+  "dsh": { "bundle": { "patch": ["./preset.patch.yml"] } }
+}
