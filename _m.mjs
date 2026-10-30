@@ -1,0 +1,16 @@
+import { chromium } from 'playwright-core';
+import { readFileSync } from 'node:fs';
+const log = readFileSync('C:/Users/finef/Desktop/mini-harness/logs/mini.log', 'utf8');
+const token = (log.match(/token=([A-Za-z0-9_-]+)/) || [])[1];
+const b = await chromium.launch({ channel: 'msedge', headless: true });
+const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
+await p.goto('http://127.0.0.1:18770/?token=' + token, { waitUntil: 'domcontentloaded' }).catch(() => {});
+await p.waitForTimeout(5000);
+const btn = p.locator('button, [role="button"]').filter({ hasText: /模式/ }).first();
+await btn.click({ timeout: 5000 }).catch(() => {});
+await p.waitForTimeout(1200);
+const items = await p.evaluate(() => Array.from(document.querySelectorAll('*')).map(e => (e.textContent||'').trim()).filter(t => t && t.length < 12));
+const uniq = [...new Set(items)];
+console.log('modes:', JSON.stringify(uniq.filter(t => /模式|实验场|Vibe|Ultra/.test(t)).slice(0, 10)));
+await p.screenshot({ path: 'C:/Users/finef/Desktop/mini-harness/state/modes-now.png' });
+await b.close();
