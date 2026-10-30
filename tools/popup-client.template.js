@@ -70,19 +70,66 @@ window.__ModuleLoader__.load({
           h("svg", { width: "100%", height: height, viewBox: "0 0 306 " + height }, nodes));
       }
 
-      // Three zones, per docs/51: navigate | list | inspect. Empty for now - the point of this
-      // step is to prove the page appears inside the native settings shell.
       function SettingsSection() {
         var tab = React.useState("概览"), active = tab[0], setActive = tab[1];
+        var data = React.useState({ rows: [], occ: null, err: "" }), d = data[0], setData = data[1];
+        React.useEffect(function () {
+          Promise.all([api("plugins").catch(function () { return null; }), api("occupancy").catch(function () { return null; })])
+            .then(function (res) {
+              setData({ rows: (res[0] && res[0].rows) || [], occ: res[1], err: "" });
+            })
+            .catch(function (e) { setData({ rows: [], occ: null, err: String(e && e.message || e) }); });
+        }, []);
         var pages = ["概览", "架构图", "占用", "插件", "控制台"];
-        return h("div", { "data-testid": "settings-shell", style: { display: "grid", gridTemplateColumns: "160px 1fr", minHeight: "420px" } },
+        var rows = d.rows || [];
+        var surfaces = (d.occ && d.occ.surfaces) || [];
+        function table(cols, body) {
+          return h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "12.5px" } },
+            h("thead", null, h("tr", null, cols.map(function (c, i) {
+              return h("th", { key: i, style: { textAlign: c.num ? "right" : "left", padding: "6px 10px", borderBottom: "1px solid #d8dee4", color: "#57606a", fontWeight: 600, whiteSpace: "nowrap" } }, c.title);
+            }))),
+            h("tbody", null, body));
+        }
+        function cell(text, style) {
+          return h("td", { style: Object.assign({ padding: "5px 10px", borderBottom: "1px solid #eef1f4", whiteSpace: "nowrap" }, style || {}) }, text);
+        }
+        var content = null;
+        if (active === "插件") {
+          content = table([{ title: "插件" }, { title: "状态" }, { title: "UI 面", num: true }, { title: "位置" }],
+            rows.map(function (r) {
+              return h("tr", { key: r.name, "data-testid": "srow-" + r.name },
+                cell(h("span", null, (r.disabled ? "× " : "· ") + r.name), { fontFamily: "ui-monospace,monospace" }),
+                cell(r.disabled ? "停用" : (r.engineSkipped ? "引擎跳过" : "启用"), { color: r.disabled ? "#cf222e" : (r.engineSkipped ? "#9a6700" : "#1a7f37") }),
+                cell(((r.ui && r.ui.length) || 0), { textAlign: "right", fontFamily: "ui-monospace,monospace" }),
+                (function () {
+                  var anchor = null;
+                  surfaces.forEach(function (s) { if (s.anchors && s.anchors[r.name]) anchor = s.anchors[r.name]; });
+                  return cell(anchor ? anchor : "硬编码", { color: anchor ? "#1f6feb" : "#9a6700", fontFamily: anchor ? "ui-monospace,monospace" : undefined });
+                })());
+            }));
+        } else if (active === "占用") {
+          content = table([{ title: "UI 面" }, { title: "插件数", num: true }, { title: "硬编码", num: true }, { title: "插件" }],
+            surfaces.map(function (s) {
+              return h("tr", { key: s.surface },
+                cell(s.surface, { fontFamily: "ui-monospace,monospace" }),
+                cell(s.count, { textAlign: "right" }),
+                cell((s.hardcoded && s.hardcoded.length) || 0, { textAlign: "right", color: (s.hardcoded && s.hardcoded.length) ? "#9a6700" : "#57606a" }),
+                cell((s.plugins || []).join(", "), { maxWidth: "300px", overflow: "hidden", textOverflow: "ellipsis", color: "#57606a", fontSize: "11.5px" }));
+            }));
+        } else {
+          content = h("div", { "data-testid": "settings-stub" }, active === "概览"
+            ? "共 " + rows.length + " 个插件，" + surfaces.length + " 个 UI 面（" + surfaces.filter(function (s) { return s.contested; }).length + " 处争用）"
+            : "骨架阶段：这一页还没有接数据。");
+        }
+        return h("div", { "data-testid": "settings-shell", style: { display: "grid", gridTemplateColumns: "150px 1fr", minHeight: "440px" } },
           h("div", { style: { borderRight: "1px solid #e5e7eb", padding: "8px 0" } },
             pages.map(function (p) {
-              return h("div", { key: p, onClick: function () { setActive(p); }, style: { padding: "6px 14px", fontSize: "13px", cursor: "pointer", color: active === p ? "#1f6feb" : "#374151", fontWeight: active === p ? "600" : "400", background: active === p ? "#eff6ff" : "transparent" } }, p);
+              return h("div", { key: p, "data-testid": "page-" + p, onClick: function () { setActive(p); }, style: { padding: "6px 14px", fontSize: "13px", cursor: "pointer", color: active === p ? "#1f6feb" : "#374151", fontWeight: active === p ? "600" : "400", background: active === p ? "#eff6ff" : "transparent" } }, p);
             })),
-          h("div", { "data-testid": "settings-body", style: { padding: "16px 20px", fontSize: "13px", color: "#374151" } },
-            h("div", { style: { fontSize: "14px", fontWeight: "600", marginBottom: "8px" } }, active),
-            h("div", { "data-testid": "settings-stub" }, "骨架阶段：这一页还没有接数据。")));
+          h("div", { "data-testid": "settings-body", style: { padding: "14px 18px", fontSize: "13px", color: "#374151", overflow: "auto", maxHeight: "62vh" } },
+            h("div", { style: { fontSize: "14px", fontWeight: "600", marginBottom: "10px" } }, active),
+            d.err ? h("div", { style: { color: "#cf222e" } }, "读取失败: " + d.err) : null,
+            content));
       }
 
       function Card() {
