@@ -80,6 +80,7 @@ window.__ModuleLoader__.load({
         var oc = React.useState(null), occ = oc[0], setOcc = oc[1];
         // Four sections do not fit one screen: collapse the two least urgent by default.
         var sx = React.useState({ topo: true, occ: true, slots: false, list: false }), secs = sx[0], setSecs = sx[1];
+        var fx = React.useState(""), fuseMsg = fx[0], setFuseMsg = fx[1];
         function section(key, title, body) {
           if (!body) return null;
           var isOpen = !!secs[key];
@@ -114,6 +115,18 @@ window.__ModuleLoader__.load({
           api("anchor-options?package=" + encodeURIComponent(row.name)).then(function (d) {
             setPicked(function (cur) { return cur && cur.name === row.name ? Object.assign({}, cur, { anchorOptions: d.suggestions || [] }) : cur; });
           }).catch(function () {});
+        }
+        function fuseSurface(surface) {
+          setBusy(surface);
+          api("fuse", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ surface: surface }) })
+            .then(function (r) {
+              var first = String(r.output || "").split("\n").filter(function (l) { return l.trim(); });
+              setFuseMsg(r.ok ? "已错开" : (first[0] || "无法在配置层解决"));
+              return api("occupancy");
+            })
+            .then(setOcc)
+            .catch(function (e) { console.warn("turnstile fuse failed", e); })
+            .then(function () { setBusy(""); });
         }
         function setAnchor(row, anchor) {
           setBusy(row.name);
@@ -168,6 +181,7 @@ window.__ModuleLoader__.load({
                   h("span", { style: { color: "#8b96a5", fontSize: "11px" } }, bySlot[k]));
               });
             })()] : null),
+          fuseMsg ? h("div", { style: { order: -1, fontSize: "11px", color: "#d29922", marginBottom: "4px" } }, fuseMsg) : null,
           h(Topology, { occ: occ }),
           occ && occ.surfaces && occ.surfaces.length ? h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", color: "#b8c2cf" } },
             h("div", { style: { color: "#d7dee8" } }, "角落占用 · " + occ.findings.length + " 处争用"),
@@ -175,7 +189,9 @@ window.__ModuleLoader__.load({
               return h("div", { key: s.surface, style: { display: "flex", gap: "6px", whiteSpace: "nowrap", overflow: "hidden" } },
                 h("span", { style: { color: "#f85149" } }, "!"),
                 h("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", fontFamily: "ui-monospace,monospace", fontSize: "11px" } }, s.surface),
-                h("span", { style: { color: "#8b96a5", fontSize: "11px" } }, s.count + " 个 · 硬编码 " + s.hardcoded.length));
+                h("button", { "data-testid": "fuse-" + s.surface, onClick: function (e) { e.stopPropagation(); fuseSurface(s.surface); },
+                  style: { padding: "0 5px", borderRadius: "5px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "10.5px", whiteSpace: "nowrap" } }, "错开"),
+                h("span", { style: { color: "#8b96a5", fontSize: "11px", whiteSpace: "nowrap" } }, s.count + " · 硬编" + s.hardcoded.length));
             })) : null,
           picked ? h("div", { "data-testid": "detail", style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", lineHeight: "1.7", color: "#b8c2cf" } },
             h("div", { style: { fontFamily: "ui-monospace,monospace", color: "#d7dee8" } }, picked.name),
