@@ -48,8 +48,10 @@ function rowIdsOf(name) {
   const j = JSON.parse(readFileSync(pj, 'utf8'));
   const ids = [];
   const rel = j.dsh?.bundle?.patch;
-  if (rel) {
-    const pf = join(d, rel.replace(/^\.\//, ''));
+  // `dsh.bundle.patch` may be a single path or an array of them (the built-in bundles use arrays).
+  const rels = Array.isArray(rel) ? rel : (rel ? [rel] : []);
+  for (const relOne of rels) {
+    const pf = join(d, String(relOne).replace(/^\.\//, ''));
     if (existsSync(pf)) {
       const t = readFileSync(pf, 'utf8');
       const pairRe = /-\s*id:\s*([\w.@/-]+)\s*\n\s*name:\s*['\"]([^'\"]+)['\"]/g;

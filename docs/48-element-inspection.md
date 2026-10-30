@@ -46,3 +46,27 @@ instead of guessing a plugin name from a heuristic.
 
 A wrong owner is worse than no owner: the user would file a bug against an innocent plugin, and
 the drag/anchor flow would write a config row for the wrong package. "Unknown" is a valid answer.
+## 更正（同日）：fiber 能给出 owner，比 data-plugin 可靠
+
+上面「认不出插件」的结论被推翻了。改用 React fiber 之后，任意 DOM 节点都能回溯到它的
+slot 边界：每个 slot 条目都渲染在 `RootEntry` 里，它的 props 带 `slotKey` 和 `entry.options.id`。
+
+实测（mini，点击三处）：
+
+    640,300  -> slot main
+    200,300  -> slot sidebar.workspaces
+    1100,200 -> slot shell.overlay · turnstile.plugin-list
+
+这正是 Process Explorer 那个准星的同构实现：
+
+| Process Explorer | 我们 |
+|---|---|
+| `WindowFromPoint` 取窗口句柄 | `document.elementFromPoint` 取 DOM 节点 |
+| `GetWindowThreadProcessId` 取进程 | 沿 `__reactFiber$` 上溯到 `RootEntry` 取 `slotKey` + `entry id` |
+| 显示进程名 | 显示 slot 名 + 条目 id |
+
+差别：它拿到的是进程（唯一），我们拿到的是 slot 条目（同一插件可能有多个条目）。
+但「这块像素由谁渲染」这个问题的答案，现在是精确的，不再是猜的。
+
+对上游的需求也降级了：不再是「请给节点加 data-plugin」，而是「可选地给 RootEntry 加
+一个 registrant 字段」——`registrant` 目前是压缩后的类名（`Gb`），拿不到插件名。

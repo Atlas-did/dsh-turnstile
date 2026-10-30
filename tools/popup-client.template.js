@@ -87,6 +87,27 @@ window.__ModuleLoader__.load({
         var im = React.useState(false), inspectMode = im[0], setInspectMode = im[1];
         var ir = React.useState(""), inspectMsg = ir[0], setInspectMsg = ir[1];
         var av = React.useState(null), activity = av[0], setActivity = av[1];
+        // Crosshair: like Process Explorer's target, but the "window handle" here is the React
+        // fiber. Every slot entry renders through RootEntry, whose props carry slotKey + options.id.
+        function ownerAtPoint(x, y) {
+          var el = document.elementFromPoint(x, y);
+          if (!el) return null;
+          var key = Object.keys(el).filter(function (k) { return k.indexOf("__reactFiber$") === 0; })[0];
+          if (!key) return { slotKey: "", entryId: "", note: "该节点不在 React 树里" };
+          var f = el[key];
+          for (var i = 0; i < 100 && f; i++) {
+            var t = f.type;
+            var name = typeof t === "function" ? (t.displayName || t.name || "") : "";
+            if (name === "RootEntry") {
+              var pr = f.memoizedProps || {};
+              var e = pr.entry || {};
+              var id = e.options && e.options.id ? String(e.options.id) : "";
+              return { slotKey: String(pr.slotKey || ""), entryId: id };
+            }
+            f = f.return;
+          }
+          return { slotKey: "", entryId: "", note: "没有找到 slot 边界" };
+        }
         // Element inspection: the DOM tags plugins with data-plugin, so a click names the owner.
         React.useEffect(function () {
           if (!inspectMode) return undefined;
@@ -103,6 +124,11 @@ window.__ModuleLoader__.load({
               var anchor = surf && surf.anchors ? surf.anchors[pkg] : null;
               var cls = el && el.className ? String(el.className).split(" ").slice(0, 2).join(".") : "";
               var where = el ? el.tagName.toLowerCase() + (cls ? "." + cls : "") : "?";
+              var own = ownerAtPoint(e.clientX, e.clientY);
+              if (own && own.slotKey) {
+                setInspectMsg("slot " + own.slotKey + (own.entryId ? "  ·  " + own.entryId : "") + (own.note ? "  (" + own.note + ")" : ""));
+                e.preventDefault(); e.stopPropagation(); return;
+              }
               setInspectMsg(pkg
                 ? pkg + (tid ? " · " + tid : "") + (surf ? "  →  " + surf.surface + "  位置=" + (anchor || "硬编码") : "")
                 : "<" + where + ">" + (tid ? " · " + tid : "") + "（宿主未给该渲染节点打插件标记）");
