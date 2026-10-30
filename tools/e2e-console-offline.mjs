@@ -3,9 +3,10 @@
 import { chromium } from 'playwright-core';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { copyTreeSafe } from './safe-copy.mjs';
 import { createConsoleServer } from './console-server.mjs';
+import { viewStatePath } from '../plugins/turnstile-popup/lib/view-state.js';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const stateDir = join(root, 'state');
@@ -202,6 +203,19 @@ try {
     const narrow = await page.locator('#main').boundingBox();
     ok('narrow layout keeps the main workspace usable', narrow.width >= 350 && narrow.x >= 0);
     await page.setViewportSize({ width: 1440, height: 960 });
+    // View state: a corrupt file must fall back (never blank the page), and a sort click must persist.
+    writeFileSync(viewStatePath(join(profileDir, '.turnstile')), '{ broken json');
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForSelector('[data-testid="nav-overview"]');
+    ok('corrupt view state falls back instead of breaking the page', (await page.locator('[data-testid="nav-overview"]').count()) === 1);
+    await click('[data-testid="nav-plugins"]');
+    let saved = null;
+    for (let i = 0; i < 15 && !saved; i++) {
+      await page.waitForTimeout(200);
+      try { saved = JSON.parse(readFileSync(viewStatePath(join(profileDir, '.turnstile')), 'utf8')); } catch { saved = null; }
+    }
+    ok('view change is persisted', Boolean(saved) && saved.view === 'plugins', saved ? saved.view : 'not written');
+
     rmSync(patchPath);
     const noPatchResponse = await page.request.post(base + '/turnstile/toggle', { data: { package: 'plug-alpha', disable: true, dryRun: false } });
     ok('first disable creates a missing patch without a backup error', noPatchResponse.ok() && /disabled: true/.test(readFileSync(patchPath, 'utf8')));

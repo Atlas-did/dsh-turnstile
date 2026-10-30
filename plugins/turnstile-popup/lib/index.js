@@ -5,6 +5,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { makePlan, applyPlan, describePlan } from "./txn.js";
 import { collectConsoleData } from "./console-data.js";
+import { readViewState, writeViewState } from "./view-state.js";
 import { designerTransaction } from "./designer-ops.js";
 import { beginOperation, settleOperation, recoverJournal } from "./journal.js";
 
@@ -255,6 +256,26 @@ export function apply(ctx, config) {
   if (recovery.recoveryRequired || (recovery.leftovers || []).length) {
     ctx.logger && ctx.logger.warn && ctx.logger.warn("turnstile: recovery-required " + JSON.stringify(recovery));
   }
+
+  // ---- view state: what the user left behind (sort column, filter, page) ----
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/view-state",
+    handler: async (req, res) => {
+      if (req.method === "GET") {
+        const r = readViewState(STATE_DIR());
+        return sendJson(res, 200, { state: r.state, source: r.source });
+      }
+      if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
+      if (!requestRejection(req, res)) return;
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      let parsed = null;
+      try { parsed = JSON.parse(body || "{}"); } catch { return sendJson(res, 400, { error: "json" }); }
+      try { sendJson(res, 200, { state: writeViewState(STATE_DIR(), parsed) }); }
+      catch (e) { sendJson(res, 500, { error: String((e && e.message) || e).slice(0, 160) }); }
+    },
+  }), "turnstile: GET/POST /turnstile/view-state");
 
   // ---- full-window console (from the user's build; same profile, same data) ----
   ctx.effect(() => ctx.webServer.register({

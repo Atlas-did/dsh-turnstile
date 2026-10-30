@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { collectConsoleData } from './console-data.mjs';
 import { togglePatch } from './toggle-patch.mjs';
 import { designerTransaction } from './designer-ops.mjs';
+import { readViewState, writeViewState } from '../plugins/turnstile-popup/lib/view-state.js';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const consoleFile = join(root, 'plugins', 'turnstile-popup', 'lib', 'console.html');
@@ -54,7 +55,24 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
         return json(200, { ok: true, package: plugin.name, row: plugin.row, disabled: Boolean(args.disable), dryRun: Boolean(args.dryRun), before, after, changed: before !== after });
       } catch (e) { return json(500, { error: String(e?.message || e).slice(0, 160) }); }
     }
-    if (req.method !== 'GET') { res.statusCode = 405; res.end('method'); return; }
+    if (req.method !== 'GET' && pathname !== '/turnstile/view-state') { res.statusCode = 405; res.end('method'); return; }
+    if (pathname === '/turnstile/view-state') {
+      const viewDir = state || join(dir, '.turnstile');
+      if (req.method === 'GET') {
+        const r = readViewState(viewDir);
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ state: r.state, source: r.source }));
+        return;
+      }
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      let parsed = null;
+      try { parsed = JSON.parse(body || '{}'); } catch { res.statusCode = 400; res.end('{"error":"json"}'); return; }
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ state: writeViewState(viewDir, parsed) }));
+      return;
+    }
+
     if (pathname === '/' || pathname === '/console') {
       res.setHeader('content-type', 'text/html; charset=utf-8');
       res.setHeader('cache-control', 'no-store');
