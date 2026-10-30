@@ -81,6 +81,42 @@ window.__ModuleLoader__.load({
         // Four sections do not fit one screen: collapse the two least urgent by default.
         var sx = React.useState({ topo: true, occ: true, slots: false, list: false }), secs = sx[0], setSecs = sx[1];
         var fx = React.useState(""), fuseMsg = fx[0], setFuseMsg = fx[1];
+        // Drag-to-corner: rows become draggable, corner zones accept the drop, and we never
+        // pretend a plugin can move when it does not declare a position.
+        var dm = React.useState(false), dragMode = dm[0], setDragMode = dm[1];
+        var dg = React.useState(null), dragging = dg[0], setDragging = dg[1];
+        function dropOn(zone) {
+          var name = dragging;
+          setDragging(null);
+          if (!name) return;
+          api("anchor-support?package=" + encodeURIComponent(name)).then(function (s) {
+            if (!s.configurable) {
+              setFuseMsg(name + " 未暴露 slot/anchor/order —— 拖不动，需要作者支持");
+              return null;
+            }
+            if (s.values.length && s.values.indexOf(zone) === -1) {
+              setFuseMsg(name + " 支持的位置: " + s.values.join(" / ") + "（不含 " + zone + "）");
+              return null;
+            }
+            return api("anchor", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ package: name, anchor: zone }) })
+              .then(function () { setFuseMsg(name + " → " + zone + "（重启后生效）"); return api("occupancy"); })
+              .then(setOcc);
+          }).catch(function (e) { setFuseMsg("落位失败: " + String(e.message || e).slice(0, 60)); });
+        }
+        var ZONES = [["top-left", "左上"], ["top-right", "右上"], ["bottom-left", "左下"], ["bottom-right", "右下"]];
+        function zones() {
+          if (!dragMode) return null;
+          return h("div", { style: { position: "fixed", inset: 0, zIndex: 2147482900, pointerEvents: "none" } },
+            ZONES.map(function (z, i) {
+              var pos = i === 0 ? { left: 24, top: 90 } : i === 1 ? { right: 24, top: 90 } : i === 2 ? { left: 24, bottom: 90 } : { right: 24, bottom: 90 };
+              return h("div", {
+                key: z[0], "data-testid": "zone-" + z[0],
+                onDragOver: function (e) { e.preventDefault(); },
+                onDrop: function (e) { e.preventDefault(); dropOn(z[0]); },
+                style: Object.assign({ position: "fixed", width: "150px", height: "110px", border: "1px dashed #58a6ff", borderRadius: "10px", color: "#58a6ff", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(88,166,255,0.06)", pointerEvents: "auto" }, pos)
+              }, "拖到" + z[1]);
+            }));
+        }
         // Drag mode: the panel itself moves (users want the tool out of the way); the position
         // is remembered per browser. Plugin overlays are a different problem - see below.
         var ps = React.useState(function () {
@@ -180,9 +216,12 @@ window.__ModuleLoader__.load({
         rows.forEach(function (r) { (r.ui || []).forEach(function (u) { hot[u] = (hot[u] || 0) + 1; }); });
         var crowded = Object.keys(hot).filter(function (u) { return hot[u] >= 3; }).length;
         return h("div", { "data-testid": "panel", style: { position: "fixed", left: pos ? pos.x : undefined, top: pos ? pos.y : "64px", right: pos ? "auto" : "18px", zIndex: 2147483000, width: "330px", maxHeight: "50vh", overflow: "auto", display: "flex", flexDirection: "column", background: "#0e1116", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "10px", padding: "12px 14px", fontFamily: "ui-sans-serif,system-ui" } },
+          zones(),
           h("div", { style: { order: -3, display: "flex", justifyContent: "space-between", marginBottom: "6px" } },
             h("span", { "data-testid": "drag-handle", onMouseDown: beginDrag, title: "拖动面板", style: { cursor: "grab", userSelect: "none" } },
               h("strong", { style: { fontSize: "13px" } }, "mini · 插件 " + rows.length)),
+            h("button", { "data-testid": "drag-mode", onClick: function () { setDragMode(!dragMode); },
+              style: { marginLeft: "6px", padding: "0 6px", borderRadius: "6px", border: "1px solid " + (dragMode ? "#58a6ff" : "#30363d"), background: dragMode ? "rgba(88,166,255,0.15)" : "transparent", color: dragMode ? "#58a6ff" : "#8b96a5", cursor: "pointer", fontSize: "11px" } }, dragMode ? "拖动中" : "拖动"),
             h("button", { onClick: function () { setOpen(false); }, style: { background: "none", border: 0, color: "#8b96a5", cursor: "pointer" } }, "×")),
           h("div", { style: { order: -2, color: "#8b96a5", fontSize: "11.5px", marginBottom: "6px" } }, "停用 " + off + " · 引擎跳过 " + sk + " · 挤爆的 UI 面 " + crowded + " · 点一行切换"),
           report ? h("div", { style: { order: -1, fontSize: "11.5px", marginBottom: "8px", color: "#8b96a5" } },
@@ -192,7 +231,7 @@ window.__ModuleLoader__.load({
                 return p ? " · 硬编码位置 " + (p.findings || []).length : "";
               })()) : null,
           section("list", "插件列表 · " + rows.length, rows.map(function (r) {
-            return h("div", { key: r.name, "data-testid": "row-" + r.name, onClick: function () { var same = picked && picked.name === r.name; setPicked(same ? null : r); if (!same) loadAnchorOptions(r); var el = document.querySelector('[data-testid=\"panel\"]'); if (el) el.scrollTop = 0; }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
+            return h("div", { key: r.name, "data-testid": "row-" + r.name, draggable: dragMode, onDragStart: function () { setDragging(r.name); }, onClick: function () { var same = picked && picked.name === r.name; setPicked(same ? null : r); if (!same) loadAnchorOptions(r); var el = document.querySelector('[data-testid=\"panel\"]'); if (el) el.scrollTop = 0; }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
               h("span", { style: { width: "12px", color: r.disabled ? "#f85149" : "#3fb950" } }, r.disabled ? "×" : "·"),
               h("span", { style: { flex: 1, fontFamily: "ui-monospace,monospace" } }, r.name),
               (r.ui && r.ui.length) ? h("span", { title: (r.ui || []).join(", "), style: { color: "#58a6ff", fontSize: "11px" } }, "ui" + r.ui.length) : null,

@@ -87,7 +87,23 @@ try {
     const restored = await waitPatch((t) => t.trim() === before.trim());
     ok('second click restored the patch', restored, restored ? '' : 'file still differs');
   }
-  // Drag mode: the panel must move with the pointer and remember where it was left.
+  // Drag-to-corner: zones appear, and a plugin that cannot move must say so (not fail silently).
+  const dmBtn = page.locator('[data-testid="drag-mode"]').first();
+  if (await dmBtn.count()) {
+    await page.evaluate(() => { const el = document.querySelector('[data-testid="panel"]'); if (el) el.scrollTop = 0; });
+    await dmBtn.click().catch(() => {});
+    await page.waitForTimeout(300);
+    ok('corner zones appear in drag mode', (await page.locator('[data-testid^="zone-"]').count()) === 4);
+    const r2 = page.locator('[data-testid="row-' + rowName + '"]').first();
+    if (await r2.count()) {
+      await r2.dragTo(page.locator('[data-testid="zone-bottom-left"]').first()).catch(() => {});
+      await page.waitForTimeout(900);
+      const txt = await page.evaluate(() => document.body.innerText);
+      ok('drop explains when a plugin cannot move', /未暴露|支持的位置|重启后生效/.test(txt), '');
+    }
+  }
+
+  // Panel drag: the panel must move with the pointer and remember where it was left.
   await page.evaluate(() => { const el = document.querySelector('[data-testid="panel"]'); if (el) el.scrollTop = 0; });
   await page.waitForTimeout(200);
   const handle = page.locator('[data-testid="drag-handle"]').first();
