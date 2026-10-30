@@ -47,6 +47,41 @@ function parseWaiting(text) {
   return out;
 }
 
+// --follow: keep reading the log and report crash context the moment a fatal line lands.
+if (process.argv.includes('--follow')) {
+  const { openSync, readSync, statSync, closeSync } = await import('node:fs');
+  const ring = [];
+  let pos = 0;
+  let reported = false;
+  const push = (line) => {
+    const kind = classify(line);
+    if (kind === 'other') return;
+    ring.push({ kind, line: line.slice(0, 200) });
+    if (ring.length > lastN) ring.shift();
+    if (kind === 'error') {
+      console.log('');
+      console.log('CRASH CONTEXT (' + new Date().toISOString() + ')');
+      for (const e of ring) console.log('  [' + e.kind.padEnd(7) + '] ' + e.line);
+      reported = true;
+      if (process.argv.includes('--exit-on-crash')) process.exit(1);
+    }
+  };
+  const tick = () => {
+    let st;
+    try { st = statSync(file); } catch { return; }
+    if (st.size <= pos) return;
+    const fd = openSync(file, 'r');
+    const buf = Buffer.alloc(st.size - pos);
+    readSync(fd, buf, 0, buf.length, pos);
+    closeSync(fd);
+    pos = st.size;
+    for (const line of buf.toString('utf8').split(/\r?\n/)) if (line) push(line);
+  };
+  console.log('following ' + file + ' (ctrlc to stop)');
+  pos = statSync(file).size;
+  void reported;
+  setInterval(tick, 500);
+} else {
 const text = readFileSync(file, 'utf8');
 const lines = text.split(/\r?\n/).filter(Boolean);
 const counts = {};
@@ -109,3 +144,4 @@ if (errors.length) {
   for (const e of errors) console.log('  ! ' + e.line);
 }
 process.exit(errors.length || waiting.length ? 1 : 0);
+}
