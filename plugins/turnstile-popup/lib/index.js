@@ -212,25 +212,32 @@ function readRows(dir) {
 function toggle(text, rowId, disable) {
   let next = text;
   if (disable) {
-    const block = "- id: " + rowId + "\n  disabled: true";
     const lines0 = text.split(/\r?\n/);
     const at = lines0.findIndex((l) => new RegExp("^-\\s*id:\\s*" + rowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*$").test(l));
     if (at !== -1) {
+      // Keep every existing key of the block (config, name, anchor...) and only add `disabled`.
       let e = lines0.length;
       for (let i = at + 1; i < lines0.length; i++) { if (/^-\s/.test(lines0[i])) { e = i; break; } }
-      next = lines0.slice(0, at).concat(block.split("\n"), lines0.slice(e)).join("\n");
+      const bodyLines = lines0.slice(at + 1, e).filter((l) => !/^\s*disabled:\s*true\s*$/.test(l));
+      const insertAt = bodyLines.findIndex((l) => /^\s*name:/.test(l));
+      const disabledLine = "  disabled: true";
+      if (insertAt === -1) bodyLines.unshift(disabledLine); else bodyLines.splice(insertAt + 1, 0, disabledLine);
+      next = lines0.slice(0, at + 1).concat(bodyLines, lines0.slice(e)).join("\n");
     } else {
+      const block = "- id: " + rowId + "\n  disabled: true";
       const emptyRe = /^\[\]\s*$/m;
       next = emptyRe.test(text) ? text.replace(emptyRe, block) : text.replace(/\s*$/, "") + "\n" + block + "\n";
     }
   } else {
+    // Enabling only removes the `disabled: true` line: every other key of the block stays.
     const out = [];
-    let dropping = false;
+    let inBlock = false;
     for (const line of text.split(/\r?\n/)) {
       const m = line.match(/^-\s*id:\s*([\w.@/-]+)\s*$/);
-      if (m) dropping = m[1] === rowId;
-      else if (/^\S/.test(line)) dropping = false;
-      if (!dropping) out.push(line);
+      if (m) inBlock = m[1] === rowId;
+      else if (/^\S/.test(line)) inBlock = false;
+      if (inBlock && /^\s*disabled:\s*true\s*$/.test(line)) continue;
+      out.push(line);
     }
     next = out.join("\n");
     if (!/^- /m.test(next)) next = next.replace(/\s*$/, "\n") + "[]\n";

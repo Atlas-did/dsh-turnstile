@@ -142,9 +142,18 @@ try {
       window.ReactDOM.createRoot(document.getElementById("root")).render(window.React.createElement(window.__PanelComponent));
     });
     await page.waitForSelector('[data-testid="panel"]');
-    // Rows live inside a collapsible section; open it before counting.
-    const listToggle = page.locator('[data-testid="sec-list"]').first();
-    if (await listToggle.count()) await listToggle.click({ force: true }).catch(() => {});
+    // Rows live inside a collapsible section; open it before counting. The panel keeps
+    // refreshing, so click until the section reports expanded.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const toggle = page.locator('[data-testid="sec-list"]').first();
+      if (!(await toggle.count())) break;
+      if ((await toggle.getAttribute('aria-expanded')) === 'true') break;
+      await page.waitForTimeout(250);
+      await toggle.click({ force: true }).catch(() => {});
+      await page.waitForTimeout(250);
+    }
+    await page.waitForTimeout(500);
+    console.log('  debug rows=' + (await page.locator('[data-testid^="row-"]').count()) + ' panel=' + ((await page.locator('[data-testid="panel"]').first().innerText().catch(() => '')).replace(/\n/g, ' | ').slice(0, 160)));
     await page.waitForFunction(() => document.querySelectorAll('[data-testid^="row-"]').length === 3);
 
     async function mouseClick(locator) {
@@ -155,6 +164,12 @@ try {
       if (!box) throw new Error("target has no clickable coordinates");
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       await page.waitForTimeout(120);
+      // Writes are two-step: confirm whatever plan the click produced.
+      const confirm = page.locator('[data-testid="confirm-apply"]').first();
+      if (await confirm.count()) {
+        const box2 = await confirm.boundingBox();
+        if (box2) { await page.mouse.click(box2.x + box2.width / 2, box2.y + box2.height / 2); await page.waitForTimeout(200); }
+      }
       if (expectMounted && !(await page.locator('[data-testid="panel"]').count())) throw new Error("panel unmounted after click");
     }
 
@@ -175,13 +190,19 @@ try {
 
     await page.locator('[data-testid="anchor-input"]').fill("bottom-right");
     await mouseClick(page.locator('[data-testid="anchor-apply"]'));
+    const anchorConfirm = page.locator('[data-testid="confirm-apply"]').first();
+    if (await anchorConfirm.count()) { await page.waitForTimeout(200); await mouseClick(anchorConfirm); }
     const anchorWrote = await waitFile((text) => text.includes("anchor: bottom-right"));
     ok("position click writes the requested anchor", anchorWrote);
     ok("position write preserves unrelated settings", readFileSync(patchPath, "utf8").includes("customSetting: keep-me"));
 
     const toggleBefore = readFileSync(patchPath, "utf8");
     await mouseClick(page.locator('[data-testid="toggle"]'));
-    const disabled = await waitFile((text) => /^- id: alpha-row\n  disabled: true$/m.test(text));
+    // Writes are two-step now: the panel shows a plan and a confirmation token first.
+    const confirmBtn = page.locator('[data-testid="confirm-apply"]').first();
+    if (await confirmBtn.count()) { await page.waitForTimeout(200); await mouseClick(confirmBtn); }
+    // The block keeps every other key; `disabled: true` is inserted, not the block replaced.
+    const disabled = await waitFile((text) => /^- id: alpha-row\n(?:.*\n)*?  disabled: true\n/m.test(text));
     ok("toggle click adds a disabled override", disabled);
     ok("disabled override keeps original config", readFileSync(patchPath, "utf8").includes("customSetting: keep-me"));
     await page.waitForFunction(() => {
@@ -279,6 +300,7 @@ try {
   }
 } catch (error) {
   ok("offline e2e completed without throwing", false, String(error && error.message || error).slice(0, 180));
+  if (pageErrors.length) console.log("  page errors: " + pageErrors.slice(0, 3).join(" | ").slice(0, 400));
 } finally {
   if (browser) await browser.close();
   if (server) await new Promise((resolve) => server.close(resolve));

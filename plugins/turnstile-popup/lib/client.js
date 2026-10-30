@@ -8,319 +8,231 @@ window.__ModuleLoader__.load({
     exports.apply = function apply(ctx) {
       var React = require("react");
       var h = React.createElement;
-      var FALLBACK = {"profile":"C:/Users/finef/Desktop/mini-harness/home/profiles/mini","generatedAt":"2026-10-30T15:27:10.868Z","rows":[{"name":"turnstile-probe","disabled":false,"engineSkipped":false},{"name":"dsh-better-sidebar","disabled":false,"engineSkipped":false},{"name":"dsh-context","disabled":true,"engineSkipped":false},{"name":"dsh-genui","disabled":false,"engineSkipped":false},{"name":"dsh-token-diet","disabled":true,"engineSkipped":false},{"name":"@changfenhuang/dsh-annotation","disabled":false,"engineSkipped":false},{"name":"@liustack/modlens","disabled":false,"engineSkipped":false},{"name":"dsh-free-search","disabled":false,"engineSkipped":false},{"name":"dsh-meme","disabled":false,"engineSkipped":false},{"name":"dsh-mimir","disabled":false,"engineSkipped":false},{"name":"dsh-ops","disabled":false,"engineSkipped":false},{"name":"dsh-soul-md","disabled":false,"engineSkipped":false},{"name":"dsh-talk","disabled":false,"engineSkipped":true},{"name":"dsh-tool-call-guard","disabled":false,"engineSkipped":false},{"name":"dsh-univer-office","disabled":false,"engineSkipped":false},{"name":"dsh-unlag","disabled":false,"engineSkipped":false},{"name":"dshmarket","disabled":false,"engineSkipped":false},{"name":"dsh-quicktest","disabled":false,"engineSkipped":false},{"name":"dsh-vibe-math","disabled":false,"engineSkipped":false},{"name":"dsh-ultramath","disabled":false,"engineSkipped":false},{"name":"@mars-sea/dsh-commandcode-provider","disabled":false,"engineSkipped":false},{"name":"dsh-api-dashboard","disabled":false,"engineSkipped":false},{"name":"dsh-voice","disabled":false,"engineSkipped":false},{"name":"dsh-whale-musume","disabled":false,"engineSkipped":false},{"name":"turnstile-popup","disabled":false,"engineSkipped":false},{"name":"mini-lab-preset","disabled":false,"engineSkipped":false}]};
+      var FALLBACK = {"profile":"<profile>","generatedAt":"2026-10-30T08:12:06.071Z","rows":[{"name":"turnstile-probe","disabled":false,"engineSkipped":false},{"name":"dsh-better-sidebar","disabled":false,"engineSkipped":false},{"name":"dsh-context","disabled":true,"engineSkipped":false},{"name":"dsh-genui","disabled":false,"engineSkipped":false},{"name":"dsh-token-diet","disabled":true,"engineSkipped":false},{"name":"@changfenhuang/dsh-annotation","disabled":false,"engineSkipped":false},{"name":"@liustack/modlens","disabled":false,"engineSkipped":false},{"name":"dsh-free-search","disabled":false,"engineSkipped":false},{"name":"dsh-meme","disabled":false,"engineSkipped":false},{"name":"dsh-mimir","disabled":false,"engineSkipped":false},{"name":"dsh-ops","disabled":false,"engineSkipped":false},{"name":"dsh-soul-md","disabled":false,"engineSkipped":false},{"name":"dsh-talk","disabled":false,"engineSkipped":true},{"name":"dsh-tool-call-guard","disabled":false,"engineSkipped":false},{"name":"dsh-univer-office","disabled":false,"engineSkipped":false},{"name":"dsh-unlag","disabled":false,"engineSkipped":false},{"name":"dshmarket","disabled":false,"engineSkipped":false},{"name":"dsh-quicktest","disabled":false,"engineSkipped":false},{"name":"dsh-vibe-math","disabled":false,"engineSkipped":false},{"name":"dsh-ultramath","disabled":false,"engineSkipped":false},{"name":"@mars-sea/dsh-commandcode-provider","disabled":false,"engineSkipped":false},{"name":"dsh-api-dashboard","disabled":false,"engineSkipped":false},{"name":"dsh-voice","disabled":false,"engineSkipped":false},{"name":"dsh-whale-musume","disabled":false,"engineSkipped":false},{"name":"turnstile-popup","disabled":false,"engineSkipped":false}]};
+      FALLBACK = FALLBACK || { profile: "mini", rows: [] };
+      FALLBACK.rows = FALLBACK.rows || [];
+
+      var C = {
+        bg: "#0c1219", panel: "#121b25", raised: "#182431", line: "#283746",
+        text: "#e6edf5", muted: "#91a1b2", blue: "#69b7ff", green: "#56d364",
+        red: "#ff7b72", amber: "#e3b341"
+      };
+      var S = {
+        button: { minHeight: "30px", padding: "4px 9px", borderRadius: "7px", border: "1px solid " + C.line, background: C.raised, color: C.text, cursor: "pointer", fontSize: "12px" },
+        quiet: { minHeight: "30px", padding: "4px 8px", borderRadius: "7px", border: "1px solid transparent", background: "transparent", color: C.muted, cursor: "pointer", fontSize: "12px" },
+        input: { width: "100%", boxSizing: "border-box", minHeight: "32px", padding: "5px 9px", borderRadius: "7px", border: "1px solid " + C.line, background: "#0d151e", color: C.text, fontSize: "12px", outline: "none" },
+        mono: { fontFamily: "ui-monospace,SFMono-Regular,Consolas,monospace" }
+      };
 
       function api(path, init) {
         var t = (location.search.match(/[?&]token=([^&]+)/) || [])[1] || "";
-        var url = "/turnstile/" + path + (t ? "?token=" + t : "");
+        var url = "/turnstile/" + path + (t ? (path.indexOf("?") === -1 ? "?" : "&") + "token=" + t : "");
         return fetch(url, Object.assign({ credentials: "include" }, init || {}))
-          .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); });
+          .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status + " · " + path); return r.json(); });
       }
       function visible(list) {
-        // The host route does not compute engine compatibility; merge it from the snapshot.
         var known = {};
         FALLBACK.rows.forEach(function (r) { known[r.name] = r.engineSkipped; });
-        return list
-          .filter(function (r) { return r.name.indexOf("@deepseek-ai/") !== 0; })
-          .map(function (r) {
-            return { name: r.name, disabled: !!r.disabled, engineSkipped: known[r.name] || false, row: r.row || "", ui: r.ui || [] };
-          });
+        return (list || []).filter(function (r) { return r.name.indexOf("@deepseek-ai/") !== 0; }).map(function (r) {
+          return { name: r.name, disabled: !!r.disabled, engineSkipped: known[r.name] || false, row: r.row || "", ui: r.ui || [] };
+        });
       }
-      // Real slot tree: SlotRegistry.entries() is exposed at runtime (discovered experimentally).
-      function slotTree() {
+      function shortProfile() {
+        var p = String(FALLBACK.profile || "mini").replace(/[\\/]+$/, "");
+        return p.split(/[\\/]/).pop() || "mini";
+      }
+      function errorText(err) { return String((err && err.message) || err || "未知错误").slice(0, 140); }
+      function badge(text, color) {
+        return h("span", { style: { display: "inline-flex", alignItems: "center", minHeight: "20px", padding: "1px 7px", borderRadius: "999px", border: "1px solid " + color, color: color, fontSize: "10.5px", whiteSpace: "nowrap" } }, text);
+      }
+      function globalSlotsSnapshot() {
+        var out = [];
         try {
-          var s = ctx.slots;
-          var list = (s && typeof s.entries === "function") ? s.entries() : [];
-          var arr = Array.isArray(list) ? list : Array.from(list || []);
-          return arr.slice(0, 400).map(function (e) {
-            return {
-              slot: String((e && (e.name || e.slot || e.slotName)) || "?"),
-              id: String((e && (e.id || e.key || e.path)) || "?")
-            };
+          var recs = ctx.slots && ctx.slots._core && ctx.slots._core.records;
+          if (!recs || typeof recs.forEach !== "function") return out;
+          recs.forEach(function (node, slot) {
+            var ids = [];
+            try {
+              var es = node && node.entries;
+              if (es && typeof es.forEach === "function") es.forEach(function (e) { ids.push(String((e && (e.id || e.key || e.name)) || "?")); });
+              else if (Array.isArray(es)) es.forEach(function (e) { ids.push(String((e && (e.id || e.key || e.name)) || "?")); });
+            } catch (e) {}
+            out.push({ slot: String(slot), declaredBy: String((node && node.declaredBy) || ""), count: ids.length, entries: ids.slice(0, 30) });
           });
-        } catch (err) { return []; }
-      }
-      // Compact topology: plugins on the left, UI surfaces on the right, one line per membership.
-      // Contended surfaces (2+ plugins, at least one hardcoded) are drawn red.
-      function Topology(props) {
-        var occ = props.occ;
-        if (!occ || !occ.surfaces || !occ.surfaces.length) return null;
-        var top = occ.surfaces.slice(0, 6);
-        var names = [];
-        top.forEach(function (s) { s.plugins.forEach(function (p) { if (names.indexOf(p) === -1) names.push(p); }); });
-        names = names.slice(0, 8);
-        var rowH = 18, pad = 6;
-        var height = Math.max(top.length, names.length) * rowH + pad * 2;
-        var nodes = [];
-        names.forEach(function (n, i) {
-          nodes.push(h("text", { key: "p" + i, x: 2, y: pad + i * rowH + 12, fill: "#b8c2cf", fontSize: "9.5px", fontFamily: "ui-monospace,monospace" }, n.length > 16 ? n.slice(0, 15) + "…" : n));
-        });
-        top.forEach(function (s, i) {
-          var y = pad + i * rowH + 12;
-          nodes.push(h("text", { key: "s" + i, x: 190, y: y, fill: s.contested ? "#f85149" : "#8b96a5", fontSize: "9.5px", fontFamily: "ui-monospace,monospace" }, s.surface.length > 18 ? s.surface.slice(0, 17) + "…" : s.surface));
-          s.plugins.forEach(function (p) {
-            var pi = names.indexOf(p);
-            if (pi === -1) return;
-            nodes.push(h("line", { key: "l" + i + p, x1: 128, y1: pad + pi * rowH + 8, x2: 188, y2: y - 3,
-              stroke: s.contested ? "rgba(248,81,73,0.55)" : "rgba(88,166,255,0.35)", strokeWidth: 1 }));
-          });
-        });
-        return h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px" } },
-          h("div", { style: { color: "#d7dee8", fontSize: "11.5px", marginBottom: "2px" } }, "拓扑 · 插件 → UI 面"),
-          h("svg", { width: "100%", height: height, viewBox: "0 0 306 " + height }, nodes));
+        } catch (e) {}
+        return out.sort(function (a, b) { return b.count - a.count || a.slot.localeCompare(b.slot); });
       }
 
-      function SettingsSection() {
-        var tab = React.useState("概览"), active = tab[0], setActive = tab[1];
-        var data = React.useState({ rows: [], occ: null, err: "", delta: null }), d = data[0], setData = data[1];
-        var selRow = React.useState(null), chosen = selRow[0], setChosen = selRow[1];
-        var qv = React.useState(""), q = qv[0], setQ = qv[1];
-        function hit(text) { return !q || String(text || "").toLowerCase().indexOf(q.toLowerCase()) !== -1; }
-        var act = React.useState(null), activity = act[0], setActivity = act[1];
-        React.useEffect(function () {
-          Promise.all([api("plugins").catch(function () { return null; }), api("occupancy").catch(function () { return null; }), api("activity").catch(function () { return null; })])
-            .then(function (res) {
-              setData({ rows: (res[0] && res[0].rows) || [], occ: res[1], err: "", delta: res[0] ? res[0].delta : null });
-              setActivity(res[2] || null);
-            })
-            .catch(function (e) { setData({ rows: [], occ: null, err: String(e && e.message || e) }); });
-        }, []);
-        var delta = d.delta || null;
-        var deltaLine = "";
-        if (delta && !delta.firstRun) {
-          var parts = [];
-          if (delta.added.length) parts.push("+" + delta.added.length + " 新装");
-          if (delta.removed.length) parts.push("-" + delta.removed.length + " 卸载");
-          if (delta.toggled.length) parts.push(delta.toggled.length + " 状态变更");
-          deltaLine = parts.length ? ("自上次查看: " + parts.join(" · ")) : "自上次查看: 无变化";
-        } else if (delta && delta.firstRun) {
-          deltaLine = "首次查看，已记下基线";
-        }
-        function deltaMark(name) {
-          if (!delta || delta.firstRun) return "";
-          if (delta.added.indexOf(name) !== -1) return "＋";
-          if (delta.toggled.some(function (t) { return t.name === name; })) return "⟳";
-          return "";
-        }
-        var pages = ["概览", "架构图", "占用", "插件", "控制台"];
-        var rows = d.rows || [];
-        var surfaces = (d.occ && d.occ.surfaces) || [];
-        function table(cols, body) {
-          return h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: "12.5px" } },
-            h("thead", null, h("tr", null, cols.map(function (c, i) {
-              return h("th", { key: i, style: { textAlign: c.num ? "right" : "left", padding: "6px 10px", borderBottom: "1px solid #d8dee4", color: "#57606a", fontWeight: 600, whiteSpace: "nowrap" } }, c.title);
-            }))),
-            h("tbody", null, body));
-        }
-        function cell(text, style) {
-          return h("td", { style: Object.assign({ padding: "5px 10px", borderBottom: "1px solid #eef1f4", whiteSpace: "nowrap" }, style || {}) }, text);
-        }
-        var content = null;
-        if (active === "插件") {
-          content = table([{ title: "插件" }, { title: "状态" }, { title: "UI 面", num: true }, { title: "位置" }],
-            rows.filter(function (r) { return hit(r.name) || hit(r.row) || (r.ui || []).some(hit); }).map(function (r) {
-              return h("tr", { key: r.name, "data-testid": "srow-" + r.name, onClick: function () { setChosen(chosen && chosen.name === r.name ? null : r); }, style: { cursor: "pointer", background: chosen && chosen.name === r.name ? "#eff6ff" : "transparent" } },
-                cell(h("span", null, deltaMark(r.name) + (r.disabled ? "× " : "· ") + r.name), { fontFamily: "ui-monospace,monospace", color: deltaMark(r.name) === "＋" ? "#0969da" : undefined }),
-                cell(r.disabled ? "停用" : (r.engineSkipped ? "引擎跳过" : "启用"), { color: r.disabled ? "#cf222e" : (r.engineSkipped ? "#9a6700" : "#1a7f37") }),
-                cell(((r.ui && r.ui.length) || 0), { textAlign: "right", fontFamily: "ui-monospace,monospace" }),
-                (function () {
-                  var anchor = null;
-                  surfaces.forEach(function (s) { if (s.anchors && s.anchors[r.name]) anchor = s.anchors[r.name]; });
-                  return cell(anchor ? anchor : "硬编码", { color: anchor ? "#1f6feb" : "#9a6700", fontFamily: anchor ? "ui-monospace,monospace" : undefined });
-                })());
-            }));
-        } else if (active === "占用") {
-          content = table([{ title: "UI 面" }, { title: "插件数", num: true }, { title: "硬编码", num: true }, { title: "插件" }],
-            surfaces.filter(function (s) { return hit(s.surface) || (s.plugins || []).some(hit); }).map(function (s) {
-              return h("tr", { key: s.surface },
-                cell(s.surface, { fontFamily: "ui-monospace,monospace" }),
-                cell(s.count, { textAlign: "right" }),
-                cell((s.hardcoded && s.hardcoded.length) || 0, { textAlign: "right", color: (s.hardcoded && s.hardcoded.length) ? "#9a6700" : "#57606a" }),
-                cell((s.plugins || []).join(", "), { maxWidth: "300px", overflow: "hidden", textOverflow: "ellipsis", color: "#57606a", fontSize: "11.5px" }));
-            }));
-        } else if (active === "控制台") {
-          content = h("div", { "data-testid": "console-view" },
-            h("div", { style: { color: "#57606a", marginBottom: "8px" } }, activity
-              ? "面板请求: " + Object.keys(activity.calls || {}).map(function (k) { return k + "×" + activity.calls[k]; }).join("   ")
-              : "读取中…"),
-            activity && activity.note ? h("div", { style: { color: "#9a6700", marginBottom: "8px" } }, activity.note) : null,
-            (activity && activity.tail || []).length
-              ? h("div", { style: { fontFamily: "ui-monospace,monospace", fontSize: "11.5px", lineHeight: "1.7" } }, activity.tail.map(function (l, i) { return h("div", { key: i, style: { color: /error|fatal|fail/i.test(l) ? "#cf222e" : "#57606a" } }, l); }))
-              : h("div", { style: { color: "#8b96a5" } }, "最近 40 行没有异常或激活记录。"));
-        } else if (active === "架构图") {
-          var tk = "";
-          try { tk = new URLSearchParams(window.location.search).get("token") || ""; } catch (e) { tk = ""; }
-          content = h("div", null,
-            h("div", { style: { marginBottom: "8px", display: "flex", gap: "8px", alignItems: "center" } },
-              h("a", { href: "/turnstile/arch?token=" + encodeURIComponent(tk), target: "_blank", rel: "noopener", style: { fontSize: "12px", whiteSpace: "nowrap" } }, "在新窗口打开"),
-              h("span", { style: { color: "#8b96a5", fontSize: "11.5px" } }, "由 occupancy 数据生成；没有图时先跑 tools/arch-graph.mjs")),
-            h("iframe", { src: "/turnstile/arch?token=" + encodeURIComponent(tk), style: { width: "100%", height: "56vh", border: "1px solid #d8dee4", borderRadius: "8px", background: "#fff" } }));
-        } else {
-          content = h("div", { "data-testid": "settings-stub" }, active === "概览"
-            ? "共 " + rows.length + " 个插件，" + surfaces.length + " 个 UI 面（" + surfaces.filter(function (s) { return s.contested; }).length + " 处争用）"
-            : "骨架阶段：这一页还没有接数据。");
-        }
-        var detail = null;
-        if (chosen) {
-          var anchorVal = null;
-          surfaces.forEach(function (s) { if (s.anchors && s.anchors[chosen.name]) anchorVal = s.anchors[chosen.name]; });
-          detail = h("div", { "data-testid": "sp-detail", style: { marginTop: "10px", padding: "10px 12px", background: "#f6f8fa", borderRadius: "8px", fontSize: "12px" } },
-            h("div", { style: { fontWeight: "600", marginBottom: "6px", fontFamily: "ui-monospace,monospace" } }, chosen.name),
-            h("div", { style: { display: "grid", gridTemplateColumns: "90px 1fr", rowGap: "2px" } },
-              h("span", { style: { color: "#57606a" } }, "行 id"), h("span", null, chosen.row || "(未声明)"),
-              h("span", { style: { color: "#57606a" } }, "状态"), h("span", null, chosen.disabled ? "停用" : (chosen.engineSkipped ? "引擎跳过" : "启用")),
-              h("span", { style: { color: "#57606a" } }, "UI 面"), h("span", null, ((chosen.ui && chosen.ui.length) || 0) + " 个"),
-              h("span", { style: { color: "#57606a" } }, "位置"), h("span", null, anchorVal || "硬编码（改配置无效）")));
-        }
-        return h("div", { "data-testid": "settings-shell", style: { display: "grid", gridTemplateColumns: "150px 1fr", minHeight: "440px" } },
-          h("div", { style: { borderRight: "1px solid #e5e7eb", padding: "8px 0" } },
-            pages.map(function (p) {
-              return h("div", { key: p, "data-testid": "page-" + p, onClick: function () { setActive(p); }, style: { padding: "6px 14px", fontSize: "13px", cursor: "pointer", color: active === p ? "#1f6feb" : "#374151", fontWeight: active === p ? "600" : "400", background: active === p ? "#eff6ff" : "transparent" } }, p);
-            })),
-          h("div", { "data-testid": "settings-body", style: { padding: "14px 18px", fontSize: "13px", color: "#374151", overflow: "auto", maxHeight: "62vh" } },
-            h("div", { style: { display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" } },
-              h("span", { style: { fontSize: "14px", fontWeight: "600" } }, active),
-              h("a", { "data-testid": "open-console", href: "/turnstile/?token=" + encodeURIComponent((function () { try { return new URLSearchParams(window.location.search).get("token") || ""; } catch (e) { return ""; } })()), target: "_blank", rel: "noopener", style: { fontSize: "12px", marginLeft: "12px", whiteSpace: "nowrap" } }, "新窗口打开"),
-              h("input", { "data-testid": "settings-filter", value: q, placeholder: "筛选插件 / UI 面", onChange: function (e) { setQ(e.target.value); },
-                style: { marginLeft: "auto", width: "200px", padding: "3px 8px", borderRadius: "6px", border: "1px solid #d0d7de", fontSize: "12px" } })),
-            d.err ? h("div", { style: { color: "#cf222e" } }, "读取失败: " + d.err) : null,
-            deltaLine ? h("div", { "data-testid": "delta-line", style: { fontSize: "12px", color: "#57606a", marginBottom: "8px" } }, deltaLine) : null,
-            detail,
-            content));
+      function Topology(props) {
+        var occ = props.occ;
+        if (!occ || !occ.surfaces || !occ.surfaces.length) return h("div", { style: { color: C.muted } }, "没有 UI 占用数据。");
+        var top = occ.surfaces.slice(0, 6), names = [];
+        top.forEach(function (s) { (s.plugins || []).forEach(function (p) { if (names.indexOf(p) === -1) names.push(p); }); });
+        names = names.slice(0, 7);
+        var rowH = 20, pad = 8, height = Math.max(top.length, names.length) * rowH + pad * 2;
+        var nodes = [];
+        names.forEach(function (n, i) {
+          nodes.push(h("text", { key: "p" + i, x: 2, y: pad + i * rowH + 13, fill: C.text, fontSize: "10px", fontFamily: "ui-monospace,monospace" }, n.length > 17 ? n.slice(0, 16) + "…" : n));
+        });
+        top.forEach(function (s, i) {
+          var y = pad + i * rowH + 13;
+          nodes.push(h("text", { key: "s" + i, x: 220, y: y, fill: s.contested ? C.red : C.muted, fontSize: "10px", fontFamily: "ui-monospace,monospace" }, s.surface.length > 17 ? s.surface.slice(0, 16) + "…" : s.surface));
+          (s.plugins || []).forEach(function (p) {
+            var pi = names.indexOf(p);
+            if (pi === -1) return;
+            nodes.push(h("line", { key: "l" + i + p, x1: 142, y1: pad + pi * rowH + 9, x2: 214, y2: y - 4, stroke: s.contested ? "rgba(255,123,114,.55)" : "rgba(105,183,255,.35)", strokeWidth: 1 }));
+          });
+        });
+        return h("svg", { "data-testid": "topology", width: "100%", height: height, viewBox: "0 0 340 " + height, role: "img", "aria-label": "插件到 UI 面的连接图" }, nodes);
       }
 
       function Card() {
         var st = React.useState(true), open = st[0], setOpen = st[1];
         var rs = React.useState(visible(FALLBACK.rows)), rows = rs[0], setRows = rs[1];
         var bs = React.useState(""), busy = bs[0], setBusy = bs[1];
+        var pd = React.useState(null), pending = pd[0], setPending = pd[1];
         var rp = React.useState(null), report = rp[0], setReport = rp[1];
         var sel = React.useState(null), picked = sel[0], setPicked = sel[1];
         var sl = React.useState([]), slots = sl[0], setSlots = sl[1];
         var oc = React.useState(null), occ = oc[0], setOcc = oc[1];
-        // Four sections do not fit one screen: collapse the two least urgent by default.
-        var sx = React.useState({ topo: true, occ: true, slots: false, list: false }), secs = sx[0], setSecs = sx[1];
-        var fx = React.useState(""), fuseMsg = fx[0], setFuseMsg = fx[1];
-        // Drag-to-corner: rows become draggable, corner zones accept the drop, and we never
-        // pretend a plugin can move when it does not declare a position.
-        var dm = React.useState(false), dragMode = dm[0], setDragMode = dm[1];
+        var sx = React.useState({ list: true, checks: false, topology: false, occupancy: false, slots: false }), secs = sx[0], setSecs = sx[1];
+        var qs = React.useState(""), query = qs[0], setQuery = qs[1];
+        var ns = React.useState(null), notice = ns[0], setNotice = ns[1];
         var im = React.useState(false), inspectMode = im[0], setInspectMode = im[1];
-        var ir = React.useState(""), inspectMsg = ir[0], setInspectMsg = ir[1];
-        var av = React.useState(null), activity = av[0], setActivity = av[1];
-        // One filter box, filtering as you type: the list is always the answer to the query (Everything's model).
-        var fv = React.useState(""), filter = fv[0], setFilter = fv[1];
-        function keep(text) {
-          if (!filter) return true;
-          return String(text || "").toLowerCase().indexOf(filter.toLowerCase()) !== -1;
-        }
-        // Crosshair: like Process Explorer's target, but the "window handle" here is the React
-        // fiber. Every slot entry renders through RootEntry, whose props carry slotKey + options.id.
-        function ownerAtPoint(x, y) {
-          var el = document.elementFromPoint(x, y);
-          if (!el) return null;
-          var key = Object.keys(el).filter(function (k) { return k.indexOf("__reactFiber$") === 0; })[0];
-          if (!key) return { slotKey: "", entryId: "", note: "该节点不在 React 树里" };
-          var f = el[key];
-          var found = null;
-          var comp = "";
-          for (var i = 0; i < 100 && f; i++) {
-            var t = f.type;
-            var name = typeof t === "function" ? (t.displayName || t.name || "") : "";
-            if ((!comp || /^[A-Z][a-z]?[_$]?$/.test(comp)) && name && name !== "RootEntry" && !/^(div|span|img|svg|button|input|path|g|rect|p|a|ul|li|section|header|main|aside|form|textarea|label)$/.test(name)) comp = name;
-            if (name === "RootEntry") {
-              var pr = f.memoizedProps || {};
-              var e = pr.entry || {};
-              var id = e.options && e.options.id ? String(e.options.id) : "";
-              // Keep the DEEPEST entry that actually carries an id: the outer RootEntry is often
-              // a whole page region ("main"), which tells the user nothing.
-              var cand = { slotKey: String(pr.slotKey || ""), entryId: id };
-              if (!found) found = cand;
-              if (id) found = cand;
-            }
-            f = f.return;
-          }
-          if (found) { found.component = found.entryId ? "" : comp; return found; }
-          return { slotKey: "", entryId: "", note: "没有找到 slot 边界" };
-        }
-        // Element inspection: the DOM tags plugins with data-plugin, so a click names the owner.
-        React.useEffect(function () {
-          if (!inspectMode) return undefined;
-          function onPick(e) {
-            try {
-              var el = document.elementFromPoint(e.clientX, e.clientY);
-              var owner = el && el.closest ? el.closest("[data-plugin]") : null;
-              var pkg = owner ? owner.getAttribute("data-plugin") : "";
-              var tid = el && el.getAttribute ? (el.getAttribute("data-testid") || "") : "";
-              var surf = null;
-              (occ && occ.surfaces || []).forEach(function (s) {
-                if (pkg && s.plugins && s.plugins.indexOf(pkg) !== -1) surf = s;
-              });
-              var anchor = surf && surf.anchors ? surf.anchors[pkg] : null;
-              var cls = el && el.className ? String(el.className).split(" ").slice(0, 2).join(".") : "";
-              var where = el ? el.tagName.toLowerCase() + (cls ? "." + cls : "") : "?";
-              var own = ownerAtPoint(e.clientX, e.clientY);
-              if (own && own.slotKey) {
-                setInspectMsg("slot " + own.slotKey + (own.entryId ? "  ·  " + own.entryId : (own.component ? "  ·  <" + own.component + ">" : "")) + (own.note ? "  (" + own.note + ")" : ""));
-                e.preventDefault(); e.stopPropagation(); return;
-              }
-              setInspectMsg(pkg
-                ? pkg + (tid ? " · " + tid : "") + (surf ? "  →  " + surf.surface + "  位置=" + (anchor || "硬编码") : "")
-                : "<" + where + ">" + (tid ? " · " + tid : "") + "（宿主未给该渲染节点打插件标记）");
-              e.preventDefault();
-              e.stopPropagation();
-            } catch (err) { /* never break the page */ }
-          }
-          document.addEventListener("click", onPick, true);
-          return function () { document.removeEventListener("click", onPick, true); };
-        }, [inspectMode, occ]);
-        var dg = React.useState(null), dragging = dg[0], setDragging = dg[1];
-        function dropOn(zone) {
-          var name = dragging;
-          setDragging(null);
-          if (!name) return;
-          api("anchor-support?package=" + encodeURIComponent(name)).then(function (s) {
-            if (!s.configurable) {
-              setFuseMsg(name + " 未暴露 slot/anchor/order —— 拖不动，需要作者支持");
-              return null;
-            }
-            if (s.values.length && s.values.indexOf(zone) === -1) {
-              setFuseMsg(name + " 支持的位置: " + s.values.join(" / ") + "（不含 " + zone + "）");
-              return null;
-            }
-            return api("anchor", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ package: name, anchor: zone }) })
-              .then(function () { setFuseMsg(name + " → " + zone + "（重启后生效）"); return api("occupancy"); })
-              .then(setOcc);
-          }).catch(function (e) { setFuseMsg("落位失败: " + String(e.message || e).slice(0, 60)); });
-        }
-        var ZONES = [["top-left", "左上"], ["top-right", "右上"], ["bottom-left", "左下"], ["bottom-right", "右下"]];
-        function zones() {
-          if (!dragMode) return null;
-          return h("div", { style: { position: "fixed", inset: 0, zIndex: 2147482900, pointerEvents: "none" } },
-            ZONES.map(function (z, i) {
-              var pos = i === 0 ? { left: 24, top: 90 } : i === 1 ? { right: 24, top: 90 } : i === 2 ? { left: 24, bottom: 90 } : { right: 24, bottom: 90 };
-              return h("div", {
-                key: z[0], "data-testid": "zone-" + z[0],
-                onDragOver: function (e) { e.preventDefault(); },
-                onDrop: function (e) { e.preventDefault(); dropOn(z[0]); },
-                style: Object.assign({ position: "fixed", width: "150px", height: "110px", border: "1px dashed #58a6ff", borderRadius: "10px", color: "#58a6ff", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(88,166,255,0.06)", pointerEvents: "auto" }, pos)
-              }, "拖到" + z[1]);
-            }));
-        }
-        // Drag mode: the panel itself moves (users want the tool out of the way); the position
-        // is remembered per browser. Plugin overlays are a different problem - see below.
+        var ir = React.useState(null), inspectResult = ir[0], setInspectResult = ir[1];
+        var ih = React.useState(null), inspectRect = ih[0], setInspectRect = ih[1];
         var ps = React.useState(function () {
           try { var v = JSON.parse(localStorage.getItem("turnstile.panelPos") || "null"); if (v && typeof v.x === "number") return v; } catch (e) {}
           return null;
         }), pos = ps[0], setPos = ps[1];
         var dragRef = React.useRef(null);
+
+        function reloadRows() {
+          return api("plugins").then(function (d) {
+            var next = visible(d.rows);
+            setRows(next);
+            setPicked(function (cur) {
+              if (!cur) return null;
+              for (var i = 0; i < next.length; i++) if (next[i].name === cur.name) return Object.assign({}, next[i], { anchorOptions: cur.anchorOptions || [] });
+              return null;
+            });
+          });
+        }
+        function refresh() {
+          setBusy("refresh");
+          var errors = [];
+          function capture(label) { return function (e) { errors.push(label + ": " + errorText(e)); }; }
+          return Promise.all([
+            reloadRows().catch(capture("插件")),
+            api("report").then(setReport).catch(capture("报告")),
+            api("occupancy").then(setOcc).catch(capture("占用"))
+          ]).then(function () {
+            setNotice(errors.length ? { kind: "error", text: errors.join("；") } : { kind: "ok", text: "数据已刷新" });
+            setBusy("");
+          });
+        }
+        React.useEffect(function () {
+          setSlots(globalSlotsSnapshot());
+          refresh();
+        }, []);
+        function ownerAtPoint(x, y) {
+          var el = document.elementFromPoint(x, y);
+          if (!el) return null;
+          var key = Object.keys(el).filter(function (k) { return k.indexOf("__reactFiber$") === 0; })[0];
+          var where = el.tagName.toLowerCase() + (el.id ? "#" + el.id : "");
+          if (!key) return { slotKey: "", entryId: "", where: where, note: "该节点不在 React 树里" };
+          var f = el[key], found = null, component = "";
+          for (var i = 0; i < 100 && f; i++) {
+            var t = f.type;
+            var name = typeof t === "function" ? (t.displayName || t.name || "") : "";
+            if (!component && name && name !== "RootEntry") component = name;
+            if (name === "RootEntry") {
+              var pr = f.memoizedProps || {}, entry = pr.entry || {};
+              var id = entry.options && entry.options.id ? String(entry.options.id) : "";
+              var candidate = { slotKey: String(pr.slotKey || ""), entryId: id, where: where };
+              if (!found || id) found = candidate;
+            }
+            f = f.return;
+          }
+          if (found) { found.component = found.entryId ? "" : component; return found; }
+          return { slotKey: "", entryId: "", where: where, note: "没有找到 slot 边界" };
+        }
+        React.useEffect(function () {
+          if (!inspectMode) return undefined;
+          function onMove(e) {
+            var el = document.elementFromPoint(e.clientX, e.clientY);
+            if (el) { var r = el.getBoundingClientRect(); setInspectRect({ left: r.left, top: r.top, width: r.width, height: r.height }); }
+          }
+          function onPick(e) {
+            e.preventDefault(); e.stopPropagation();
+            var own = ownerAtPoint(e.clientX, e.clientY);
+            setInspectResult(own || { note: "没有可取点的元素" });
+            setInspectMode(false); setInspectRect(null);
+          }
+          function onKey(e) { if (e.key === "Escape") { setInspectMode(false); setInspectRect(null); } }
+          document.addEventListener("mousemove", onMove, true);
+          document.addEventListener("click", onPick, true);
+          document.addEventListener("keydown", onKey, true);
+          return function () {
+            document.removeEventListener("mousemove", onMove, true);
+            document.removeEventListener("click", onPick, true);
+            document.removeEventListener("keydown", onKey, true);
+          };
+        }, [inspectMode]);
+        function loadAnchorOptions(row) {
+          api("anchor-options?package=" + encodeURIComponent(row.name)).then(function (d) {
+            setPicked(function (cur) { return cur && cur.name === row.name ? Object.assign({}, cur, { anchorOptions: d.suggestions || [] }) : cur; });
+          }).catch(function (e) { setNotice({ kind: "error", text: "位置建议读取失败：" + errorText(e) }); });
+        }
+        function setAnchor(row, anchor) {
+          setBusy(row.name);
+          setNotice(null);
+          postPlan("anchor", { package: row.name, anchor: anchor })
+            .catch(function (e) { setNotice({ kind: "error", text: "位置更新失败：" + errorText(e) }); })
+            .then(function () { setBusy(""); });
+        }
+        // Every write is two-step: the host answers with a plan and a confirmation token; nothing is
+        // written until that token comes back. The panel shows the diff instead of writing silently.
+        function postPlan(endpoint, payload) {
+          return api(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) })
+            .then(function (r) {
+              if (r && r.needsConfirm && r.plan) { setPending({ endpoint, payload, plan: r.plan }); setNotice(null); return null; }
+              return r;
+            });
+        }
+        function confirmPending() {
+          if (!pending) return;
+          var p = pending;
+          setBusy(p.payload.package || "");
+          api(p.endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(Object.assign({}, p.payload, { confirm: p.plan.confirm })) })
+            .then(function (r) {
+              setPending(null);
+              if (r && r.ok === false) throw new Error((r.evidence && r.evidence.problems && r.evidence.problems.join(", ")) || "未写入");
+              return reloadRows();
+            })
+            .then(function () { setNotice({ kind: "ok", text: "已写入，重启后生效。" }); })
+            .catch(function (e) { setNotice({ kind: "error", text: "写入失败：" + errorText(e) }); })
+            .then(function () { setBusy(""); });
+        }
+        function flip(row) {
+          setBusy(row.name);
+          setNotice(null);
+          postPlan("toggle", { package: row.name, disable: !row.disabled })
+            .catch(function (e) { setNotice({ kind: "error", text: "状态切换失败：" + errorText(e) }); })
+            .then(function () { setBusy(""); });
+        }
         function beginDrag(e) {
           e.preventDefault();
-          var startX = e.clientX, startY = e.clientY;
-          var box = document.querySelector('[data-testid="panel"]').getBoundingClientRect();
-          var baseX = box.left, baseY = box.top;
+          var panel = document.querySelector('[data-testid="panel"]');
+          if (!panel) return;
+          var box = panel.getBoundingClientRect(), startX = e.clientX, startY = e.clientY;
           dragRef.current = true;
           function move(ev) {
             if (!dragRef.current) return;
-            setPos({ x: Math.max(0, baseX + ev.clientX - startX), y: Math.max(0, baseY + ev.clientY - startY) });
+            setPos({
+              x: Math.min(window.innerWidth - 80, Math.max(0, box.left + ev.clientX - startX)),
+              y: Math.min(window.innerHeight - 40, Math.max(0, box.top + ev.clientY - startY))
+            });
           }
           function up() {
             dragRef.current = false;
@@ -332,220 +244,134 @@ window.__ModuleLoader__.load({
           window.addEventListener("mouseup", up);
         }
         function section(key, title, body) {
-          if (!body) return null;
           var isOpen = !!secs[key];
-          return h("div", { style: { marginBottom: "6px", borderBottom: "1px solid #30363d", paddingBottom: "6px" } },
+          return h("section", { style: { marginTop: "8px", border: "1px solid " + C.line, borderRadius: "9px", background: C.panel, overflow: "hidden" } },
             h("button", {
-              "data-testid": "sec-" + key,
+              type: "button", "data-testid": "sec-" + key, "aria-expanded": isOpen,
               onClick: function () { var n = Object.assign({}, secs); n[key] = !isOpen; setSecs(n); },
-              style: { width: "100%", textAlign: "left", background: "none", border: 0, color: "#d7dee8", cursor: "pointer", fontSize: "11.5px", padding: 0 }
-            }, (isOpen ? "▾ " : "▸ ") + title),
-            isOpen ? h("div", { style: { marginTop: "4px", fontSize: "11.5px", color: "#b8c2cf" } }, body) : null);
+              style: { width: "100%", minHeight: "36px", display: "flex", alignItems: "center", justifyContent: "space-between", textAlign: "left", background: "transparent", border: 0, color: C.text, cursor: "pointer", fontSize: "12px", padding: "7px 10px" }
+            }, h("span", null, title), h("span", { style: { color: C.muted } }, isOpen ? "▾" : "▸")),
+            isOpen ? h("div", { style: { padding: "0 10px 10px", fontSize: "11.5px", color: C.muted } }, body) : null);
         }
-        React.useEffect(function () {
-          // peek: the floating panel must not consume the settings page's "since last look" baseline.
-          api("plugins?update=0").then(function (d) { setRows(visible(d.rows)); }).catch(function () {});
-          api("report").then(setReport).catch(function () {});
-          setSlots(globalSlotsSnapshot());
-          api("occupancy").then(setOcc).catch(function () {});
-          api("activity").then(setActivity).catch(function () {});
-        }, []);
-        function reload() {
-          return api("plugins?update=0").then(function (d) {
-            var next = visible(d.rows);
-            setRows(next);
-            // The property panel holds a snapshot row: refresh it, or the toggle keeps sending
-            // the same direction because it reads a stale `disabled`.
-            setPicked(function (cur) {
-              if (!cur) return null;
-              for (var i = 0; i < next.length; i++) if (next[i].name === cur.name) return next[i];
-              return null;
-            });
-          });
+        function currentAnchor(row) {
+          var cur = "";
+          (occ && occ.surfaces || []).forEach(function (s) { if (s.anchors && s.anchors[row.name]) cur = s.anchors[row.name]; });
+          return cur;
         }
-        function loadAnchorOptions(row) {
-          api("anchor-options?package=" + encodeURIComponent(row.name)).then(function (d) {
-            setPicked(function (cur) { return cur && cur.name === row.name ? Object.assign({}, cur, { anchorOptions: d.suggestions || [] }) : cur; });
-          }).catch(function () {});
-        }
-        function fuseSurface(surface) {
-          setBusy(surface);
-          api("fuse", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ surface: surface }) })
-            .then(function (r) {
-              var first = String(r.output || "").split("\n").filter(function (l) { return l.trim(); });
-              setFuseMsg(r.ok ? "已错开" : (first[0] || "无法在配置层解决"));
-              return api("occupancy");
-            })
-            .then(setOcc)
-            .catch(function (e) { console.warn("turnstile fuse failed", e); })
-            .then(function () { setBusy(""); });
-        }
-        function setAnchor(row, anchor) {
-          setBusy(row.name);
-          api("anchor", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ package: row.name, anchor: anchor })
-          }).then(function () { return api("occupancy"); }).then(setOcc).catch(function (e) {
-            console.warn("turnstile anchor failed", e);
-          }).then(function () { setBusy(""); });
-        }
-        function flip(row) {
-          setBusy(row.name);
-          api("toggle", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ package: row.name, disable: !row.disabled })
-          }).then(reload).catch(function (e) { console.warn("turnstile toggle failed", e); })
-            .then(function () { setBusy(""); });
-        }
-        if (!open) return h("button", { onClick: function () { setOpen(true); }, style: { position: "fixed", right: "18px", top: "64px", zIndex: 2147483000, padding: "6px 10px", borderRadius: "8px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "12px" } }, "插件 " + rows.length);
+
+        if (!open) return h("button", { type: "button", "data-testid": "reopen", onClick: function () { setOpen(true); }, style: Object.assign({}, S.button, { position: "fixed", right: "16px", top: "64px", zIndex: 2147483000, boxShadow: "0 8px 28px rgba(0,0,0,.35)" }) }, "插件闸门 · " + rows.length);
+
         var off = rows.filter(function (r) { return r.disabled; }).length;
-        var sk = rows.filter(function (r) { return r.engineSkipped; }).length;
-        var hot = {};
-        rows.forEach(function (r) { (r.ui || []).forEach(function (u) { hot[u] = (hot[u] || 0) + 1; }); });
-        var crowded = Object.keys(hot).filter(function (u) { return hot[u] >= 3; }).length;
-        return h("div", { "data-testid": "panel", style: { position: "fixed", left: pos ? pos.x : undefined, top: pos ? pos.y : "64px", right: pos ? "auto" : "18px", zIndex: 2147483000, width: "360px", maxHeight: "calc(100vh - 140px)", overflow: "auto", display: "flex", flexDirection: "column", background: "#0e1116", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "10px", padding: "12px 14px", fontFamily: "ui-sans-serif,system-ui" } },
-          zones(),
-          h("div", { style: { order: -3, display: "flex", justifyContent: "space-between", marginBottom: "6px" } },
-            h("span", { "data-testid": "drag-handle", onMouseDown: beginDrag, title: "拖动面板", style: { cursor: "grab", userSelect: "none" } },
-              h("strong", { style: { fontSize: "13px" } }, "mini · 插件 " + rows.length)),
-            h("button", { "data-testid": "drag-mode", onClick: function () { setDragMode(!dragMode); },
-              style: { marginLeft: "6px", padding: "0 6px", borderRadius: "6px", border: "1px solid " + (dragMode ? "#58a6ff" : "#30363d"), background: dragMode ? "rgba(88,166,255,0.15)" : "transparent", color: dragMode ? "#58a6ff" : "#8b96a5", cursor: "pointer", fontSize: "11px" } }, dragMode ? "拖动中" : "拖动"),
-            h("input", { "data-testid": "filter", value: filter, placeholder: "筛选插件…", onChange: function (e) { setFilter(e.target.value); },
-              style: { marginLeft: "6px", width: "96px", padding: "1px 6px", borderRadius: "6px", border: "1px solid #30363d", background: "#0b0e13", color: "#d7dee8", fontSize: "11px" } }),
-            h("button", { "data-testid": "inspect", onClick: function () { setInspectMode(!inspectMode); setInspectMsg(""); },
-              style: { marginLeft: "4px", padding: "0 6px", borderRadius: "6px", border: "1px solid " + (inspectMode ? "#d29922" : "#30363d"), background: inspectMode ? "rgba(210,153,34,0.15)" : "transparent", color: inspectMode ? "#d29922" : "#8b96a5", cursor: "pointer", fontSize: "11px" } }, inspectMode ? "检查中" : "检查"),
-            h("button", { onClick: function () { setOpen(false); }, style: { background: "none", border: 0, color: "#8b96a5", cursor: "pointer" } }, "×")),
-          h("div", { style: { order: -2, color: "#8b96a5", fontSize: "11.5px", marginBottom: "6px" } }, "停用 " + off + " · 引擎跳过 " + sk + " · 挤爆的 UI 面 " + crowded + " · 点一行切换"),
-          report ? h("div", { style: { order: -1, fontSize: "11.5px", marginBottom: "8px", color: "#8b96a5" } },
-            "闸门 " + (report.checks || []).length + " 项 · 阻塞 " + ((report.blocking || []).length) + " · " + (report.result || "?")
-            + (function () {
-                var p = (report.checks || []).filter(function (c) { return c.name === "ui-placement"; })[0];
-                return p ? " · 硬编码位置 " + (p.findings || []).length : "";
-              })()) : null,
-          section("list", "插件列表 · " + rows.filter(function (r) { return keep(r.id) || keep(r.name); }).length + " / " + rows.length, rows.filter(function (r) { return keep(r.id) || keep(r.name); }).map(function (r) {
-            return h("div", { key: r.name, "data-testid": "row-" + r.name, draggable: dragMode, onDragStart: function () { setDragging(r.name); }, onClick: function () { var same = picked && picked.name === r.name; setPicked(same ? null : r); if (!same) loadAnchorOptions(r); var el = document.querySelector('[data-testid=\"panel\"]'); if (el) el.scrollTop = 0; }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
-              h("span", { style: { width: "12px", color: r.disabled ? "#f85149" : "#3fb950" } }, r.disabled ? "×" : "·"),
-              h("span", { style: { flex: 1, fontFamily: "ui-monospace,monospace" } }, r.name),
-              (r.ui && r.ui.length) ? h("span", { title: (r.ui || []).join(", "), style: { color: "#58a6ff", fontSize: "11px" } }, "ui" + r.ui.length) : null,
-              r.engineSkipped ? h("span", { style: { color: "#d29922", fontSize: "11px" } }, "skip") : null);
-          })),
-          section("slots", "slot 树 · " + slots.length + " 个注册", slots && slots.length ? [
-            (function () {
-              var bySlot = {};
-              slots.forEach(function (s) { bySlot[s.slot] = s.count; });
-              return Object.keys(bySlot).sort().slice(0, 12).map(function (k) {
-                return h("div", { key: k, style: { display: "flex", gap: "6px", whiteSpace: "nowrap", overflow: "hidden", lineHeight: "1.5" } },
-                  h("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", fontFamily: "ui-monospace,monospace", fontSize: "11px" } }, k),
-                  h("span", { style: { color: "#8b96a5", fontSize: "11px" } }, bySlot[k]));
-              });
-            })()] : null),
-          inspectMsg ? h("div", { "data-testid": "inspect-result", style: { order: -1, fontSize: "11px", color: "#58a6ff", marginBottom: "4px", wordBreak: "break-all" } }, inspectMsg) : null,
-          fuseMsg ? h("div", { style: { order: -1, fontSize: "11px", color: "#d29922", marginBottom: "4px" } }, fuseMsg) : null,
-          section("console", "控制台 · 最近 " + ((activity && activity.tail && activity.tail.length) || 0) + " 条",
-            activity ? h("div", null,
-              h("div", { style: { color: "#8b96a5", fontSize: "11px" } }, "面板请求: " + Object.keys(activity.calls || {}).map(function (k) { return k + "×" + activity.calls[k]; }).join("  ")),
-              activity.note ? h("div", { style: { color: "#8b96a5", fontSize: "11px" } }, activity.note) : null,
-              (activity.tail || []).map(function (l, i) {
-                return h("div", { key: i, style: { fontFamily: "ui-monospace,monospace", fontSize: "10.5px", color: /error|fatal|fail/i.test(l) ? "#f85149" : "#b8c2cf", wordBreak: "break-all" } }, l);
-              })) : null),
-          occ && occ.surfaces ? h("div", { "data-testid": "topo-summary", style: { order: -1, marginBottom: "6px", color: "#8b96a5", fontSize: "11px" } },
-            occ.surfaces.length + " 个 UI 面 · 争用 " + occ.surfaces.filter(function (s) { return s.contested; }).length + " 处 · 拓扑见设置页（未裁切，可缩放）") : null,
-          occ && occ.surfaces && occ.surfaces.length ? h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", color: "#b8c2cf" } },
-            h("div", { style: { color: "#d7dee8" } }, "角落占用 · " + occ.findings.length + " 处争用"),
-            occ.surfaces.filter(function (s) { return keep(s.surface) || (s.plugins || []).some(keep); }).slice(0, 8).map(function (s) {
-              return h("div", { key: s.surface, style: { display: "flex", gap: "6px", whiteSpace: "nowrap", overflow: "hidden" } },
-                h("span", { style: { color: "#f85149" } }, "!"),
-                h("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", fontFamily: "ui-monospace,monospace", fontSize: "11px" } }, s.surface),
-                h("button", { "data-testid": "fuse-" + s.surface, onClick: function (e) { e.stopPropagation(); fuseSurface(s.surface); },
-                  style: { padding: "0 5px", borderRadius: "5px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "10.5px", whiteSpace: "nowrap" } }, "错开"),
-                h("span", { style: { color: "#8b96a5", fontSize: "11px", whiteSpace: "nowrap" } }, s.count + " · 硬编" + s.hardcoded.length));
-            })) : null,
-          picked ? h("div", { "data-testid": "detail", style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", lineHeight: "1.7", color: "#b8c2cf" } },
-            h("div", { style: { fontFamily: "ui-monospace,monospace", color: "#d7dee8" } }, picked.name),
-            h("div", { "data-testid": "detail-grid", style: { display: "grid", gridTemplateColumns: "72px 1fr", columnGap: "10px", rowGap: "1px", marginTop: "4px" } },
-              h("span", { style: { color: "#8b96a5" } }, "行 id"),
-              h("span", { style: { fontFamily: "ui-monospace,monospace" } }, picked.row || "(未声明)"),
-              h("span", { style: { color: "#8b96a5" } }, "状态"),
-              h("span", null, (picked.disabled ? "已停用" : "启用") + (picked.engineSkipped ? " · 引擎跳过" : "")),
-              h("span", { style: { color: "#8b96a5" } }, "UI 面"),
-              h("span", null, (picked.ui && picked.ui.length) ? picked.ui.length + " 个: " + picked.ui.join(", ") : "无（宿主侧或自绘）")),
-            (function () {
-              var cur = null;
-              try {
-                (occ && occ.surfaces || []).forEach(function (s) {
-                  if (s.anchors && s.anchors[picked.name]) cur = s.anchors[picked.name];
-                });
-              } catch (e) { /* ignore */ }
-              // Free-form: the plugin owns the value space, we only refuse YAML-breaking text.
-              return h("div", { style: { display: "flex", gap: "4px", alignItems: "center", marginTop: "2px" } },
-                h("span", null, "位置:"),
-                h("input", {
-                  defaultValue: cur || "",
-                  list: "anchor-opts-" + picked.name.replace(/[^\w-]/g, "_"),
-                  placeholder: "例如 bottom-right",
-                  disabled: Boolean(busy),
-                  onKeyDown: function (e) { if (e.key === "Enter") setAnchor(picked, e.target.value.trim()); },
-                  style: { flex: 1, minWidth: 0, background: "#161b22", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "6px", fontSize: "11.5px", padding: "1px 5px" }
-                }),
-                h("datalist", { id: "anchor-opts-" + picked.name.replace(/[^\w-]/g, "_") },
-                  (picked.anchorOptions || []).map(function (a) { return h("option", { key: a, value: a }); })),
-                h("button", { onClick: function (e) { var v = e.target.parentNode.querySelector("input"); setAnchor(picked, v.value.trim()); },
-                  style: { padding: "1px 6px", borderRadius: "6px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "11.5px" } }, "设"),
-                h("button", { onClick: function () { setAnchor(picked, ""); },
-                  style: { padding: "1px 6px", borderRadius: "6px", border: "1px solid #30363d", background: "transparent", color: "#8b96a5", cursor: "pointer", fontSize: "11.5px" } }, "清"));
-            })(),
-            h("div", { style: { marginTop: "6px", display: "flex", gap: "8px" } },
-              h("button", { "data-testid": "toggle", onClick: function () { if (!busy) flip(picked); }, style: { padding: "2px 8px", borderRadius: "6px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "11.5px" } }, picked.disabled ? "启用" : "停用"),
-              h("button", { onClick: function () { setPicked(null); }, style: { padding: "2px 8px", borderRadius: "6px", border: "1px solid #30363d", background: "transparent", color: "#8b96a5", cursor: "pointer", fontSize: "11.5px" } }, "收起"))
-          ) : null);
+        var skipped = rows.filter(function (r) { return r.engineSkipped; }).length;
+        var contested = occ && occ.findings ? occ.findings.length : 0;
+        var blocking = report ? (report.blocking || []).length : 0;
+        var gateColor = !report ? C.muted : blocking ? C.red : C.green;
+        var gateText = !report ? "报告不可用" : blocking ? "发现 " + blocking + " 项阻塞" : "检查通过";
+        var q = query.trim().toLowerCase();
+        var filtered = rows.filter(function (r) { return !q || r.name.toLowerCase().indexOf(q) !== -1; });
+        var anchor = picked ? currentAnchor(picked) : "";
+
+        return h("div", {
+          "data-testid": "panel",
+          style: { position: "fixed", left: pos ? pos.x : undefined, top: pos ? pos.y : "56px", right: pos ? "auto" : "16px", zIndex: 2147483000, width: "min(390px, calc(100vw - 24px))", maxHeight: "min(80vh, 780px)", overflowY: "auto", boxSizing: "border-box", background: C.bg, color: C.text, border: "1px solid " + C.line, borderRadius: "14px", padding: "14px", boxShadow: "0 18px 60px rgba(0,0,0,.48)", fontFamily: "ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif", fontSize: "12px" }
+        },
+          inspectMode && inspectRect ? h("div", { "data-testid": "inspect-highlight", style: { position: "fixed", left: inspectRect.left, top: inspectRect.top, width: inspectRect.width, height: inspectRect.height, border: "2px solid " + C.amber, background: "rgba(227,179,65,.10)", boxSizing: "border-box", pointerEvents: "none", zIndex: 2147483001 } }) : null,
+          h("header", { style: { display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: "12px" } },
+            h("div", { "data-testid": "drag-handle", title: "拖动面板", onMouseDown: beginDrag, style: { flex: 1, cursor: "grab", userSelect: "none" } },
+              h("div", { style: { fontSize: "16px", fontWeight: 650, letterSpacing: ".01em" } }, "插件闸门"),
+              h("div", { style: { color: C.muted, fontSize: "11px", marginTop: "2px" } }, shortProfile() + " · 安装前检查与界面占用")),
+            h("button", { type: "button", "data-testid": "inspect", title: "准星：点选页面元素，解析 slot 与条目归属", "aria-label": "准星定位", "aria-pressed": inspectMode, onClick: function () { setInspectMode(!inspectMode); setInspectRect(null); }, style: Object.assign({}, S.button, { borderColor: inspectMode ? C.amber : C.line, color: inspectMode ? C.amber : C.text }) }, inspectMode ? "点选目标" : "准星"),
+            h("button", { type: "button", "data-testid": "console-open", title: "在浏览器中打开完整控制台", "aria-label": "打开完整控制台", onClick: function () { var t = (location.search.match(/[?&]token=([^&]+)/) || [])[1] || ""; window.open("/turnstile/console" + (t ? "?token=" + encodeURIComponent(t) : ""), "_blank", "noopener"); }, style: S.button }, "全窗口"),
+            h("button", { type: "button", "data-testid": "refresh", title: "重新读取面板数据", "aria-label": "刷新", disabled: Boolean(busy), onClick: refresh, style: Object.assign({}, S.quiet, { opacity: busy ? .5 : 1 }) }, busy === "refresh" ? "…" : "↻"),
+            h("button", { type: "button", "data-testid": "close", title: "收起面板", "aria-label": "收起", onClick: function () { setOpen(false); }, style: S.quiet }, "×")),
+
+          h("button", { type: "button", "data-testid": "gate-badge", onClick: function () { var n = Object.assign({}, secs); n.checks = !n.checks; setSecs(n); }, style: { width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", textAlign: "left", padding: "11px 12px", borderRadius: "10px", border: "1px solid " + gateColor, background: blocking ? "rgba(255,123,114,.07)" : "rgba(86,211,100,.05)", color: gateColor, cursor: "pointer" } },
+            h("span", null, h("strong", { style: { fontSize: "13px" } }, gateText), h("span", { style: { display: "block", color: C.muted, fontSize: "10.5px", marginTop: "3px" } }, report ? (report.checks || []).length + " 项检查 · 点击查看明细" : "缺少报告时不会假定检查通过")),
+            h("span", { style: { fontSize: "18px" } }, blocking ? "!" : report ? "✓" : "?")),
+
+          h("div", { style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", marginTop: "8px" } },
+            [[rows.length, "插件"], [off, "停用"], [skipped, "引擎跳过"], [contested, "UI 争用"]].map(function (m) {
+              return h("div", { key: m[1], style: { padding: "8px 4px", textAlign: "center", borderRadius: "8px", background: C.panel, border: "1px solid " + C.line } },
+                h("div", { style: { fontSize: "16px", fontWeight: 650 } }, m[0]), h("div", { style: { color: C.muted, fontSize: "10px", marginTop: "2px" } }, m[1]));
+            })),
+
+          pending ? h("div", { "data-testid": "confirm", style: { marginTop: "8px", padding: "8px 10px", borderRadius: "8px", border: "1px solid " + C.amber, background: C.panel, fontSize: "11px", lineHeight: 1.5 } },
+            h("div", { style: { color: C.muted } }, "将写入 " + String(pending.plan.file || "").split(/[\\/]/).pop() + " · " + String(pending.plan.beforeSha || "新建").slice(0, 8) + " → " + String(pending.plan.afterSha || "").slice(0, 8)),
+            h("div", { style: { display: "flex", gap: "6px", marginTop: "6px", alignItems: "center" } },
+              h("code", { "data-testid": "confirm-token", style: { color: C.amber } }, pending.plan.confirm),
+              h("button", { type: "button", "data-testid": "confirm-apply", onClick: confirmPending, style: Object.assign({}, S.button, { marginLeft: "auto", borderColor: C.amber }) }, "确认写入"),
+              h("button", { type: "button", "data-testid": "confirm-cancel", onClick: function () { setPending(null); }, style: S.button }, "取消"))) : null,
+          notice ? h("div", { "data-testid": "notice", role: "status", style: { marginTop: "8px", padding: "8px 10px", borderRadius: "8px", border: "1px solid " + (notice.kind === "error" ? C.red : C.line), color: notice.kind === "error" ? C.red : C.muted, background: C.panel, fontSize: "11px", lineHeight: 1.5, wordBreak: "break-word" } }, notice.text) : null,
+
+          inspectResult ? h("div", { "data-testid": "inspect-result", style: { marginTop: "8px", padding: "9px 10px", borderRadius: "8px", border: "1px solid " + C.blue, background: C.panel, fontSize: "11px", lineHeight: 1.55 } },
+            h("strong", null, "像素归属"),
+            h("div", { style: S.mono }, inspectResult.slotKey ? "slot: " + inspectResult.slotKey : inspectResult.where || "未识别"),
+            inspectResult.entryId ? h("div", { style: S.mono }, "entry: " + inspectResult.entryId) : null,
+            inspectResult.component ? h("div", { style: S.mono }, "组件: " + inspectResult.component) : null,
+            h("div", { style: { color: C.muted } }, inspectResult.note || "已定位到 slot 条目；RootEntry 未提供可靠插件包名，不做猜测。")) : null,
+
+          picked ? h("div", { "data-testid": "detail", style: { marginTop: "8px", padding: "11px", borderRadius: "10px", border: "1px solid " + C.blue, background: C.panel } },
+            h("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+              h("strong", { style: Object.assign({ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }, S.mono) }, picked.name),
+              picked.disabled ? badge("已停用", C.red) : badge("启用", C.green)),
+            h("div", { "data-testid": "row-id", style: { marginTop: "8px", color: C.muted, fontSize: "11px" } }, "行 id："),
+            h("div", { style: Object.assign({ color: C.text, fontSize: "11.5px", wordBreak: "break-all" }, S.mono) }, picked.row || "（未声明）"),
+            h("div", { style: { marginTop: "6px", color: C.muted, fontSize: "11px", lineHeight: 1.5 } }, "UI 面：" + ((picked.ui && picked.ui.length) ? picked.ui.join(", ") : "无（宿主侧或自绘）")),
+            h("label", { style: { display: "block", marginTop: "10px", color: C.muted, fontSize: "11px" } }, "位置"),
+            h("div", { style: { display: "flex", gap: "6px", marginTop: "4px" } },
+              h("input", { key: picked.name + ":" + anchor, "data-testid": "anchor-input", defaultValue: anchor, list: "anchor-opts-" + picked.name.replace(/[^\w-]/g, "_"), placeholder: "例如 bottom-right", disabled: Boolean(busy), onKeyDown: function (e) { if (e.key === "Enter") setAnchor(picked, e.target.value.trim()); }, style: Object.assign({}, S.input, { flex: 1, minWidth: 0 }) }),
+              h("datalist", { id: "anchor-opts-" + picked.name.replace(/[^\w-]/g, "_") }, (picked.anchorOptions || []).map(function (a) { return h("option", { key: a, value: a }); })),
+              h("button", { type: "button", "data-testid": "anchor-apply", disabled: Boolean(busy), onClick: function (e) { var input = e.currentTarget.parentNode.querySelector("input"); setAnchor(picked, input.value.trim()); }, style: S.button }, "设置"),
+              h("button", { type: "button", "data-testid": "anchor-clear", disabled: Boolean(busy), onClick: function () { setAnchor(picked, ""); }, style: S.quiet }, "清除")),
+            h("div", { style: { display: "flex", gap: "6px", marginTop: "10px" } },
+              h("button", { type: "button", "data-testid": "toggle", disabled: Boolean(busy), onClick: function () { flip(picked); }, style: Object.assign({}, S.button, { borderColor: picked.disabled ? C.green : C.red }) }, picked.disabled ? "启用插件" : "停用插件"),
+              h("button", { type: "button", "data-testid": "detail-close", onClick: function () { setPicked(null); }, style: S.quiet }, "收起"))) : null,
+
+          h("div", { style: { marginTop: "10px" } },
+            h("input", { "data-testid": "search", value: query, onChange: function (e) { setQuery(e.target.value); }, placeholder: "搜索插件…", "aria-label": "搜索插件", style: S.input })),
+
+          section("list", "插件列表 · " + filtered.length + " / " + rows.length,
+            filtered.length ? h("div", { style: { display: "grid", gap: "4px" } }, filtered.map(function (r) {
+              return h("button", {
+                type: "button", key: r.name, "data-testid": "row-" + r.name, "aria-pressed": Boolean(picked && picked.name === r.name),
+                onClick: function () { var same = picked && picked.name === r.name; setPicked(same ? null : r); if (!same) loadAnchorOptions(r); },
+                style: { width: "100%", minHeight: "38px", display: "flex", alignItems: "center", gap: "8px", textAlign: "left", padding: "6px 8px", borderRadius: "7px", border: "1px solid " + (picked && picked.name === r.name ? C.blue : "transparent"), background: picked && picked.name === r.name ? C.raised : "transparent", color: C.text, cursor: "pointer", opacity: busy === r.name ? .5 : 1 }
+              },
+                h("span", { style: Object.assign({ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", fontSize: "11.5px" }, S.mono) }, r.name),
+                r.ui && r.ui.length ? badge("UI " + r.ui.length, C.blue) : null,
+                r.engineSkipped ? badge("跳过", C.amber) : badge(r.disabled ? "停用" : "运行", r.disabled ? C.red : C.green));
+            })) : h("div", { "data-testid": "empty-list", style: { padding: "12px 4px", textAlign: "center" } }, "没有匹配“" + query + "”的插件。")),
+
+          section("checks", "检查明细 · " + (report ? (report.checks || []).length : 0),
+            report ? h("div", { style: { display: "grid", gap: "5px" } }, (report.checks || []).map(function (c) {
+              return h("div", { key: c.name, style: { display: "flex", gap: "8px", alignItems: "center" } },
+                h("span", { style: Object.assign({ flex: 1 }, S.mono) }, c.name),
+                h("span", { style: { color: c.ok ? C.green : C.amber } }, c.ok ? "PASS" : "CHECK"),
+                h("span", null, (c.findings || []).length + " 项"));
+            })) : "未读取到报告。请先运行 preflight，并确认报告目录配置一致。"),
+
+          section("topology", "UI 拓扑", h(Topology, { occ: occ })),
+
+          section("occupancy", "UI 占用 · " + contested + " 处争用",
+            occ && occ.surfaces && occ.surfaces.length ? h("div", { style: { display: "grid", gap: "6px" } }, occ.surfaces.map(function (s) {
+              return h("div", { key: s.surface, style: { paddingBottom: "5px", borderBottom: "1px solid " + C.line } },
+                h("div", { style: { display: "flex", gap: "6px" } },
+                  h("span", { style: Object.assign({ flex: 1, color: s.contested ? C.red : C.text }, S.mono) }, s.surface),
+                  h("span", null, s.count + " 个插件")),
+                h("div", { style: { marginTop: "3px", fontSize: "10.5px" } }, s.contested ? "存在争用；硬编码 " + (s.hardcoded || []).length + " 个。请用 CLI 的 fuse/anchor 审查调整。" : "未发现争用。"));
+            })) : "没有 UI 占用数据。"),
+
+          section("slots", "slot 树 · " + slots.length,
+            slots.length ? h("div", { style: { display: "grid", gap: "4px" } }, slots.slice(0, 20).map(function (s) {
+              return h("div", { key: s.slot, style: { display: "flex", gap: "8px" } }, h("span", { style: Object.assign({ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }, S.mono) }, s.slot), h("span", null, s.count));
+            })) : "宿主没有暴露全局 slot 数据。"),
+
+          h("footer", { style: { marginTop: "10px", color: C.muted, fontSize: "10.5px", lineHeight: 1.5 } }, "写操作会保留备份；插件状态与位置变更需重启 DSH 后生效。"));
       }
 
-      // Global slots snapshot.
-      // SlotRegistry.entries() is scoped to the calling plugin, but the shared store behind every
-      // scope (_core.records) holds the whole tree: slot node -> { declaredBy, entries, ... }.
-      // This polyfills the API we are proposing upstream (see docs/34-proposal-*).
-      function globalSlotsSnapshot() {
-        var out = [];
-        try {
-          var recs = ctx.slots && ctx.slots._core && ctx.slots._core.records;
-          if (!recs || typeof recs.forEach !== "function") return out;
-          recs.forEach(function (node, slot) {
-            var ids = [];
-            try {
-              var es = node && node.entries;
-              if (es && typeof es.forEach === "function") {
-                es.forEach(function (e) { ids.push(String((e && (e.id || e.key || e.name)) || "?")); });
-              } else if (Array.isArray(es)) {
-                es.forEach(function (e) { ids.push(String((e && (e.id || e.key || e.name)) || "?")); });
-              }
-            } catch (e) { /* ignore */ }
-            out.push({
-              slot: String(slot),
-              declaredBy: String((node && node.declaredBy) || ""),
-              count: ids.length,
-              entries: ids.slice(0, 30)
-            });
-          });
-        } catch (e) { /* never break the panel */ }
-        return out.sort(function (a, b) { return b.count - a.count || a.slot.localeCompare(b.slot); });
-      }
-      try { window.__DSH_SLOTS_SNAPSHOT__ = globalSlotsSnapshot; } catch (e) { /* ignore */ }
-
+      try { window.__DSH_SLOTS_SNAPSHOT__ = globalSlotsSnapshot; } catch (e) {}
       ctx.slots.inject("shell.overlay", function () {
         return ctx.slots.register({ name: "shell.overlay", id: "turnstile.plugin-list" }, Card);
-      });
-
-      // M1: a real settings page, not a floating panel. Registered the same way
-      // dsh-better-sidebar registers its 侧边卡片 section.
-      ctx.slots.inject("settings.section", function () {
-        return ctx.slots.register({
-          name: "settings.section",
-          id: "turnstile",
-          order: 120,
-          label: function () { return "插件体检"; },
-        }, SettingsSection);
       });
     };
     return module.exports;
