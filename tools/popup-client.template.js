@@ -78,6 +78,19 @@ window.__ModuleLoader__.load({
         var sel = React.useState(null), picked = sel[0], setPicked = sel[1];
         var sl = React.useState([]), slots = sl[0], setSlots = sl[1];
         var oc = React.useState(null), occ = oc[0], setOcc = oc[1];
+        // Four sections do not fit one screen: collapse the two least urgent by default.
+        var sx = React.useState({ topo: true, occ: true, slots: false, list: false }), secs = sx[0], setSecs = sx[1];
+        function section(key, title, body) {
+          if (!body) return null;
+          var isOpen = !!secs[key];
+          return h("div", { style: { marginBottom: "6px", borderBottom: "1px solid #30363d", paddingBottom: "6px" } },
+            h("button", {
+              "data-testid": "sec-" + key,
+              onClick: function () { var n = Object.assign({}, secs); n[key] = !isOpen; setSecs(n); },
+              style: { width: "100%", textAlign: "left", background: "none", border: 0, color: "#d7dee8", cursor: "pointer", fontSize: "11.5px", padding: 0 }
+            }, (isOpen ? "▾ " : "▸ ") + title),
+            isOpen ? h("div", { style: { marginTop: "4px", fontSize: "11.5px", color: "#b8c2cf" } }, body) : null);
+        }
         React.useEffect(function () {
           api("plugins").then(function (d) { setRows(visible(d.rows)); }).catch(function () {});
           api("report").then(setReport).catch(function () {});
@@ -128,25 +141,24 @@ window.__ModuleLoader__.load({
         rows.forEach(function (r) { (r.ui || []).forEach(function (u) { hot[u] = (hot[u] || 0) + 1; }); });
         var crowded = Object.keys(hot).filter(function (u) { return hot[u] >= 3; }).length;
         return h("div", { "data-testid": "panel", style: { position: "fixed", right: "18px", top: "64px", zIndex: 2147483000, width: "330px", maxHeight: "50vh", overflow: "auto", display: "flex", flexDirection: "column", background: "#0e1116", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "10px", padding: "12px 14px", fontFamily: "ui-sans-serif,system-ui" } },
-          h("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "6px" } },
+          h("div", { style: { order: -3, display: "flex", justifyContent: "space-between", marginBottom: "6px" } },
             h("strong", { style: { fontSize: "13px" } }, "mini · 插件 " + rows.length),
             h("button", { onClick: function () { setOpen(false); }, style: { background: "none", border: 0, color: "#8b96a5", cursor: "pointer" } }, "×")),
-          h("div", { style: { color: "#8b96a5", fontSize: "11.5px", marginBottom: "6px" } }, "停用 " + off + " · 引擎跳过 " + sk + " · 挤爆的 UI 面 " + crowded + " · 点一行切换"),
-          report ? h("div", { style: { fontSize: "11.5px", marginBottom: "8px", color: "#8b96a5" } },
+          h("div", { style: { order: -2, color: "#8b96a5", fontSize: "11.5px", marginBottom: "6px" } }, "停用 " + off + " · 引擎跳过 " + sk + " · 挤爆的 UI 面 " + crowded + " · 点一行切换"),
+          report ? h("div", { style: { order: -1, fontSize: "11.5px", marginBottom: "8px", color: "#8b96a5" } },
             "闸门 " + (report.checks || []).length + " 项 · 阻塞 " + ((report.blocking || []).length) + " · " + (report.result || "?")
             + (function () {
                 var p = (report.checks || []).filter(function (c) { return c.name === "ui-placement"; })[0];
                 return p ? " · 硬编码位置 " + (p.findings || []).length : "";
               })()) : null,
-          rows.map(function (r) {
+          section("list", "插件列表 · " + rows.length, rows.map(function (r) {
             return h("div", { key: r.name, "data-testid": "row-" + r.name, onClick: function () { var same = picked && picked.name === r.name; setPicked(same ? null : r); if (!same) loadAnchorOptions(r); var el = document.querySelector('[data-testid=\"panel\"]'); if (el) el.scrollTop = 0; }, style: { display: "flex", gap: "8px", fontSize: "12.5px", padding: "3px 0", cursor: "pointer", opacity: busy === r.name ? 0.5 : 1 } },
               h("span", { style: { width: "12px", color: r.disabled ? "#f85149" : "#3fb950" } }, r.disabled ? "×" : "·"),
               h("span", { style: { flex: 1, fontFamily: "ui-monospace,monospace" } }, r.name),
               (r.ui && r.ui.length) ? h("span", { title: (r.ui || []).join(", "), style: { color: "#58a6ff", fontSize: "11px" } }, "ui" + r.ui.length) : null,
               r.engineSkipped ? h("span", { style: { color: "#d29922", fontSize: "11px" } }, "skip") : null);
-          }),
-          slots && slots.length ? h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", color: "#b8c2cf" } },
-            h("div", { style: { color: "#d7dee8" } }, "slot 树 · " + slots.length + " 个注册"),
+          })),
+          section("slots", "slot 树 · " + slots.length + " 个注册", slots && slots.length ? [
             (function () {
               var bySlot = {};
               slots.forEach(function (s) { bySlot[s.slot] = s.count; });
@@ -155,7 +167,7 @@ window.__ModuleLoader__.load({
                   h("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", fontFamily: "ui-monospace,monospace", fontSize: "11px" } }, k),
                   h("span", { style: { color: "#8b96a5", fontSize: "11px" } }, bySlot[k]));
               });
-            })()) : null,
+            })()] : null),
           h(Topology, { occ: occ }),
           occ && occ.surfaces && occ.surfaces.length ? h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", color: "#b8c2cf" } },
             h("div", { style: { color: "#d7dee8" } }, "角落占用 · " + occ.findings.length + " 处争用"),

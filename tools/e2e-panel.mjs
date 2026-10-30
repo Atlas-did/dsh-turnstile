@@ -50,6 +50,13 @@ try {
   ok('panel is mounted', present);
   if (!present) { console.log('SKIP: panel not found'); process.exit(3); }
 
+  // The plugin list starts collapsed: expanding it is part of the flow a user walks.
+  const sec = page.locator('[data-testid="sec-list"]');
+  if (await sec.count()) {
+    await sec.first().click().catch(() => {});
+    await page.waitForTimeout(400);
+  }
+
   // Clicks go through the input pipeline (hit-testing, scroll, stability) - never element.click().
   const rowLoc = page.locator('[data-testid="row-' + rowName + '"]');
   const box = await rowLoc.boundingBox();
