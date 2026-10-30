@@ -24,7 +24,7 @@ window.__ModuleLoader__.load({
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'rgba(88,166,255,0.15)', border: '1px solid #58a6ff', borderRadius: '10px',
           color: '#58a6ff', fontSize: '11px', fontFamily: 'ui-monospace,monospace', pointerEvents: 'none' }, pos);
-        return h('div', { style: style }, anchor || '(no anchor)');
+        return h('div', { 'data-testid': 'demo-anchor-widget', style: style }, anchor || '(no anchor)');
       }
       ctx.slots.inject('shell.overlay', function () {
         return ctx.slots.register({ name: 'shell.overlay', id: 'demo.anchor-widget' }, Badge);
