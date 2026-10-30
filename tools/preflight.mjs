@@ -31,16 +31,6 @@ const CHECKS = [
   { name: 'ui-placement', script: 'tools/slot-scan.mjs', hint: 'advisory: client plugins whose UI position is hardcoded (no slot/anchor/order)', advisory: true },
 ];
 
-const only = (flagValue('--only') || '').split(',').map((s) => s.trim()).filter(Boolean);
-const skip = (flagValue('--skip') || '').split(',').map((s) => s.trim()).filter(Boolean);
-const aliasOf = (c) => [c.name, c.name.split('-')[0], c.script.split('/').pop().replace(/\.mjs$/, '')];
-const matches = (list, c) => list.some((x) => aliasOf(c).includes(x));
-const selected = CHECKS.filter((c) => {
-  if (only.length && !matches(only, c)) return false;
-  if (matches(skip, c)) return false;
-  return true;
-});
-
 const VALUE_FLAGS = new Set(['--only', '--skip']);
 let dir = '';
 for (let i = 0; i < argv.length; i++) {
@@ -59,6 +49,17 @@ const timeout = Number(process.env.DSH_CHECK_TIMEOUT || 30000);
   const snap = process.env.DSH_RUNTIME_SNAPSHOT || (existsSync(guess) ? guess : '');
   if (snap) CHECKS.push({ name: 'runtime-truth', script: 'tools/runtime-diff.mjs', args: [snap, '--profile', dir], hint: 'declared in the profile but never activated at runtime' });
 })();
+
+// Selection happens after the runtime check may have been appended above.
+const only = (flagValue('--only') || '').split(',').map((s) => s.trim()).filter(Boolean);
+const skip = (flagValue('--skip') || '').split(',').map((s) => s.trim()).filter(Boolean);
+const aliasOf = (c) => [c.name, c.name.split('-')[0], c.script.split('/').pop().replace(/\.mjs$/, '')];
+const matches = (list, c) => list.some((x) => aliasOf(c).includes(x));
+const selected = CHECKS.filter((c) => {
+  if (only.length && !matches(only, c)) return false;
+  if (matches(skip, c)) return false;
+  return true;
+});
 
 if (isFlag('--regen')) {
   // Keep the service knowledge aligned with the runtime instead of silently judging
