@@ -52,6 +52,14 @@ if (!existsSync(join(dir, 'package.json'))) { console.error('not a profile (no p
 
 const timeout = Number(process.env.DSH_CHECK_TIMEOUT || 30000);
 
+// Runtime truth, when the probe plugin left a snapshot behind: the only check that can see
+// "installed but did not activate" without trusting static files.
+(() => {
+  const guess = join(root, 'state', 'runtime-' + dir.split(/[\\/]/).pop() + '.json');
+  const snap = process.env.DSH_RUNTIME_SNAPSHOT || (existsSync(guess) ? guess : '');
+  if (snap) CHECKS.push({ name: 'runtime-truth', script: 'tools/runtime-diff.mjs', args: [snap, '--profile', dir], hint: 'declared in the profile but never activated at runtime' });
+})();
+
 if (isFlag('--regen')) {
   // Keep the service knowledge aligned with the runtime instead of silently judging
   // a profile with a stale allowlist.
@@ -81,7 +89,7 @@ function parseEnvelope(stdout) {
 
 async function one(c) {
   const started = Date.now();
-  const args = [join(root, c.script), dir, '--json'];
+  const args = c.args ? [join(root, c.script), ...c.args, '--json'] : [join(root, c.script), dir, '--json'];
   try {
     const { stdout } = await run(process.execPath, args, { timeout, maxBuffer: 32 * 1024 * 1024 });
     const j = parseEnvelope(stdout);
