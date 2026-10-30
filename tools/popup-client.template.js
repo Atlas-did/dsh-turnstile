@@ -26,15 +26,31 @@ window.__ModuleLoader__.load({
             return { name: r.name, disabled: !!r.disabled, engineSkipped: known[r.name] || false, row: r.row || "", ui: r.ui || [] };
           });
       }
+      // Real slot tree: SlotRegistry.entries() is exposed at runtime (discovered experimentally).
+      function slotTree() {
+        try {
+          var s = ctx.slots;
+          var list = (s && typeof s.entries === "function") ? s.entries() : [];
+          var arr = Array.isArray(list) ? list : Array.from(list || []);
+          return arr.slice(0, 400).map(function (e) {
+            return {
+              slot: String((e && (e.name || e.slot || e.slotName)) || "?"),
+              id: String((e && (e.id || e.key || e.path)) || "?")
+            };
+          });
+        } catch (err) { return []; }
+      }
       function Card() {
         var st = React.useState(true), open = st[0], setOpen = st[1];
         var rs = React.useState(visible(FALLBACK.rows)), rows = rs[0], setRows = rs[1];
         var bs = React.useState(""), busy = bs[0], setBusy = bs[1];
         var rp = React.useState(null), report = rp[0], setReport = rp[1];
         var sel = React.useState(null), picked = sel[0], setPicked = sel[1];
+        var sl = React.useState(null), slots = sl[0], setSlots = sl[1];
         React.useEffect(function () {
           api("plugins").then(function (d) { setRows(visible(d.rows)); }).catch(function () {});
           api("report").then(setReport).catch(function () {});
+          setSlots(slotTree());
         }, []);
         function reload() { return api("plugins").then(function (d) { setRows(visible(d.rows)); }); }
         function flip(row) {
@@ -70,6 +86,17 @@ window.__ModuleLoader__.load({
               (r.ui && r.ui.length) ? h("span", { title: (r.ui || []).join(", "), style: { color: "#58a6ff", fontSize: "11px" } }, "ui" + r.ui.length) : null,
               r.engineSkipped ? h("span", { style: { color: "#d29922", fontSize: "11px" } }, "skip") : null);
           }),
+          slots && slots.length ? h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", color: "#b8c2cf" } },
+            h("div", { style: { color: "#d7dee8" } }, "slot 树 · " + slots.length + " 个注册"),
+            (function () {
+              var bySlot = {};
+              slots.forEach(function (s) { bySlot[s.slot] = (bySlot[s.slot] || 0) + 1; });
+              return Object.keys(bySlot).sort().slice(0, 12).map(function (k) {
+                return h("div", { key: k, style: { display: "flex", gap: "6px" } },
+                  h("span", { style: { flex: 1, fontFamily: "ui-monospace,monospace" } }, k),
+                  h("span", { style: { color: "#8b96a5" } }, bySlot[k]));
+              });
+            })()) : null,
           picked ? h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", lineHeight: "1.7", color: "#b8c2cf" } },
             h("div", { style: { fontFamily: "ui-monospace,monospace", color: "#d7dee8" } }, picked.name),
             h("div", null, "行 id: " + (picked.row || "(未声明)")),
@@ -80,6 +107,7 @@ window.__ModuleLoader__.load({
               h("button", { onClick: function () { setPicked(null); }, style: { padding: "2px 8px", borderRadius: "6px", border: "1px solid #30363d", background: "transparent", color: "#8b96a5", cursor: "pointer", fontSize: "11.5px" } }, "收起"))
           ) : null);
       }
+
       ctx.slots.inject("shell.overlay", function () {
         return ctx.slots.register({ name: "shell.overlay", id: "turnstile.plugin-list" }, Card);
       });
