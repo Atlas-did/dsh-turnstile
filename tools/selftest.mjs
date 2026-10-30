@@ -69,6 +69,10 @@ check('shortcut scan catches duplicate key', r.code === 9 && /ctrl\+k/.test(r.ou
 r = run('tools/css-scan.mjs', join(root, 'tests/scan-fixture'));
 check('css scan catches shared class', /panel/.test(r.out), 'exit=' + r.code);
 
+// Occupancy: two plugins on one surface, one of them hardcoded, must be flagged contested.
+r = run('tools/occupancy.mjs', join(root, 'tests/slot-fixture'));
+check('occupancy flags the contested corner', r.code === 0 && /!\s+ui-settings/.test(r.out), 'exit=' + r.code);
+
 r = run('tools/probe.mjs', join(root, 'tests/probe-fixture'), '--strict');
 check('probe sees computed registration', r.code === 7 && /sharedStore/.test(r.out), 'exit=' + r.code);
 
