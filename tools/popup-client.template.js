@@ -40,6 +40,36 @@ window.__ModuleLoader__.load({
           });
         } catch (err) { return []; }
       }
+      // Compact topology: plugins on the left, UI surfaces on the right, one line per membership.
+      // Contended surfaces (2+ plugins, at least one hardcoded) are drawn red.
+      function Topology(props) {
+        var occ = props.occ;
+        if (!occ || !occ.surfaces || !occ.surfaces.length) return null;
+        var top = occ.surfaces.slice(0, 6);
+        var names = [];
+        top.forEach(function (s) { s.plugins.forEach(function (p) { if (names.indexOf(p) === -1) names.push(p); }); });
+        names = names.slice(0, 8);
+        var rowH = 18, pad = 6;
+        var height = Math.max(top.length, names.length) * rowH + pad * 2;
+        var nodes = [];
+        names.forEach(function (n, i) {
+          nodes.push(h("text", { key: "p" + i, x: 2, y: pad + i * rowH + 12, fill: "#b8c2cf", fontSize: "9.5px", fontFamily: "ui-monospace,monospace" }, n.length > 16 ? n.slice(0, 15) + "…" : n));
+        });
+        top.forEach(function (s, i) {
+          var y = pad + i * rowH + 12;
+          nodes.push(h("text", { key: "s" + i, x: 190, y: y, fill: s.contested ? "#f85149" : "#8b96a5", fontSize: "9.5px", fontFamily: "ui-monospace,monospace" }, s.surface.length > 18 ? s.surface.slice(0, 17) + "…" : s.surface));
+          s.plugins.forEach(function (p) {
+            var pi = names.indexOf(p);
+            if (pi === -1) return;
+            nodes.push(h("line", { key: "l" + i + p, x1: 128, y1: pad + pi * rowH + 8, x2: 188, y2: y - 3,
+              stroke: s.contested ? "rgba(248,81,73,0.55)" : "rgba(88,166,255,0.35)", strokeWidth: 1 }));
+          });
+        });
+        return h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px" } },
+          h("div", { style: { color: "#d7dee8", fontSize: "11.5px", marginBottom: "2px" } }, "拓扑 · 插件 → UI 面"),
+          h("svg", { width: "100%", height: height, viewBox: "0 0 306 " + height }, nodes));
+      }
+
       function Card() {
         var st = React.useState(true), open = st[0], setOpen = st[1];
         var rs = React.useState(visible(FALLBACK.rows)), rows = rs[0], setRows = rs[1];
@@ -126,6 +156,7 @@ window.__ModuleLoader__.load({
                   h("span", { style: { color: "#8b96a5", fontSize: "11px" } }, bySlot[k]));
               });
             })()) : null,
+          h(Topology, { occ: occ }),
           occ && occ.surfaces && occ.surfaces.length ? h("div", { style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", color: "#b8c2cf" } },
             h("div", { style: { color: "#d7dee8" } }, "角落占用 · " + occ.findings.length + " 处争用"),
             occ.surfaces.filter(function (s) { return s.contested; }).slice(0, 5).map(function (s) {
