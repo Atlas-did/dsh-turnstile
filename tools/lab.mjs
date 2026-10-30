@@ -38,7 +38,12 @@ if (installSrc) {
   if (j.dsh.profile.bundles.indexOf(realName) === -1) j.dsh.profile.bundles.push(realName);
   writePkg(j);
   const anchor = val('--anchor');
-  if (existsSync(patchPath)) {
+  // A bundle that declares dsh.bundle.patch already contributes its own rows; adding a profile
+  // row as well would declare the same id twice in one scope (a real clash, caught by lint-rows).
+  const declaresOwnRows = Boolean(JSON.parse(readFileSync(srcPkg, 'utf8')).dsh && JSON.parse(readFileSync(srcPkg, 'utf8')).dsh.bundle);
+  if (declaresOwnRows) {
+    console.log('bundle declares its own rows; no profile row added');
+  } else if (existsSync(patchPath)) {
     const t = readFileSync(patchPath, 'utf8');
     if (new RegExp('id:\\s*' + realName).test(t)) {
       console.log('already has a patch row; left untouched');

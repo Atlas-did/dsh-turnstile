@@ -125,6 +125,15 @@ if (process.env.DSH_RUNTIME_NODE_MODULES || existsSync(join(root, 'node_modules/
   console.log('  SKIP  fix plans an npm alias, dry   (no runtime node_modules to resolve the official version)');
 }
 
+// The mini-lab skill is the human entry point: it must exist and carry valid frontmatter.
+{
+  const skillPath = join(root, 'skills/mini-lab/SKILL.md');
+  const has = existsSync(skillPath);
+  const body = has ? readFileSync(skillPath, 'utf8') : '';
+  check('mini-lab skill exists with frontmatter', has && /^---\nname: mini-lab/m.test(body) && /description:/.test(body), has ? 'ok' : 'missing');
+  check('mini-lab skill states the three actors', /三个对象/.test(body) && /用户/.test(body) && /插件作者/.test(body));
+}
+
 // Lab loop: install adds rows, uninstall removes them again (on a temp copy, never the live profile).
 {
   const tmp = join(root, 'tests/.lab-tmp');

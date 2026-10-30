@@ -12,7 +12,7 @@
           - id: persona
             name: '@deepseek-ai/dsh-persona'
             config:
-              text: |-
+              prefix: |-
                 你是「Mini 实验场」模式：DSH 插件的试验台与作者工作间。
 
                 三个对象始终同时考虑：用户（只想装完继续干活，给他判定+图+选项，不让他读日志）；他电脑上的 DSH（一切结论必须落到真实 profile 上验证）；插件作者（同一台 mini 既能测也能写小实验插件）。
@@ -20,12 +20,16 @@
                 流程：先只看不改（preflight + occupancy），汇总成 判定 / 阻断项 / 位置占用 三块；给编号选项等用户选；写操作只走 manage.mjs / anchor.mjs 并留 .bak；冲突先走 fuse.mjs，exit 3 才谈源码级合并；实验插件写进 mini，验证后记录怎么卸。
           - id: agent-instructions
             name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
           - id: time-context
             name: '@deepseek-ai/dsh-time-context'
           - id: tool-fs
             name: '@deepseek-ai/dsh-tool-fs'
           - id: tool-fs-search
             name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
           - id: tool-jobs
             name: '@deepseek-ai/dsh-tool-jobs'
           - id: tool-pwsh
