@@ -163,6 +163,20 @@ Add a check, add its fixture. A scanner without a failing fixture is not trusted
 
 ---
 
+## What it looks like
+
+![the management panel](docs/img/panel.png)
+
+One panel answers the three questions a plugin install raises, in this order: **can I keep
+working** (verdict + gate summary), **who is fighting whom** (plugin -> UI surface topology, red
+edges are contested), **how bad is it** (per-surface counts, with the number of plugins that
+cannot be repositioned from configuration). Plugin list and slot tree stay collapsed until asked.
+
+Clicking any row opens its properties: row id, state, UI surfaces, and a free-form position field
+that also offers the values the plugin documents about itself. Two clicks later the patch is
+written, with a backup, and the second click puts it back - that round trip is asserted by
+`tools/e2e-panel.mjs` with real input events, not `element.click()`.
+
 ## Known limits, and what this repo does about them
 
 A gate that hides its blind spots is worse than no gate. These are real, measured compromises.
