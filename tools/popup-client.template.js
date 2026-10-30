@@ -193,6 +193,7 @@ window.__ModuleLoader__.load({
         var st = React.useState(true), open = st[0], setOpen = st[1];
         var rs = React.useState(visible(FALLBACK.rows)), rows = rs[0], setRows = rs[1];
         var bs = React.useState(""), busy = bs[0], setBusy = bs[1];
+        var pd = React.useState(null), pending = pd[0], setPending = pd[1];
         var rp = React.useState(null), report = rp[0], setReport = rp[1];
         var sel = React.useState(null), picked = sel[0], setPicked = sel[1];
         var sl = React.useState([]), slots = sl[0], setSlots = sl[1];
@@ -380,24 +381,34 @@ window.__ModuleLoader__.load({
             .catch(function (e) { console.warn("turnstile fuse failed", e); })
             .then(function () { setBusy(""); });
         }
+        // Two-step writes: the server answers with a plan (file + hashes + a confirm string) and
+        // nothing is written until that exact string comes back. No silent edits.
+        function commitWithPlan(url, payload, plan, confirmText) {
+          setBusy(payload.package || '');
+          return api(url, { method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(Object.assign({}, payload, { confirm: confirmText })) })
+            .then(function (r) { setPending(null); return r; })
+            .then(function () { return api('occupancy'); }).then(setOcc).catch(function () {})
+            .then(function () { return reload(); }).catch(function () {})
+            .then(function () { setBusy(''); });
+        }
         function setAnchor(row, anchor) {
           setBusy(row.name);
-          api("anchor", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ package: row.name, anchor: anchor })
-          }).then(function () { return api("occupancy"); }).then(setOcc).catch(function (e) {
-            console.warn("turnstile anchor failed", e);
-          }).then(function () { setBusy(""); });
+          api('anchor', { method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ package: row.name, anchor: anchor }) })
+            .then(function (r) {
+              setBusy('');
+              if (r && r.needsConfirm) setPending({ url: 'anchor', payload: { package: row.name, anchor: anchor }, plan: r.plan });
+            }).catch(function (e) { console.warn('turnstile anchor plan failed', e); setBusy(''); });
         }
         function flip(row) {
           setBusy(row.name);
-          api("toggle", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ package: row.name, disable: !row.disabled })
-          }).then(reload).catch(function (e) { console.warn("turnstile toggle failed", e); })
-            .then(function () { setBusy(""); });
+          api('toggle', { method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ package: row.name, disable: !row.disabled }) })
+            .then(function (r) {
+              setBusy('');
+              if (r && r.needsConfirm) setPending({ url: 'toggle', payload: { package: row.name, disable: !row.disabled }, plan: r.plan });
+            }).catch(function (e) { console.warn('turnstile toggle plan failed', e); setBusy(''); });
         }
         if (!open) return h("button", { onClick: function () { setOpen(true); }, style: { position: "fixed", right: "18px", top: "64px", zIndex: 2147483000, padding: "6px 10px", borderRadius: "8px", border: "1px solid #30363d", background: "#161b22", color: "#d7dee8", cursor: "pointer", fontSize: "12px" } }, "插件 " + rows.length);
         var off = rows.filter(function (r) { return r.disabled; }).length;
@@ -441,6 +452,15 @@ window.__ModuleLoader__.load({
                   h("span", { style: { color: "#8b96a5", fontSize: "11px" } }, bySlot[k]));
               });
             })()] : null),
+          pending ? h("div", { "data-testid": "confirm", style: { order: -1, border: "1px solid #d29922", borderRadius: "8px", padding: "8px 10px", marginBottom: "8px", fontSize: "11.5px", color: "#d7dee8" } },
+            h("div", { style: { fontWeight: 600, marginBottom: "4px" } }, "将写入 " + (pending.plan.file || "")),
+            h("div", { style: { color: "#8b96a5", fontFamily: "ui-monospace,monospace", wordBreak: "break-all" } }, (pending.plan.beforeSha || "(新建)").slice(0, 12) + " → " + String(pending.plan.afterSha).slice(0, 12) + "  ·  " + pending.plan.bytesAfter + " 字节"),
+            h("div", { style: { marginTop: "6px", display: "flex", gap: "6px", alignItems: "center" } },
+              h("span", { style: { color: "#8b96a5" } }, "确认串"),
+              h("code", { "data-testid": "confirm-token", style: { color: "#d29922" } }, pending.plan.confirm),
+              h("button", { "data-testid": "confirm-apply", onClick: function () { commitWithPlan(pending.url, pending.payload, pending.plan, pending.plan.confirm); }, style: { marginLeft: "auto", padding: "2px 10px", borderRadius: "6px", border: "1px solid #d29922", background: "#2b1d00", color: "#d29922", cursor: "pointer" } }, "确认写入"),
+              h("button", { onClick: function () { setPending(null); }, style: { padding: "2px 10px", borderRadius: "6px", border: "1px solid #30363d", background: "transparent", color: "#8b96a5", cursor: "pointer" } }, "取消"))
+          ) : null,
           inspectMsg ? h("div", { "data-testid": "inspect-result", style: { order: -1, fontSize: "11px", color: "#58a6ff", marginBottom: "4px", wordBreak: "break-all" } }, inspectMsg) : null,
           fuseMsg ? h("div", { style: { order: -1, fontSize: "11px", color: "#d29922", marginBottom: "4px" } }, fuseMsg) : null,
           section("console", "控制台 · 最近 " + ((activity && activity.tail && activity.tail.length) || 0) + " 条",

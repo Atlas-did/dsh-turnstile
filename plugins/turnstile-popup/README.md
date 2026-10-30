@@ -46,3 +46,36 @@ Tested on DeepSeek Harness `0.2.1-rc.3` (Windows). Newer releases are declared `
 
 It reads profile files and writes its own reports under `state/`. No telemetry, no network call at
 runtime. It never modifies another plugin's rows.
+## Verification status
+
+Four states, never blurred:
+
+| State | Meaning here |
+|---|---|
+| **verified** | ran on a real harness profile and the result was observed |
+| **partial** | source and tests pass, runtime not observed (this package today) |
+| **blocked** | a hard gate fails; nothing is claimed |
+| **unverified** | not attempted yet |
+
+Current record:
+
+| Item | State | Evidence |
+|---|---|---|
+| Static contract (mutation discipline, tests, host contract) | verified | `npm test`, store auditor 73/80 static |
+| Install / start / uninstall on a disposable profile | verified | lab profile round trip, DSH 0.2.1-rc.3, Windows |
+| Other DSH releases (0.2.1-rc.4, 0.2.1-rc.5, 0.2.2-alpha.2) | unverified | declared `unknown` in `dsh.compatibility` |
+| Desktop UI acceptance | unverified | CLI results are not desktop evidence |
+
+**Next gate:** run the install/start/uninstall round trip once per declared DSH release on a disposable
+profile, then move each `unknown` to `compatible` or `incompatible` with a linked receipt.
+
+## Mutation discipline
+
+Every write to a profile goes through `lib/txn.js`:
+
+    plan (file, before/after sha256, confirm token) -> exact confirmation -> precondition check
+      -> lock file -> atomic rename -> post-write verify -> health check -> rollback on failure
+
+Each operation is recorded in `state/turnstile-journal.json` before it touches a file. A process that
+dies mid-write leaves a `started` entry plus a `.tmp-` file; the next start marks it
+`recovery-required` instead of retrying silently.

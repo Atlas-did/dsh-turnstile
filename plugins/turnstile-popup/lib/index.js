@@ -1,6 +1,48 @@
 // Host side: GET /turnstile/plugins and POST /turnstile/toggle.
 // The browser cannot write files, so every change happens here with a backup.
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from "node:fs";
+import { makePlan, applyPlan, describePlan } from "./txn.js";
+import { beginOperation, settleOperation, recoverJournal } from "./journal.js";
+
+const STATE_DIR = () => process.env.DSH_TURNSTILE_STATE || join(process.env.DSH_TURNSTILE_HOME || process.cwd(), "state");
+
+// Reject anything that is not the host's own page: 401 for no credential, 403 for a foreign origin.
+// Named after the host capability it mirrors: reject a request that the host would reject.
+function requestRejection(req, res) {
+  const origin = String(req.headers.origin || "");
+  if (origin && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin)) {
+    sendJson(res, 403, { error: "cross-origin" });
+    return false;
+  }
+  const url = String(req.url || "");
+  if (url.indexOf("token=") === -1 && !req.headers["x-dsh-token"]) {
+    sendJson(res, 401, { error: "unauthenticated" });
+    return false;
+  }
+  return true;
+}
+
+// Minimal health check for a patch file: never leave a file that is obviously broken.
+function yamlish(file) {
+  const text = readFileSync(file, "utf8");
+  if (!text.trim()) return { ok: false, detail: "file became empty" };
+  const bad = text.split(/\r?\n/).find((l) => l.trim() && !/^(\s*-|\s*[\w.@/-]+:|\s*\[\]|#)/.test(l));
+  return bad ? { ok: false, detail: "unexpected line: " + bad.slice(0, 60) } : { ok: true, detail: "structure intact" };
+}
+
+// Two-step write: plan first, then apply with the exact confirmation string.
+function txnWrite(res, patchPath, nextText, args, reason) {
+  const plan = makePlan({ file: patchPath, next: nextText, reason });
+  if (!args.confirm) return sendJson(res, 200, { needsConfirm: true, plan: describePlan(plan) });
+  beginOperation(STATE_DIR(), { planId: plan.id, file: patchPath, reason, beforeSha: plan.beforeSha, afterSha: plan.afterSha });
+  const evidence = applyPlan(plan, { confirm: args.confirm, healthCheck: yamlish });
+  if (!evidence.applied) {
+    settleOperation(STATE_DIR(), plan.id, evidence.rolledBack ? "rolled-back" : "failed", evidence.problems.join(", "));
+    return sendJson(res, 409, { error: "not applied", evidence });
+  }
+  settleOperation(STATE_DIR(), plan.id, "applied", null);
+  return sendJson(res, 200, { ok: true, evidence });
+}
 import { join } from "node:path";
 
 export const inject = ["webServer"];
@@ -163,9 +205,7 @@ function readRows(dir) {
   });
 }
 
-function toggle(dir, rowId, disable) {
-  const patchPath = join(dir, "cordis.patch.yml");
-  const text = existsSync(patchPath) ? readFileSync(patchPath, "utf8") : "";
+function toggle(text, rowId, disable) {
   let next = text;
   if (disable) {
     const block = "- id: " + rowId + "\n  disabled: true";
@@ -192,14 +232,18 @@ function toggle(dir, rowId, disable) {
     if (!/^- /m.test(next)) next = next.replace(/\s*$/, "\n") + "[]\n";
   }
   if (!/\n$/.test(next)) next += "\n";
-  copyFileSync(patchPath, patchPath + ".bak-" + Date.now());
-  writeFileSync(patchPath, next);
+  return next;
 }
 
 export function apply(ctx, config) {
   const home = process.env.DSH_HOME || "";
   const profile = (config && config.profile) || "mini";
   const dir = join(home, "profiles", profile);
+  // A leftover lock or temp file means the previous process died mid-write: surface it, do not retry.
+  const recovery = recoverJournal(STATE_DIR(), [dir]);
+  if (recovery.recoveryRequired || (recovery.leftovers || []).length) {
+    ctx.logger && ctx.logger.warn && ctx.logger.warn("turnstile: recovery-required " + JSON.stringify(recovery));
+  }
 
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
@@ -380,6 +424,7 @@ export function apply(ctx, config) {
     path: "/turnstile/anchor",
     handler: async (req, res) => {
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
+      if (!requestRejection(req, res)) return;
       let body = "";
       for await (const chunk of req) body += chunk;
       let args = {};
@@ -417,11 +462,7 @@ export function apply(ctx, config) {
         else if (a === -1) next.splice(cfg + 1, 0, leafIndent + "anchor: " + args.anchor);
         else next[a] = leafIndent + "anchor: " + args.anchor;
       }
-      try {
-        copyFileSync(patchPath, patchPath + ".bak-" + Date.now());
-        writeFileSync(patchPath, next.join("\n"));
-        sendJson(res, 200, { ok: true, package: args.package, row: row.row, anchor: args.anchor });
-      } catch (e) { sendJson(res, 500, { error: String((e && e.message) || e).slice(0, 160) }); }
+      return txnWrite(res, patchPath, next.join("\n"), args, "anchor:" + args.package + "=" + (args.anchor || "clear"));
     },
   }), "turnstile: POST /turnstile/anchor");
 
@@ -430,18 +471,17 @@ export function apply(ctx, config) {
     path: "/turnstile/toggle",
     handler: async (req, res) => {
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
+      if (!requestRejection(req, res)) return;
       let body = "";
       for await (const chunk of req) body += chunk;
       let args = {};
       try { args = JSON.parse(body || "{}"); } catch { return sendJson(res, 400, { error: "json" }); }
       const row = readRows(dir).find((r) => r.name === args.package);
       if (!row || !row.row) return sendJson(res, 404, { error: "no-row", package: args.package });
-      try {
-        toggle(dir, row.row, Boolean(args.disable));
-        sendJson(res, 200, { ok: true, package: row.name, row: row.row, disabled: Boolean(args.disable) });
-      } catch (e) {
-        sendJson(res, 500, { error: String((e && e.message) || e).slice(0, 160) });
-      }
+      const patchPath = join(dir, "cordis.patch.yml");
+      const before = existsSync(patchPath) ? readFileSync(patchPath, "utf8") : "";
+      const nextText = toggle(before, row.row, Boolean(args.disable));
+      return txnWrite(res, patchPath, nextText, args, "toggle:" + row.name + "=" + (args.disable ? "off" : "on"));
     }
   }), "turnstile: POST /turnstile/toggle");
 }
