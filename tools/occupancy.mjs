@@ -56,6 +56,15 @@ const findings = rows.filter((r) => r.contested).map((r) => ({
   fix: { kind: 'configurable-position', snippet: 'expose slot/anchor/order, or move one plugin to another surface' },
 }));
 
+// --out writes the same payload the panel reads, so the UI needs no subprocess.
+const outIdx = argv.indexOf('--out');
+if (outIdx >= 0 && argv[outIdx + 1]) {
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  const { dirname: dn } = await import('node:path');
+  const payload = { checker: 'occupancy', profile: dir, surfaces: rows, findings };
+  try { mkdirSync(dn(argv[outIdx + 1]), { recursive: true }); writeFileSync(argv[outIdx + 1], JSON.stringify(payload, null, 2) + '\n'); } catch (e) { console.error('cannot write ' + argv[outIdx + 1]); }
+}
+
 if (wantsJson()) { emitJson('occupancy', findings, 0); process.exit(0); }
 console.log('profile: ' + dir);
 console.log('surface'.padEnd(30) + 'n'.padStart(3) + '  hardcoded' + '   plugins');
