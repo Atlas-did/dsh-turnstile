@@ -66,6 +66,13 @@ check('preflight blocks the fixture', r.code === 1, 'exit=' + r.code);
 // Environment-specific cases: only meaningful on a machine that actually has these profiles.
 // They are skipped (and reported as skipped, not passed) everywhere else.
 let skipped = 0, envRun = 0;
+
+// A case whose fixture is missing must FAIL, not quietly pass because the tool errored out.
+const FIXTURES = ['ast-fixture', 'conflict-fixture', 'gate-fixture', 'import-fixture',
+  'manage-fixture', 'probe-fixture', 'risk-fixture', 'ui-fixture'];
+for (const f of FIXTURES) {
+  check('fixture exists: ' + f, existsSync(join(root, 'tests', f)), 'tests/' + f);
+}
 const hasDesk = existsSync(DESK), hasMini = existsSync(MINI);
 if (hasDesk) {
   envRun++;

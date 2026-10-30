@@ -3,7 +3,7 @@
 // Row ids come from each plugin's own bundle patch (id + name pairs), so a toggle writes the
 // exact row the loader reads instead of guessing from the package name.
 // usage: node tools/manage.mjs <profileDir> [--list] [--disable <pkg>] [--enable <pkg>] [--yes]
-import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, copyFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkCompatibility } from './version.mjs';
 
@@ -12,7 +12,23 @@ const flag = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 
 const doDisable = flag('--disable');
 const doEnable = flag('--enable');
 const consumed = new Set([doDisable, doEnable].filter(Boolean));
-const profile = argv.find((a) => !a.startsWith('--') && !consumed.has(a)) || ((process.env.DSH_HOME || '') + '/profiles/desktop');
+// Auto-detect instead of assuming "desktop": use the only profile that exists, else a
+// documented preference order. A phone install calls its profile "web", for example.
+function detectProfile() {
+  const home = process.env.DSH_HOME || '';
+  const bases = [home, join(home, '..')].filter(Boolean);
+  for (const base of bases) {
+    const dir = join(base, 'profiles');
+    if (!existsSync(dir)) continue;
+    let names = [];
+    try { names = readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch { continue; }
+    const withPkg = names.filter((n) => existsSync(join(dir, n, 'package.json')));
+    if (withPkg.length === 1) return join(dir, withPkg[0]);
+    for (const pref of ['web', 'desktop', 'mini']) if (withPkg.includes(pref)) return join(dir, pref);
+  }
+  return (process.env.DSH_HOME || '') + '/profiles/desktop';
+}
+const profile = argv.find((a) => !a.startsWith('--') && !consumed.has(a)) || detectProfile();
 const confirmed = argv.includes('--yes');
 
 if (!existsSync(join(profile, 'package.json'))) { console.error('profile not found: ' + profile); process.exit(2); }

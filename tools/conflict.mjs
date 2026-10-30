@@ -40,7 +40,8 @@ if (existsSync(knowledgePath)) {
         console.log('      Service-subclass registrations are invisible to it, so the curated list still contributes.');
       }
     } else {
-      console.log('WARNING: knowledge is for dsh ' + k.dshVersion + ' but the runtime is ' + runtimeVersion);
+      const shown = runtimeVersion || 'unknown (set DSH_BIN or DSH_VERSION)';
+      console.log('WARNING: knowledge is for dsh ' + k.dshVersion + ' but the runtime is ' + shown);
       console.log('         regenerate: node tools/knowledge-gen.mjs');
       knowledgeSource = 'knowledge (STALE: built for ' + k.dshVersion + ')';
     }

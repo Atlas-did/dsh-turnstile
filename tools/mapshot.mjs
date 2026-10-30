@@ -1,5 +1,10 @@
 // Screenshot a local HTML file with the system Edge (playwright-core).
-import { chromium } from 'playwright-core';
+let chromium;
+try { ({ chromium } = await import('playwright-core')); }
+catch {
+  console.error('mapshot needs playwright-core (npm i -D playwright-core) and a system Edge/Chrome.');
+  process.exit(3);
+}
 const file = process.argv[2];
 const out = process.argv[3] || 'state/gate-map.png';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });

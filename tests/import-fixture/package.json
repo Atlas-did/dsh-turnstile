@@ -1,0 +1,6 @@
+{
+  "name": "import-fixture",
+  "private": true,
+  "dependencies": { "plug-unresolvable": "1.0.0" },
+  "dsh": { "profile": { "bundles": ["plug-unresolvable"] } }
+}
