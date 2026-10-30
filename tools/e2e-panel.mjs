@@ -87,6 +87,24 @@ try {
     const restored = await waitPatch((t) => t.trim() === before.trim());
     ok('second click restored the patch', restored, restored ? '' : 'file still differs');
   }
+  // Drag mode: the panel must move with the pointer and remember where it was left.
+  await page.evaluate(() => { const el = document.querySelector('[data-testid="panel"]'); if (el) el.scrollTop = 0; });
+  await page.waitForTimeout(200);
+  const handle = page.locator('[data-testid="drag-handle"]').first();
+  if (await handle.count()) {
+    const panelBox = async () => page.locator('[data-testid="panel"]').first().boundingBox();
+    const b0 = await panelBox();
+    const hb = await handle.boundingBox();
+    await page.mouse.move(hb.x + 10, hb.y + 8);
+    await page.mouse.down();
+    await page.mouse.move(hb.x - 120, hb.y + 90, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+    const b1 = await panelBox();
+    ok('drag moves the panel', Math.abs(b0.x - b1.x) > 40 || Math.abs(b0.y - b1.y) > 40, Math.round(b1.x) + ',' + Math.round(b1.y));
+    const saved = await page.evaluate(() => localStorage.getItem("turnstile.panelPos"));
+    ok('drag position is remembered', Boolean(saved), saved || 'none');
+  }
 } catch (e) {
   ok('e2e completed without throwing', false, String(e.message).slice(0, 120));
 } finally {

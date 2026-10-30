@@ -81,6 +81,32 @@ window.__ModuleLoader__.load({
         // Four sections do not fit one screen: collapse the two least urgent by default.
         var sx = React.useState({ topo: true, occ: true, slots: false, list: false }), secs = sx[0], setSecs = sx[1];
         var fx = React.useState(""), fuseMsg = fx[0], setFuseMsg = fx[1];
+        // Drag mode: the panel itself moves (users want the tool out of the way); the position
+        // is remembered per browser. Plugin overlays are a different problem - see below.
+        var ps = React.useState(function () {
+          try { var v = JSON.parse(localStorage.getItem("turnstile.panelPos") || "null"); if (v && typeof v.x === "number") return v; } catch (e) {}
+          return null;
+        }), pos = ps[0], setPos = ps[1];
+        var dragRef = React.useRef(null);
+        function beginDrag(e) {
+          e.preventDefault();
+          var startX = e.clientX, startY = e.clientY;
+          var box = document.querySelector('[data-testid="panel"]').getBoundingClientRect();
+          var baseX = box.left, baseY = box.top;
+          dragRef.current = true;
+          function move(ev) {
+            if (!dragRef.current) return;
+            setPos({ x: Math.max(0, baseX + ev.clientX - startX), y: Math.max(0, baseY + ev.clientY - startY) });
+          }
+          function up() {
+            dragRef.current = false;
+            window.removeEventListener("mousemove", move);
+            window.removeEventListener("mouseup", up);
+            setPos(function (p) { try { if (p) localStorage.setItem("turnstile.panelPos", JSON.stringify(p)); } catch (e) {} return p; });
+          }
+          window.addEventListener("mousemove", move);
+          window.addEventListener("mouseup", up);
+        }
         function section(key, title, body) {
           if (!body) return null;
           var isOpen = !!secs[key];
@@ -153,9 +179,10 @@ window.__ModuleLoader__.load({
         var hot = {};
         rows.forEach(function (r) { (r.ui || []).forEach(function (u) { hot[u] = (hot[u] || 0) + 1; }); });
         var crowded = Object.keys(hot).filter(function (u) { return hot[u] >= 3; }).length;
-        return h("div", { "data-testid": "panel", style: { position: "fixed", right: "18px", top: "64px", zIndex: 2147483000, width: "330px", maxHeight: "50vh", overflow: "auto", display: "flex", flexDirection: "column", background: "#0e1116", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "10px", padding: "12px 14px", fontFamily: "ui-sans-serif,system-ui" } },
+        return h("div", { "data-testid": "panel", style: { position: "fixed", left: pos ? pos.x : undefined, top: pos ? pos.y : "64px", right: pos ? "auto" : "18px", zIndex: 2147483000, width: "330px", maxHeight: "50vh", overflow: "auto", display: "flex", flexDirection: "column", background: "#0e1116", color: "#d7dee8", border: "1px solid #30363d", borderRadius: "10px", padding: "12px 14px", fontFamily: "ui-sans-serif,system-ui" } },
           h("div", { style: { order: -3, display: "flex", justifyContent: "space-between", marginBottom: "6px" } },
-            h("strong", { style: { fontSize: "13px" } }, "mini · 插件 " + rows.length),
+            h("span", { "data-testid": "drag-handle", onMouseDown: beginDrag, title: "拖动面板", style: { cursor: "grab", userSelect: "none" } },
+              h("strong", { style: { fontSize: "13px" } }, "mini · 插件 " + rows.length)),
             h("button", { onClick: function () { setOpen(false); }, style: { background: "none", border: 0, color: "#8b96a5", cursor: "pointer" } }, "×")),
           h("div", { style: { order: -2, color: "#8b96a5", fontSize: "11.5px", marginBottom: "6px" } }, "停用 " + off + " · 引擎跳过 " + sk + " · 挤爆的 UI 面 " + crowded + " · 点一行切换"),
           report ? h("div", { style: { order: -1, fontSize: "11.5px", marginBottom: "8px", color: "#8b96a5" } },
