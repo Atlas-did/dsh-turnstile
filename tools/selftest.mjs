@@ -47,6 +47,10 @@ check('manage menu toggles without writing', /\[ \]/.test(r.out) && !/已写入/
 r = run('tools/conflict.mjs', join(root, 'tests/conflict-fixture'));
 check('conflict ignores commented ctx writes', r.code === 0 && !/ctx\.fs/.test(r.out) && /ctx evidence: ast/.test(r.out), 'exit=' + r.code);
 
+// Fix planner: a dry run must name the alias and write nothing.
+r = run('tools/fix.mjs', join(root, 'tests/risk-fixture'));
+check('fix plans an npm alias, dry', r.code === 4 && /npm:@deepseek-ai\/schemastery/.test(r.out), 'exit=' + r.code);
+
 // Four conflict surfaces that used to be unchecked: port / file / css / shortcut.
 r = run('tools/port-scan.mjs', join(root, 'tests/scan-fixture'));
 check('port scan catches duplicate port', r.code === 9 && /34567/.test(r.out), 'exit=' + r.code);

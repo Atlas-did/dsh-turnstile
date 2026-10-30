@@ -129,6 +129,20 @@ if (isFlag('--json')) {
   console.log(failed.length ? 'RESULT: ' + failed.length + ' blocking check(s)' : 'RESULT: clear to install');
 }
 
+if (isFlag('--fix')) {
+  // Ask the fix planner what it would change; --apply is a separate, explicit step.
+  const fixArgs = [join(root, 'tools/fix.mjs'), dir];
+  if (isFlag('--apply')) fixArgs.push('--apply');
+  try {
+    const { stdout } = await run(process.execPath, fixArgs, { timeout: 120000, maxBuffer: 16 * 1024 * 1024 });
+    process.stdout.write(stdout);
+  } catch (e) {
+    // fix.mjs exits 4 for "plan ready, nothing written" — that is not an error here.
+    if (e && e.stdout) process.stdout.write(String(e.stdout));
+    if (e && e.stderr) process.stderr.write(String(e.stderr));
+  }
+}
+
 if (!failed.length && !isFlag('--no-record')) {
   const tmp = join(root, 'state', '.preflight-' + process.pid + '.txt');
   try {
