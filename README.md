@@ -132,6 +132,7 @@ A gate that hides its blind spots is worse than no gate. These are real, measure
 | Version rules were re-implemented by hand | Fixed here | `tools/version.mjs` delegates to the host's own `evaluatePluginCompatibility`; fallback is `semver` with includePrerelease. For `^0.2.0-rc.1` vs `0.2.1-rc.3`, plain `semver.satisfies` says false, the host says true. Only the host is authoritative. |
 | `semver` / core-service knowledge is hand-maintained and drifts | Partly open | Version rules no longer drift (delegated). The known-ctx-service allowlist is still a constant; next step is generating it from the installed runtime and failing loudly when the runtime version has no knowledge file. |
 | Deeply tied to DSH internals | By design | It understands `cordis.patch.yml`, `--dump-config` and the inspector byte budget. Another harness needs an adapter, not a flag. |
+| A plugin cannot enumerate what its peers registered | **Proven, not fixed** | Client side: `ctx.slots` is a scoped `SlotRegistry` — `entries()` and `entriesOfSlot('shell.overlay')` both return 0 from inside a plugin (`docs/33-no-live-slot-tree.md`). Server side: `session/event` (tool/call, tool/result) is emitted on the agent's own context and a root plugin never sees it (`docs/32-runtime-probe.md`). Both need an agent/global context, which a plugin cannot reach. |
 | `selftest` reported "healthy" while skipping environment cases | Fixed here | Summary now separates fixture from environment coverage, and `--strict` exits 4 when anything was skipped. A green line no longer means two different things. |
 
 ### What a green report actually means
@@ -150,7 +151,7 @@ skipped               -> neither; coverage you did not get
 | resolve | the module was actually resolved | high |
 | ast | parsed with es-module-lexer / acorn | high |
 | text | regex over source (fallback only) | medium |
-| runtime | observed in a live host | highest (not implemented) |
+| runtime | observed in a live host | highest (see `plugins/turnstile-probe`) |
 
 ---
 
