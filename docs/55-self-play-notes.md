@@ -48,3 +48,13 @@ For (4): report the deepest slot entry found, not the first `RootEntry` - walk u
 
 仍然没解决：筛选框只有 96px 宽、标题行有点挤（`mini · 插件 26 拖动 univer 检查 ×`）；
 第 3 条（内联属性网格）和第 4 条（准星取最深条目）还没做。
+## 进展 23:05 - 第 3、4 条也修了
+
+- **准星**现在报最深一层：`slot main · <ConversationContent>`、`slot sidebar.workspaces · <ProjectRowItem>`、
+  `slot shell.overlay · turnstile.plugin-list`；压缩后的短名（`S_`）会跳过继续往上找。
+- **属性网格**：选中一行后是两列标签/值（行 id / 状态 / UI 面），不再是三句描述；
+  位置输入框和停用/收藏按钮在网格下方。
+
+实测：`grid: 行 id | mimir | 状态 | 启用 | UI 面 | 4 个: ui-layout, ui-renderer, ui-sidebar, ui-theme`。
+
+仍然存在的：面板挡住对话右侧一部分；标题行仍有四个元素挤在一起；slot 树与控制台被挤到需要滚动。

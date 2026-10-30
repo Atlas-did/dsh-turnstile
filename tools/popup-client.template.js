@@ -101,17 +101,25 @@ window.__ModuleLoader__.load({
           var key = Object.keys(el).filter(function (k) { return k.indexOf("__reactFiber$") === 0; })[0];
           if (!key) return { slotKey: "", entryId: "", note: "该节点不在 React 树里" };
           var f = el[key];
+          var found = null;
+          var comp = "";
           for (var i = 0; i < 100 && f; i++) {
             var t = f.type;
             var name = typeof t === "function" ? (t.displayName || t.name || "") : "";
+            if ((!comp || /^[A-Z][a-z]?[_$]?$/.test(comp)) && name && name !== "RootEntry" && !/^(div|span|img|svg|button|input|path|g|rect|p|a|ul|li|section|header|main|aside|form|textarea|label)$/.test(name)) comp = name;
             if (name === "RootEntry") {
               var pr = f.memoizedProps || {};
               var e = pr.entry || {};
               var id = e.options && e.options.id ? String(e.options.id) : "";
-              return { slotKey: String(pr.slotKey || ""), entryId: id };
+              // Keep the DEEPEST entry that actually carries an id: the outer RootEntry is often
+              // a whole page region ("main"), which tells the user nothing.
+              var cand = { slotKey: String(pr.slotKey || ""), entryId: id };
+              if (!found) found = cand;
+              if (id) found = cand;
             }
             f = f.return;
           }
+          if (found) { found.component = found.entryId ? "" : comp; return found; }
           return { slotKey: "", entryId: "", note: "没有找到 slot 边界" };
         }
         // Element inspection: the DOM tags plugins with data-plugin, so a click names the owner.
@@ -132,7 +140,7 @@ window.__ModuleLoader__.load({
               var where = el ? el.tagName.toLowerCase() + (cls ? "." + cls : "") : "?";
               var own = ownerAtPoint(e.clientX, e.clientY);
               if (own && own.slotKey) {
-                setInspectMsg("slot " + own.slotKey + (own.entryId ? "  ·  " + own.entryId : "") + (own.note ? "  (" + own.note + ")" : ""));
+                setInspectMsg("slot " + own.slotKey + (own.entryId ? "  ·  " + own.entryId : (own.component ? "  ·  <" + own.component + ">" : "")) + (own.note ? "  (" + own.note + ")" : ""));
                 e.preventDefault(); e.stopPropagation(); return;
               }
               setInspectMsg(pkg
@@ -336,9 +344,13 @@ window.__ModuleLoader__.load({
             })) : null,
           picked ? h("div", { "data-testid": "detail", style: { order: -1, marginBottom: "8px", borderBottom: "1px solid #30363d", paddingBottom: "8px", fontSize: "11.5px", lineHeight: "1.7", color: "#b8c2cf" } },
             h("div", { style: { fontFamily: "ui-monospace,monospace", color: "#d7dee8" } }, picked.name),
-            h("div", null, "行 id: " + (picked.row || "(未声明)")),
-            h("div", null, "状态: " + (picked.disabled ? "已停用" : "启用") + (picked.engineSkipped ? " · 引擎跳过" : "")),
-            h("div", null, "UI 面: " + ((picked.ui && picked.ui.length) ? picked.ui.join(", ") : "无（宿主侧或自绘）")),
+            h("div", { "data-testid": "detail-grid", style: { display: "grid", gridTemplateColumns: "72px 1fr", columnGap: "10px", rowGap: "1px", marginTop: "4px" } },
+              h("span", { style: { color: "#8b96a5" } }, "行 id"),
+              h("span", { style: { fontFamily: "ui-monospace,monospace" } }, picked.row || "(未声明)"),
+              h("span", { style: { color: "#8b96a5" } }, "状态"),
+              h("span", null, (picked.disabled ? "已停用" : "启用") + (picked.engineSkipped ? " · 引擎跳过" : "")),
+              h("span", { style: { color: "#8b96a5" } }, "UI 面"),
+              h("span", null, (picked.ui && picked.ui.length) ? picked.ui.length + " 个: " + picked.ui.join(", ") : "无（宿主侧或自绘）")),
             (function () {
               var cur = null;
               try {
