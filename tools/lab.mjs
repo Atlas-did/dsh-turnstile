@@ -42,7 +42,16 @@ if (installSrc) {
   // row as well would declare the same id twice in one scope (a real clash, caught by lint-rows).
   const declaresOwnRows = Boolean(JSON.parse(readFileSync(srcPkg, 'utf8')).dsh && JSON.parse(readFileSync(srcPkg, 'utf8')).dsh.bundle);
   if (declaresOwnRows) {
-    console.log('bundle declares its own rows; no profile row added');
+    // A bundle row can be *overridden* by id from the profile patch - that is the supported
+    // way to give a user-specific config without declaring the same id twice.
+    if (anchor && existsSync(patchPath)) {
+      const t = readFileSync(patchPath, 'utf8');
+      const hasOverride = new RegExp('^- id:\\s*' + realName + '\\s*$', 'm').test(t);
+      if (!hasOverride) {
+        writeFileSync(patchPath, t.replace(/\s*$/, '') + '\n- id: ' + realName + '\n  name: ' + realName + '\n  config:\n    anchor: ' + anchor + '\n');
+      }
+    }
+    console.log('bundle declares its own rows; wrote a config override only' + (anchor ? ' (anchor: ' + anchor + ')' : ''));
   } else if (existsSync(patchPath)) {
     const t = readFileSync(patchPath, 'utf8');
     if (new RegExp('id:\\s*' + realName).test(t)) {

@@ -125,6 +125,12 @@ if (process.env.DSH_RUNTIME_NODE_MODULES || existsSync(join(root, 'node_modules/
   console.log('  SKIP  fix plans an npm alias, dry   (no runtime node_modules to resolve the official version)');
 }
 
+// Promote: the lab->main diff must be machine-readable and must not apply without --apply.
+r = run('tools/promote.mjs', '--from', join(root, 'tests/anchor-fixture'), '--to', join(root, 'tests/fuse-fixture'), '--json');
+check('promote prints a plan as JSON', r.code === 0 && /"plan"/.test(r.out), 'exit=' + r.code);
+r = run('tools/promote.mjs', '--from', join(root, 'tests/anchor-fixture'), '--to', join(root, 'tests/fuse-fixture'));
+check('promote is a dry run by default', /DRY RUN/.test(r.out), 'exit=' + r.code);
+
 // The mini-lab skill is the human entry point: it must exist and carry valid frontmatter.
 {
   const skillPath = join(root, 'skills/mini-lab/SKILL.md');
