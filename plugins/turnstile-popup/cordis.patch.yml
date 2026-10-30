@@ -1,0 +1,5 @@
+- insert:
+    - id: turnstile-popup
+      name: turnstile-popup
+      config:
+        profile: mini

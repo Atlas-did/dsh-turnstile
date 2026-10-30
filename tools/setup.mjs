@@ -49,6 +49,10 @@ steps.push({ id: 'map', title: 'look at the topology, not the log',
   detail: 'node tools/gate-map.mjs ' + profile + '  -> state/gate-map-' + profile + '.html',
   command: 'node tools/gate-map.mjs ' + profile });
 
+steps.push({ id: 'panel', title: 'install the management panel into this profile',
+  detail: 'copies plugins/turnstile-popup into node_modules, adds the bundle entry and a patch row (backup kept)',
+  command: 'node tools/setup.mjs --home ' + home + ' --profile ' + profile + ' --panel --yes' });
+
 steps.push({ id: 'e2e', title: 'prove the panel actually works (real clicks, no JS dispatch)',
   detail: 'node tools/e2e-panel.mjs --log <dsh log> --patch <profile>/cordis.patch.yml --row <a harmless plugin>',
   command: 'node tools/e2e-panel.mjs --log <dsh log> --patch ' + join(target, 'cordis.patch.yml') + ' --row dsh-talk' });
@@ -82,6 +86,32 @@ if (has('--install') && has('--yes')) {
     failed = 1;
   }
 }
+if (has('--panel') && has('--yes')) {
+  const src = join(ROOT, 'plugins', 'turnstile-popup');
+  const dst = join(target, 'node_modules', 'turnstile-popup');
+  try {
+    execFileSync(process.execPath, ['-e', [
+      'const fs=require("fs"),p=require("path");',
+      'const src=process.argv[1],dst=process.argv[2],target=process.argv[3];',
+      'fs.mkdirSync(p.dirname(dst),{recursive:true});',
+      'fs.rmSync(dst,{recursive:true,force:true});',
+      'fs.cpSync(src,dst,{recursive:true});',
+      'const pkgPath=p.join(target,"package.json"),j=JSON.parse(fs.readFileSync(pkgPath,"utf8"));',
+      'j.dependencies=j.dependencies||{};j.dependencies["turnstile-popup"]="link:"+dst;',
+      'j.dsh=j.dsh||{};j.dsh.profile=j.dsh.profile||{};j.dsh.profile.bundles=j.dsh.profile.bundles||[];',
+      'if(!j.dsh.profile.bundles.includes("turnstile-popup"))j.dsh.profile.bundles.push("turnstile-popup");',
+      'fs.copyFileSync(pkgPath,pkgPath+".bak-"+Date.now());',
+      'fs.writeFileSync(pkgPath,JSON.stringify(j,null,2)+"\\n");',
+      'const patch=p.join(target,"cordis.patch.yml");',
+      'if(fs.existsSync(patch)){const t=fs.readFileSync(patch,"utf8");if(!/id:\\s*turnstile-popup/.test(t)){fs.copyFileSync(patch,patch+".bak-"+Date.now());fs.writeFileSync(patch,t.replace(/\\s*$/,"")+"\\n- insert:\\n    - id: turnstile-popup\\n      name: turnstile-popup\\n");}}',
+    ].join(''), src, dst, target], { stdio: 'inherit' });
+    console.log('panel installed into ' + target + ' (restart DSH to load it)');
+  } catch (e) {
+    console.error('panel install failed: ' + String(e.message).slice(0, 200));
+    failed = 1;
+  }
+}
+
 if (containerName && has('--yes')) {
   const dir = join(home, 'containers', containerName);
   mkdirSync(dir, { recursive: true });
