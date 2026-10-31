@@ -163,6 +163,19 @@ try {
   await anchorInput.dispatchEvent('input');
   await page.waitForTimeout(300);
   ok('a valid value clears the field error', ((await page.locator('[data-testid="field-error-anchor"]').first().textContent()) || '') === '');
+  // A before hook refuses the second identical command, and the refusal names the duplicate.
+  await click('[data-testid="nav-designer"]');
+  await click('[data-testid="palette-Common"]');
+  const beforeDup = await page.locator('[data-testid^="command-delete-"]').count();
+  await click('[data-testid="designer-add-toggle"]');
+  await page.waitForTimeout(200);
+  const afterFirst = await page.locator('[data-testid^="command-delete-"]').count();
+  await click('[data-testid="designer-add-toggle"]');
+  await page.waitForTimeout(250);
+  const afterSecond = await page.locator('[data-testid^="command-delete-"]').count();
+  ok('a before hook refuses the duplicate command', afterFirst === afterSecond, beforeDup + '/' + afterFirst + '/' + afterSecond);
+  const refusal = await text('[data-testid="designer-error"]');
+  ok('the refusal names the duplicate', refusal.includes('已经有相同的命令'), refusal);
   ok('no uncaught designer browser errors', errors.length === 0, errors.join(' | ').slice(0, 200));
 } catch (error) {
   ok('designer e2e completed without throwing', false, String(error?.stack || error).slice(0, 500));

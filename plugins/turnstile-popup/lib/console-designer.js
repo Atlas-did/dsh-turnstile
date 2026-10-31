@@ -60,8 +60,7 @@
   function addOperation(op) {
     const p = selected();
     if (!p || p.missing || !p.row) { ds.error = '选中的插件没有可写入的配置行。'; render(); return; }
-    if (ds.operations.length >= 100) { ds.error = '一次最多生成 100 条命令。'; render(); return; }
-    mutate(() => ds.operations.push({ ...op, package: p.name }));
+    enqueue({ ...op, package: p.name });
   }
   function addAnchor(anchor) { addOperation({ type: 'anchor', anchor }); }
   function undo() {
@@ -202,6 +201,35 @@
   function configValues(p) {
     const eff = p ? effective(p) : { disabled: false, anchor: '' };
     return { disabled: Boolean(eff.disabled), anchor: ds.anchorDraft || eff.anchor || '' };
+  }
+  // A real use of the hook layer: the queue-cap rule and duplicate detection live in a before hook,
+  // so the palette and the batch path share one decision instead of each checking its own thing.
+  function ensureHooks() {
+    const HK = window.TurnstileHooks;
+    if (!HK || ds.hooks) return ds.hooks;
+    if (!HK) return null;
+    ds.hooks = HK.createHooks();
+    HK.on(ds.hooks, 'beforeEnqueue', (cmd) => {
+      if (!cmd) return true;
+      if (ds.operations.length >= 100) return '一次最多生成 100 条命令。';
+      const same = ds.operations.some((op) => op.type === cmd.type && op.package === cmd.package
+        && (cmd.type !== 'toggle' || Boolean(op.disable) === Boolean(cmd.disable))
+        && (cmd.type !== 'anchor' || (op.anchor || '') === (cmd.anchor || '')));
+      if (same) return '队列里已经有相同的命令：' + cmd.type + ' · ' + cmd.package;
+      return true;
+    });
+    return ds.hooks;
+  }
+  function enqueue(op) {
+    const HK = window.TurnstileHooks;
+    const hooks = ensureHooks();
+    if (HK && hooks) {
+      const verdict = HK.runBefore(hooks, 'beforeEnqueue', op);
+      if (!verdict.allowed) { ds.error = verdict.reason; render(); return false; }
+    }
+    mutate(() => ds.operations.push(op));
+    if (HK && hooks) HK.runAfter(hooks, 'afterEnqueue', op);
+    return true;
   }
   function paletteButton(label, fn, id) { return btn(label, fn, id, 'btn'); }
   function renderPalette() {
