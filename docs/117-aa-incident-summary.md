@@ -2,7 +2,29 @@
 
 一句话：`2.0.2 插件 × 2.1.0 桌面端` 的 `PARSE_ERROR` 只是第一层；升级后仍然「启动中」，第二层是 AA 的 Python connector 把同步批次发给云端时走了本地代理，`aa.dsh.v2.Sync.ingestBatch` 一直失败。两层都通了，DSH 才真正变成「运行中」。
 
+## 先说适用条件（否则这不是你的故障）
+
+这两个故障是**并列**的，不是因果链：任何一个单独成立都能让 AA 连不上；两个都不成立时，AA 大概率是正常的。先跑下面 2 项，再决定要不要往下读。
+
+| 检查 | 命中本故障的条件 | 怎么查 |
+|---|---|---|
+| 协议线 | 桌面端 2.1.0（meshcall v2）+ 插件 2.0.2（v1） | AA `ProductVersion`；插件 `lib/index.js` 的 `protocolVersion` / `PROTOCOL_VERSION_MISMATCH` |
+| 出站代理 | `ALL_PROXY` / `HTTPS_PROXY` 指向一个坏代理（如 7897） | `HKCU\Environment`、`netsh winhttp show proxy`、端口监听；直连 vs `curl -x` 对比 |
+
+判定表：
+
+| 桌面端 | 插件 | 代理 | 结论 |
+|---|---|---|---|
+| 2.1.0 | 2.0.2 | 任意 | 故障一：先升插件到 2.1.0 |
+| 2.1.0 | 2.1.0 | 坏 | 故障二：NO_PROXY / 修代理 |
+| 2.0.x | 2.0.2 | 无 | **不适用**：双方都是 v1，正常握手 |
+| 2.0.x | 2.0.2 | 坏 | 只有故障二 |
+
+反例（2026-10-31，另一台机器 `C:\Users\星`）：AA `2.0.3.0`、插件 2.0.2、无任何 `*_PROXY`、无 7897 监听；`PARSE_ERROR = 0`、`backend ingest request failed = 0`、`sync.ack` 10319 次、`throughSeq` 最高 2671，AA 显示「运行中」。它那 10 次告警是 `resubscribing for history calibration`，属于流断开后的重新订阅，和本文两条不是同一件事。→ 本文**不适用于它**，也不需要改任何配置。
+
 ## 症状
+
+> 以下证据都来自本机 `C:\Users\finef`（AA 2.1.0 + `ALL_PROXY=http://127.0.0.1:7897`），不是通用现象。
 
 - AA 设备页：DSH「启动中 · DSH 会话同步中断，正在重试」
 - 插件日志：`bridge.connected` → `PARSE_ERROR` ×5 → `ERR_STREAM_WRITE_AFTER_END` → `disconnected initialized=false`
@@ -80,6 +102,7 @@ aa.dsh.v2.Sync.ingestBatch
 
 ## 下次照这个顺序判定
 
+0. 先过上面的适用条件表（版本线 + 代理），不命中就别套本文
 1. 两端版本矩阵：桌面端 / 插件 / npm latest
 2. 端口是否 `LISTENING`，AA 侧是否有 `TIME_WAIT`
 3. 插件日志有没有 `PARSE_ERROR` → 协议层
@@ -92,6 +115,12 @@ aa.dsh.v2.Sync.ingestBatch
 
 - 删掉 `NO_PROXY` 末尾的 `,agents-anywhere.com`，重启 AA
 - 插件可装回 2.0.2，但 2.1.0 桌面端会再次 `PARSE_ERROR`，不建议
+
+## 附注：`desktop.executablePath` 的 GBK 乱码（仅另一台机器）
+
+`C:\Users\星` 那台的 `connector-runtime.json` 里 `desktop.executablePath` 是 `C:\Users\鏄焅\...`（「星」被 GBK 化，即 `星` 的 UTF-8 字节按 GBK 读回去）。它不影响同步，只在 AA 按记录路径重启自身时可能踩空。
+
+修复（在**那台机器**上做，先完全退出 AA）：备份 `connector-runtime.json`，把 `desktop.executablePath` 改成真实路径，或删掉该字段让 AA 下次启动重写。本机（finef）该字段是正常的 `D:\Software_download_link\Agents Anywhere\Agents Anywhere.exe`。
 
 ## 证据与相关文档
 
