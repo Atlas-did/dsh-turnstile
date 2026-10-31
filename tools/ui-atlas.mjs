@@ -46,10 +46,23 @@ let runtime = null;
 if (existsSync(slotMapFile)) {
   try { runtime = JSON.parse(readFileSync(slotMapFile, 'utf8')); } catch { runtime = null; }
 }
+// 面名与客户端 slot 名不同名（前者是 @deepseek-ai/dsh-client-ui-settings，后者可能是 settings.section），
+// 所以把两边都归一化成「最后一段」，再比。
+const norm = (s) => String(s || '')
+  .replace('@deepseek-ai/dsh-client-ui-', '')
+  .replace('@deepseek-ai/dsh-client-', '')
+  .replace(/^ui-/, '')
+  .split('.').pop()
+  .toLowerCase();
+// 客户端 slot 名常是「命名空间.路径」（settings.section），面的名字是 settings；
+// 所以 slot 侧取第一段，面侧取最后一段。
+const slotKey = (s) => String(s || '').split('.')[0].replace(/^ui-/, '').toLowerCase();
 const runtimeCount = (surface) => {
   if (!runtime || !Array.isArray(runtime.slots)) return null;
-  const hit = runtime.slots.find((s) => String(s.slot) === surface || String(s.slot).endsWith(surface));
-  return hit ? hit.count : null;
+  const want = norm(surface);
+  const hits = runtime.slots.filter((s) => slotKey(s.slot) === want);
+  if (!hits.length) return null;
+  return hits.reduce((n, h) => n + (h.count || 0), 0);
 };
 
 const rows = [...surfaces.entries()].map(([surface, list]) => ({ surface, count: new Set(list.map((l) => l.plugin)).size, entries: list, runtime: runtimeCount(surface) }))

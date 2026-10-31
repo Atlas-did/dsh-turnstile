@@ -24,8 +24,21 @@ window.__ModuleLoader__.load({
         mono: { fontFamily: "ui-monospace,SFMono-Regular,Consolas,monospace" }
       };
 
+      // 模块加载时就把 token 抓住：宿主可能在加载后改写 URL（实测会把 ?token= 抹掉），
+      // 之后再读 location.search 就空了，写操作会被 401 拒。
+      var TOKEN_AT_LOAD = (function () {
+        try {
+          var m = (location.search.match(/[?&]token=([^&]+)/) || [])[1];
+          if (m) { try { sessionStorage.setItem("turnstile-token", m); } catch (e) {} return m; }
+          try { return sessionStorage.getItem("turnstile-token") || ""; } catch (e) { return ""; }
+        } catch (e) { return ""; }
+      })();
+      function token() {
+        var m = (location.search.match(/[?&]token=([^&]+)/) || [])[1];
+        return m || TOKEN_AT_LOAD || "";
+      }
       function api(path, init) {
-        var t = (location.search.match(/[?&]token=([^&]+)/) || [])[1] || "";
+        var t = token();
         var url = "/turnstile/" + path + (t ? (path.indexOf("?") === -1 ? "?" : "&") + "token=" + t : "");
         return fetch(url, Object.assign({ credentials: "include" }, init || {}))
           .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status + " · " + path); return r.json(); });
@@ -407,11 +420,18 @@ window.__ModuleLoader__.load({
 
       // 把观测到的 slot 记录交给宿主存盘（供 tools/ui-atlas.mjs 的运行时列使用）。
       try {
-        var t0 = (location.search.match(/[?&]token=([^&]+)/) || [])[1] || "";
-        fetch("/turnstile/slot-map" + (t0 ? "?token=" + encodeURIComponent(t0) : ""), {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ slots: globalSlotsSnapshot() }),
-        }).catch(function () {});
+        var t0 = token();
+        var sendSlots = function () {
+          try {
+            fetch("/turnstile/slot-map" + (t0 ? "?token=" + encodeURIComponent(t0) : ""), {
+              method: "POST", headers: { "content-type": "application/json" },
+              body: JSON.stringify({ slots: globalSlotsSnapshot() }),
+            }).catch(function () {});
+          } catch (e) {}
+        };
+        sendSlots();
+        // 挂载时插件可能还没全部注入，4 秒后再报一次（覆盖晚到的那批）
+        setTimeout(sendSlots, 4000);
       } catch (e) {}
       try { window.__DSH_SLOTS_SNAPSHOT__ = globalSlotsSnapshot; } catch (e) {}
       ctx.slots.inject("shell.overlay", function () {

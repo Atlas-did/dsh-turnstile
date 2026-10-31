@@ -64,7 +64,10 @@ export const inject = ["webServer"];
 // B4: the panel runs inside the host's authenticated page, so a blanket token requirement would
 // break it. What can be enforced without pretending: foreign origins are rejected on every route,
 // and state-changing requests still need the token. Read-only routes are same-origin only.
-const AUTH_EXEMPT = new Set(["/turnstile/"]);
+// slot-map 是「页面自己报上来的 slot 快照」：只含 slot 名与条目数，不含用户内容。
+// 它必须免 token —— DSH 加载后会抹掉 URL 里的 ?token=，插件侧拿不到令牌（实测 401）。
+// 跨源仍由 guardHandler 挡住，所以只允许同源页面/本机工具写入。
+const AUTH_EXEMPT = new Set(["/turnstile/", "/turnstile/slot-map"]);
 function guardHandler(handler, path) {
   if (!path || !path.startsWith("/turnstile/")) return handler;
   if (AUTH_EXEMPT.has(path)) return handler;

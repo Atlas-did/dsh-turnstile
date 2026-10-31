@@ -277,6 +277,15 @@ try {
     ok('channels are listed with evidence', (await text('[data-testid="channel-codex"]')).includes('aa.jsonl'));
     ok('every channel states a falsifier', (await text('[data-testid="channel-codex"]')).includes('推翻条件'));
     ok('the fix actions carry a rollback point', (await text('[data-testid="diagnose-actions"]')).includes('回滚'));
+    // 插件行点击 -> 直接跳骨架（不用先输包名）
+    await page.locator('[data-testid="nav-plugins"]').click();
+    await page.waitForTimeout(400);
+    const firstName = await page.locator('[data-testid^="plugin-name-"]').first().getAttribute('data-testid');
+    await page.locator('[data-testid="' + firstName + '"]').click();
+    await page.waitForTimeout(900);
+    const jumped = await text('[data-testid="skeleton"]');
+    ok('clicking a plugin row opens its skeleton', jumped.includes('inject 面'), jumped.slice(0, 60));
+
     // 插件骨架视图：输入包名 -> 出骨架（声明/面/patch 行/slot）
     await page.locator('[data-testid="nav-skeleton"]').click();
     await page.waitForTimeout(250);
