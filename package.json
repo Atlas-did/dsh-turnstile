@@ -47,7 +47,9 @@
     "inspect": "node tools/inspect-plugin.mjs",
     "atlas": "node tools/ui-atlas.mjs",
     "diff-plugins": "node tools/diff-plugins.mjs",
-    "test:look": "node tools/test-look-tools.mjs"
+    "test:look": "node tools/test-look-tools.mjs",
+    "mini": "node tools/mini-ctl.mjs",
+    "test:arch": "node tools/test-arch-graph.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",

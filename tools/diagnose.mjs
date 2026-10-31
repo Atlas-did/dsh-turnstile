@@ -54,9 +54,36 @@ if (corpusArg) {
   manifest = readManifest(dir);
   sets = collect(dir);
 } else {
-  const aaLogs = join(homedir(), '.agents-anywhere', 'logs');
-  const pluginLogs = join(homedir(), '.agents-anywhere', 'dsh-bridge-next', 'logs');
+  // 跨平台日志发现：以前写死 ~/.agents-anywhere，换个系统/换个安装位置就全空。
+  // 候选按「越具体越优先」排，全部找不到时要明确说「未找到日志」，不能只报 undetermined。
+  const home = homedir();
+  const roots = [
+    join(home, '.agents-anywhere', 'logs'),
+    join(home, '.agents-anywhere', 'dsh-bridge-next', 'logs'),
+    join(home, '.dsh', 'logs'),
+    process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'DeepSeek Harness', 'logs') : '',
+    process.env.XDG_STATE_HOME ? join(process.env.XDG_STATE_HOME, 'dsh', 'logs') : '',
+    join(home, 'Library', 'Logs', 'dsh'),
+  ].filter(Boolean);
+  // profile 级日志（~/.dsh/profiles/*/logs）也纳入
+  const profilesDir = join(home, '.dsh', 'profiles');
+  if (existsSync(profilesDir)) {
+    for (const p of readdirSync(profilesDir)) {
+      const lp = join(profilesDir, p, 'logs');
+      if (existsSync(lp)) roots.push(lp);
+    }
+  }
+  const searched = roots.filter((r) => existsSync(r));
+  const aaLogs = join(home, '.agents-anywhere', 'logs');
+  const pluginLogs = join(home, '.agents-anywhere', 'dsh-bridge-next', 'logs');
   sets = {};
+  for (const r of searched) {
+    const files = readdirSync(r).filter((f) => f.endsWith('.jsonl')).map((f) => join(r, f));
+    if (!files.length) continue;
+    const kind = r === aaLogs ? 'aa' : r === pluginLogs ? 'plugin' : 'control';
+    sets[kind] = (sets[kind] || []).concat(files);
+  }
+  if (!searched.length) { console.error('未找到任何日志目录（找过: ' + roots.join(', ') + '）'); }
   if (existsSync(aaLogs)) sets.aa = readdirSync(aaLogs).filter((f) => f.endsWith('.jsonl')).map((f) => join(aaLogs, f));
   if (existsSync(pluginLogs)) sets.plugin = readdirSync(pluginLogs).filter((f) => f.endsWith('.jsonl')).map((f) => join(pluginLogs, f));
 }

@@ -24,12 +24,27 @@ const pluginCount = new Map();
 for (const s of occ.surfaces || []) for (const p of s.plugins || []) pluginCount.set(p, (pluginCount.get(p) || 0) + 1);
 const plugins = [...pluginCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
 
+// 标签宽度按字符估：中文 13px、西文 7.2px（archify 会按真实字体算，这里只要不低估）
+const textW = (s) => [...String(s || '')].reduce((n, ch) => n + (ch.charCodeAt(0) > 127 ? 13 : 7.2), 0);
+const boxW = (label, sub) => Math.max(200, Math.ceil(Math.max(textW(label), textW(sub)) + 48));
+const GAP = 30;
+
 const components = [];
-surfaces.forEach((s, i) => components.push({ id: 's' + i, type: 'frontend', label: s.surface, sublabel: s.count + ' 个插件', pos: [60 + i * 250, 40], size: [200, 64] }));
-plugins.forEach(([name, n], i) => components.push({ id: 'p' + i, type: 'backend', label: name, sublabel: n + ' 个面', pos: [60 + i * 250, 220], size: [200, 64] }));
-components.push({ id: 'host', type: 'cloud', label: 'DeepSeek Harness', sublabel: '宿主运行时', pos: [60, 400], size: [220, 64] });
-components.push({ id: 'patch', type: 'database', label: 'cordis.patch.yml', sublabel: '行配置', pos: [420, 400], size: [220, 64] });
-components.push({ id: 'gate', type: 'external', label: 'turnstile 闸门', sublabel: '12 项检查', pos: [780, 400], size: [220, 64] });
+let cursor = 60;
+surfaces.forEach((s, i) => {
+  const w = boxW(s.surface, s.count + ' 个插件');
+  components.push({ id: 's' + i, type: 'frontend', label: s.surface, sublabel: s.count + ' 个插件', pos: [cursor, 40], size: [w, 64] });
+  cursor += w + GAP;
+});
+let cursor2 = 60;
+plugins.forEach(([name, n], i) => {
+  const w = boxW(name, n + ' 个面');
+  components.push({ id: 'p' + i, type: 'backend', label: name, sublabel: n + ' 个面', pos: [cursor2, 220], size: [w, 64] });
+  cursor2 += w + GAP;
+});
+components.push({ id: 'host', type: 'cloud', label: 'DeepSeek Harness', sublabel: '宿主运行时', pos: [60, 400], size: [boxW('DeepSeek Harness', '宿主运行时'), 64] });
+components.push({ id: 'patch', type: 'database', label: 'cordis.patch.yml', sublabel: '行配置', pos: [420, 400], size: [boxW('cordis.patch.yml', '行配置'), 64] });
+components.push({ id: 'gate', type: 'external', label: 'turnstile 闸门', sublabel: '12 项检查', pos: [780, 400], size: [boxW('turnstile 闸门', '12 项检查'), 64] });
 
 const connections = [];
 let n = 0;
@@ -44,9 +59,14 @@ for (const s of surfaces) {
 connections.push({ id: 'host-patch', from: 'host', to: 'patch', label: '读取', fromSide: 'right', toSide: 'left' });
 connections.push({ id: 'gate-patch', from: 'gate', to: 'patch', label: '写回（留备份）', fromSide: 'left', toSide: 'right' });
 
+// viewBox 必须是 [w, h] 两项（archify 会对 4 项报 "viewBox: 长度必须是 2"）
+const right = Math.max(...components.map((c) => c.pos[0] + c.size[0]));
+const bottom = Math.max(...components.map((c) => c.pos[1] + c.size[1]));
+const viewBox = [Math.ceil(right + 60), Math.ceil(bottom + 60)];
+
 const doc = {
   schema_version: 1, diagram_type: 'architecture',
-  meta: { title: 'DeepSeek Harness 插件架构（实验场）', output: 'graph.html', quality_profile: 'showcase', viewBox: [1560, 520] },
+  meta: { title: 'DeepSeek Harness 插件架构（实验场）', output: 'graph.html', quality_profile: 'showcase', viewBox },
   components, connections,
 };
 mkdirSync(outDir, { recursive: true });

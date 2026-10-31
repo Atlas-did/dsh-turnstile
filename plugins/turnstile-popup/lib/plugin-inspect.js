@@ -35,8 +35,29 @@ export function inspectPlugin(profileDir, pkgName, { lines = 40 } = {}) {
     for (const m of readFileSync(f, 'utf8').matchAll(/^\s*-\s*id:\s*([\w.@/-]+)/gm)) rows.push(m[1]);
   }
 
-  const candidates = ['lib/client.js', 'lib/client.mjs', 'dist/client.js', (dsh.client && dsh.client.entry) || ''].filter(Boolean);
-  const entry = candidates.map((c) => join(pluginDir, c)).find((p) => existsSync(p)) || '';
+  // 入口探测顺序（都找不到时要说「未声明」，不能含糊地说「没找到」）：
+  //   1. package.json 的 dsh.client.entry   2. main / browser 字段
+  //   3. 常见产物路径（lib/client.js 等）    4. 任意 lib/*.js 且里面有 slot/inject 痕迹
+  const candidates = [
+    (dsh.client && dsh.client.entry) || '',
+    pkg.main || '',
+    pkg.browser || '',
+    'lib/client.js', 'lib/client.mjs', 'dist/client.js', 'lib/index.js', 'index.js',
+  ].filter(Boolean);
+  let entry = candidates.map((c) => join(pluginDir, String(c).replace(/^\.\//, ''))).find((p) => existsSync(p)) || '';
+  let entryKind = entry ? (entry.endsWith('index.js') ? 'host-or-bundle' : 'client') : 'none';
+  if (!entry) {
+    const libDir = join(pluginDir, 'lib');
+    if (existsSync(libDir)) {
+      for (const f of readdirSync(libDir)) {
+        if (!/\.(js|mjs)$/.test(f)) continue;
+        try {
+          const txt = readFileSync(join(libDir, f), 'utf8');
+          if (/\.inject\(|ctx\.slots|ctx\.webServer/.test(txt)) { entry = join(libDir, f); entryKind = 'scanned'; break; }
+        } catch {}
+      }
+    }
+  }
   const source = entry ? readFileSync(entry, 'utf8') : '';
 
   const slotKeys = [...new Set([...source.matchAll(/["']((?:shell|ui|sidebar|conversation|settings)\.[\w.-]+)["']/g)].map((m) => m[1]))].slice(0, 20);
@@ -63,6 +84,8 @@ export function inspectPlugin(profileDir, pkgName, { lines = 40 } = {}) {
       declaration: { engine: pkg.engines && pkg.engines.dsh, compatibility: dsh.compatibility || null, platform: (dsh.client && dsh.client.platform) || null },
       injects, patchFiles: patchFilesList.map((p) => p.split(/[\\/]/).slice(-1)[0]), patchRows: rows,
       entry: entry ? entry.split(/[\\/]/).slice(-2).join('/') : '',
+      entryKind,
+      entryNote: entry ? '' : '未声明客户端入口（可能是纯 host 插件，或入口在 bundle 里）',
       entryBytes: source.length,
       slotKeys, classNames, testIds, injectCalls, files,
       head: source ? source.split(/\r?\n/).slice(0, lines) : [],
