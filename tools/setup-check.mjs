@@ -35,10 +35,11 @@ results.push(checkBridge({
 }));
 
 // 3. the plugins the tutorial says to install
-const want = ['@ace-zone/dsh-market', 'dsh-free-search', '@agents-anywhere/dsh-bridge-next'];
-let bundles = [];
-try { bundles = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8')).dsh?.profile?.bundles || []; } catch {}
-for (const name of want) {
+// The tutorial names one market package; the machine may already carry another. Either counts.
+const want = [['dshmarket', '@ace-zone/dsh-market'], 'dsh-free-search', ['@agents-anywhere/dsh-bridge-next']];
+for (const entry of want) {
+  const names = Array.isArray(entry) ? entry : [entry];
+  const name = names.find((n) => existsSync(join(profileDir, 'node_modules', n))) || names[0];
   const installed = existsSync(join(profileDir, 'node_modules', name));
   const patch = existsSync(join(profileDir, 'cordis.patch.yml')) ? readFileSync(join(profileDir, 'cordis.patch.yml'), 'utf8') : '';
   const disabled = new RegExp('id:\\s*' + name + '\\s*\\n\\s*disabled:\\s*true').test(patch);
