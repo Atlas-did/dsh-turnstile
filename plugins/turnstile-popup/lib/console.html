@@ -72,10 +72,33 @@ function deltaStrip(){const d=state.delta;if(!d)return null;const parts=[];if(d.
 function pluginDeltaClass(name){const d=state.delta;if(!d||d.firstRun)return'';if(d.added.includes(name))return'delta-added';if(d.toggled.some(x=>x.name===name))return'delta-toggled';if(d.moved.some(x=>x.name===name))return'delta-moved';return'';}
 function empty(text){return node('div',{class:'empty','data-testid':'empty',text});}
 function setStatus(shown,total){$('counts').textContent=shown+' / '+total+' 项';$('generated').textContent=state.data?'快照 '+new Date(state.data.generatedAt).toLocaleTimeString():'';}
+async function runHealth(){
+  const box=document.querySelector('[data-testid="health-box"]');if(!box)return;
+  box.replaceChildren(node('p',{class:'hint',text:'体检中…'}));
+  try{
+    const r=await fetch('/turnstile/health',{headers:{accept:'application/json'}});
+    const j=await r.json();
+    const s=j.summary||{};
+    const head=node('p',{class:'hint','data-testid':'health-summary',text:'体检结果：'+s.pass+' 通过 / '+s.warn+' 警告 / '+s.fail+' 失败'+(s.skip?' / '+s.skip+' 跳过':'')});
+    const list=node('div',{class:'action-stack','data-testid':'health-items'});
+    for(const it of (j.items||[])){
+      const tag=it.level==='pass'?'✓':it.level==='warn'?'!':it.level==='fail'?'✗':'·';
+      const row=node('div',{class:'history-row','data-testid':'health-'+it.id});
+      row.append(node('strong',{text:tag+' '+it.message}));
+      if(it.next)row.append(node('small',{text:'→ '+it.next}));
+      list.append(row);
+    }
+    box.replaceChildren(head,list);
+  }catch(e){box.replaceChildren(node('p',{class:'hint',text:'体检失败：'+e.message}));}
+}
 function overview(){
   const d=state.data,report=d.report,blocking=report?.blocking?.length||0;
   const verdict=!report?['未观测','unknown']:blocking?['发现阻塞','bad']:['检查通过','good'];
-  const main=$('main');main.append(pageHead('控制台总览',d.profile.name+' · '+d.profile.dir));
+  const healthCard=node('section',{class:'panel'},[
+    node('div',{class:'panel-head'},[node('strong',{text:'全面体检'}),btn('开始体检',()=>runHealth(),'health-run')]),
+    node('div',{'data-testid':'health-box','class':''},[node('p',{class:'hint',text:'像杀毒软件那样扫一遍：凭据、桥接、插件、登录记录。每条不只说对错，还给下一步。'})]),
+  ]);
+  const main=$('main');main.append(healthCard);main.append(pageHead('控制台总览',d.profile.name+' · '+d.profile.dir));
   if(state.notice)main.append(node('div',{class:'notice',text:state.notice}));
   main.append(deltaStrip());
   if(!d.coverage.report)main.append(node('div',{class:'notice',text:'尚未读取到门禁报告；“未观测”不代表安全。请先运行 preflight。'}));

@@ -13,7 +13,7 @@
   "files": ["lib", "cordis.patch.yml", "README.md"],
   "keywords": ["dsh", "dsh-plugin", "deepseek-harness", "diagnostics", "occupancy"],
   "engines": { "node": ">=20" },
-  "scripts": { "test": "node test/txn.test.mjs && node test/lifecycle.test.mjs && node test/view-state.test.mjs && node test/sort-context.test.mjs && node test/inspector-model.test.mjs && node test/diff-state.test.mjs && node test/diff-classify.test.mjs && node test/virtual-window.test.mjs && node test/toggle-text.test.mjs && node test/capabilities.test.mjs && node test/history-timeline.test.mjs && node test/inspector-caps.test.mjs && node test/selection.test.mjs && node test/field-schema.test.mjs && node test/hooks.test.mjs && node test/hook-rules.test.mjs" },
+  "scripts": { "test": "node test/txn.test.mjs && node test/lifecycle.test.mjs && node test/view-state.test.mjs && node test/sort-context.test.mjs && node test/inspector-model.test.mjs && node test/diff-state.test.mjs && node test/diff-classify.test.mjs && node test/virtual-window.test.mjs && node test/toggle-text.test.mjs && node test/capabilities.test.mjs && node test/history-timeline.test.mjs && node test/inspector-caps.test.mjs && node test/selection.test.mjs && node test/field-schema.test.mjs && node test/hooks.test.mjs && node test/hook-rules.test.mjs && node test/health.test.mjs" },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Atlas-did/dsh-turnstile.git",

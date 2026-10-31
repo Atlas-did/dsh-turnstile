@@ -1,6 +1,6 @@
 // Host side: GET /turnstile/plugins and POST /turnstile/toggle.
 // The browser cannot write files, so every change happens here with a backup.
-import { readFileSync, writeFileSync, existsSync, copyFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, copyFileSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { makePlan, applyPlan, describePlan } from "./txn.js";
@@ -8,6 +8,7 @@ import { collectConsoleData } from "./console-data.js";
 import { readViewState, writeViewState } from "./view-state.js";
 import { toggleText } from "./toggle-text.js";
 import { DEFAULT_RULES as DEFAULT_HOOK_RULES, validateRules as validateHookRules } from "./hook-rules.js";
+import * as health from "./health.js";
 import { designerTransaction } from "./designer-ops.js";
 import { beginOperation, settleOperation, recoverJournal } from "./journal.js";
 
@@ -298,7 +299,7 @@ export function apply(ctx, config) {
 
   // Model modules are ESM files the page loads as classic scripts: strip `export`, keep the window
   // attach. One helper for all of them, so a new module is one list entry instead of a copied block.
-  const MODULES = ["capabilities.js", "selection.js", "history-timeline.js", "field-schema.js", "hooks.js", "virtual-window.js", "hook-rules.js"];
+  const MODULES = ["capabilities.js", "selection.js", "history-timeline.js", "field-schema.js", "hooks.js", "virtual-window.js", "hook-rules.js", "health.js"];
   for (const file of MODULES) {
     ctx.effect(() => ctx.webServer.register({
       kind: "exact",
@@ -393,6 +394,33 @@ export function apply(ctx, config) {
       } catch (e) { sendJson(res, e.status || 400, { error: String((e && e.message) || e).slice(0, 180) }); }
     },
   }), "turnstile: POST /turnstile/designer");
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/health",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      const items = [];
+      const home = process.env.DSH_HOME || "";
+      const credFile = join(home, ".credentials.yaml");
+      const credKeys = existsSync(credFile)
+        ? readFileSync(credFile, "utf8").split(/\r?\n/).map((l) => (/^([A-Za-z0-9._-]+)\s*:/.exec(l) || [])[1]).filter(Boolean)
+        : [];
+      items.push(health.credentialsItem({ exists: existsSync(credFile), keys: credKeys }));
+      const endpoint = join(process.env.USERPROFILE || "", ".agents-anywhere", "dsh-bridge", "endpoint.json");
+      let endpointMtime = 0;
+      try { if (existsSync(endpoint)) endpointMtime = statSync(endpoint).mtimeMs; } catch {}
+      items.push(health.bridgeItem({ exists: existsSync(endpoint), mtimeMs: endpointMtime }));
+      const prof = { name: profile, dir };
+      for (const name of ["dsh-free-search", "@ace-zone/dsh-market", "@agents-anywhere/dsh-bridge-next"]) {
+        const installed = existsSync(join(prof.dir, "node_modules", name));
+        const patchText = existsSync(join(prof.dir, "cordis.patch.yml")) ? readFileSync(join(prof.dir, "cordis.patch.yml"), "utf8") : "";
+        const disabled = new RegExp("id:\\s*" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*\\n\\s*disabled:\\s*true").test(patchText);
+        items.push(health.pluginItem({ name, installed, disabled }));
+      }
+      items.push(health.authItem({ total: null }));
+      sendJson(res, 200, { items, summary: health.summarize(items), profile: prof.name, at: new Date().toISOString() });
+    },
+  }), "turnstile: GET /turnstile/health");
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
     path: "/turnstile/hooks",

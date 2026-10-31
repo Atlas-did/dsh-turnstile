@@ -244,6 +244,15 @@ try {
     await page.locator('[data-testid="plugin-plug-beta"]').click({ modifiers: ['Control'] });
     const summary = await text('[data-testid="selection-summary"]').catch(() => '');
     ok('ctrl-click builds a multi-selection', summary.includes('已选 2 个'), summary);
+    // 全面体检: one button, every item carries a next step.
+    await click('[data-testid="nav-overview"]');
+    await page.waitForTimeout(400);
+    await click('[data-testid="health-run"]');
+    await page.waitForTimeout(1200);
+    const healthItems = await page.locator('[data-testid^="health-"]').count();
+    ok('the health scan renders items', healthItems >= 2, String(healthItems));
+    const summaryText = await text('[data-testid="health-summary"]').catch(() => '');
+    ok('the scan summarises pass/warn/fail', /通过/.test(summaryText), summaryText);
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {

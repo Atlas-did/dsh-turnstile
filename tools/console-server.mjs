@@ -21,6 +21,18 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
   return createServer(async (req, res) => {
     const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
     const json = (code, value) => { res.statusCode = code; res.setHeader('content-type', 'application/json; charset=utf-8'); res.end(JSON.stringify(value)); };
+    if (pathname === '/turnstile/health') {
+      const mod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health.js')).href);
+      const items = [];
+      const credFile = join(root, 'tests', 'console-fixture', '.credentials.yaml');
+      items.push(mod.credentialsItem({ exists: existsSync(credFile), keys: [] }));
+      items.push(mod.bridgeItem({ exists: false }));
+      items.push(mod.pluginItem({ name: 'dsh-free-search', installed: true, disabled: false }));
+      items.push(mod.authItem({ total: null }));
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ items, summary: mod.summarize(items), profile: 'console-fixture', at: new Date().toISOString() }));
+      return;
+    }
     if (pathname === '/turnstile/hooks') {
       const json = (code, value) => { res.statusCode = code; res.setHeader('content-type', 'application/json; charset=utf-8'); res.end(JSON.stringify(value)); };
       let rules = [];
