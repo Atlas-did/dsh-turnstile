@@ -298,6 +298,14 @@ try {
     ok("mouse drag moves the panel", Math.abs(after.x - before.x) > 40 || Math.abs(after.y - before.y) > 40, JSON.stringify({ before, after, handle: hb }));
     const savedPos = await page.evaluate(() => localStorage.getItem("turnstile.panelPos"));
     ok("drag position persists", Boolean(savedPos), savedPos || "none");
+    // 全屏/专注模式：点一下进全屏，再点退出（Esc 是浏览器兜底）
+    await page.locator('[data-testid="fs-mode"]').first().click({ force: true });
+    await page.waitForTimeout(400);
+    ok('fullscreen mode enters fullscreen', await page.evaluate(() => !!document.fullscreenElement));
+    await page.evaluate(() => document.exitFullscreen && document.exitFullscreen());
+    await page.waitForTimeout(300);
+    ok('fullscreen mode can exit', await page.evaluate(() => !document.fullscreenElement));
+
     ok("no uncaught browser errors", pageErrors.length === 0, pageErrors.join(" | ").slice(0, 100));
   }
 } catch (error) {

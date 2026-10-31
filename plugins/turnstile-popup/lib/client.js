@@ -285,6 +285,16 @@ window.__ModuleLoader__.load({
               h("div", { style: { fontSize: "16px", fontWeight: 650, letterSpacing: ".01em" } }, "插件闸门"),
               h("div", { style: { color: C.muted, fontSize: "11px", marginTop: "2px" } }, shortProfile() + " · 安装前检查与界面占用")),
             h("button", { type: "button", "data-testid": "inspect", title: "准星：点选页面元素，解析 slot 与条目归属", "aria-label": "准星定位", "aria-pressed": inspectMode, onClick: function () { setInspectMode(!inspectMode); setInspectRect(null); }, style: Object.assign({}, S.button, { borderColor: inspectMode ? C.amber : C.line, color: inspectMode ? C.amber : C.text }) }, inspectMode ? "点选目标" : "准星"),
+            h("button", { type: "button", "data-testid": "fs-mode", title: "全屏/专注：把页面铺满（Esc 退出）", "aria-label": "全屏", onClick: function () {
+              try {
+                if (!document.fullscreenElement) {
+                  var req = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+                  if (req && req.catch) req.catch(function () {});
+                } else if (document.exitFullscreen) {
+                  document.exitFullscreen();
+                }
+              } catch (e) {}
+            }, style: S.button }, "⛶"),
             h("button", { type: "button", "data-testid": "page-open", title: "在宿主内打开搭建好的页面", "aria-label": "页面", onClick: function () {
               var t = (location.search.match(/[?&]token=([^&]+)/) || [])[1] || "";
               var box = document.getElementById("turnstile-page-overlay");

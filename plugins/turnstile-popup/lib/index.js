@@ -640,6 +640,24 @@ export function apply(ctx, config) {
     },
   }), "turnstile: GET /turnstile/page-model.js");
 
+  // 启动器：搜索 state/launcher-index.json（由 tools/launcher.mjs index 生成）。
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/search",
+    handler: async (req, res) => {
+      const qm = /[?&]q=([^&]*)/.exec(String(req.url || ""));
+      const query = qm ? decodeURIComponent(qm[1]) : "";
+      const file = join(stateBase(), "launcher-index.json");
+      if (!existsSync(file)) return sendJson(res, 200, { query, hits: [], status: "no-index", hint: "node tools/launcher.mjs index --root <dir>" });
+      try {
+        const libDir = dirname(fileURLToPath(import.meta.url));
+        const mod = await import(pathToFileURL(join(libDir, "launcher-index.js")).href);
+        const idx = JSON.parse(readFileSync(file, "utf8"));
+        const hits = mod.searchIndex(idx.entries, query, { limit: 30 });
+        return sendJson(res, 200, { query, count: hits.length, total: idx.count, builtAt: idx.builtAt, hits });
+      } catch (e) { return sendJson(res, 500, { error: String(e.message).slice(0, 160) }); }
+    },
+  }), "turnstile: GET /turnstile/search");
   // 本地图片：搭建器要能引用仓库里的图（docs/img、state）或 DSH_TURNSTILE_ASSETS 指定的目录。
   // 只允许白名单根目录，并且解析后必须仍在其中（防 ../ 穿越）。
   ctx.effect(() => ctx.webServer.register({

@@ -37,6 +37,13 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
       ] }));
       return;
     }
+    if (pathname === '/turnstile/search') {
+      const q = (new URL(req.url, 'http://x').searchParams.get('q') || '');
+      const hits = q ? [{ path: 'C:/x/tools/launcher.mjs', name: 'launcher.mjs', score: 800 }, { path: 'C:/x/docs/launcher.md', name: 'launcher.md', score: 600 }] : [];
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ query: q, count: hits.length, total: 2, hits }));
+      return;
+    }
     if (pathname === '/turnstile/health') {
       const mod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health.js')).href);
       const items = [];

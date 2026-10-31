@@ -23,7 +23,11 @@ if (cmd === 'index') {
   const root = val('--root');
   if (!root || !existsSync(root)) { console.error('index 需要 --root <存在的目录>'); process.exit(2); }
   const max = Number(val('--max') || 20000);
+  const incremental = has('--incremental');
+  const prev = incremental && existsSync(indexPath) ? JSON.parse(readFileSync(indexPath, 'utf8')) : null;
+  const prevByPath = new Map((prev && prev.entries || []).map((e) => [e.path, e]));
   const entries = [];
+  let reused = 0;
   const started = Date.now();
   let skipped = 0;
   const walk = (dir, depth) => {
@@ -37,13 +41,18 @@ if (cmd === 'index') {
       if (d.isDirectory()) { if (depth < 12) walk(full, depth + 1); continue; }
       let st;
       try { st = statSync(full); } catch { continue; }
-      entries.push({ path: full, name: d.name, size: st.size, mtime: Math.floor(st.mtimeMs) });
+      const mtime = Math.floor(st.mtimeMs);
+      const old = prevByPath.get(full);
+      // 增量：内容和时间都没变就复用旧条目（省 CPU，也避免无意义的写）
+      if (old && old.size === st.size && old.mtime === mtime) { reused += 1; entries.push(old); continue; }
+      entries.push({ path: full, name: d.name, size: st.size, mtime });
     }
   };
   walk(root, 0);
   mkdirSync(dirname(indexPath), { recursive: true });
   writeFileSync(indexPath, JSON.stringify({ root, builtAt: new Date().toISOString(), count: entries.length, skippedDirs: skipped, entries }, null, 0));
-  console.log('索引完成 ' + entries.length + ' 条（跳过 ' + skipped + ' 个目录）· ' + (Date.now() - started) + 'ms · ' + indexPath);
+  const removed = incremental ? Math.max(0, prevByPath.size - reused - (entries.length - reused)) : 0;
+  console.log('索引完成 ' + entries.length + ' 条（跳过 ' + skipped + ' 个目录' + (incremental ? '，复用 ' + reused + '，新增/改动 ' + (entries.length - reused) : '') + '）· ' + (Date.now() - started) + 'ms');
   process.exit(0);
 }
 

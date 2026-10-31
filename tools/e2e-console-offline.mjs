@@ -277,6 +277,18 @@ try {
     ok('channels are listed with evidence', (await text('[data-testid="channel-codex"]')).includes('aa.jsonl'));
     ok('every channel states a falsifier', (await text('[data-testid="channel-codex"]')).includes('推翻条件'));
     ok('the fix actions carry a rollback point', (await text('[data-testid="diagnose-actions"]')).includes('回滚'));
+    // 启动器视图：输入即搜，结果带路径
+    await page.locator('[data-testid="nav-launcher"]').click();
+    await page.waitForTimeout(300);
+    ok('launcher view renders its input', (await page.locator('[data-testid="launcher-input"]').count()) === 1);
+    // 路由连通性：从页面里真发一次请求（UI 渲染链路仍标 unverified，见 docs/121）
+    const routeHits = await page.evaluate(async () => {
+      const r = await fetch('/turnstile/search?q=launcher');
+      const j = await r.json();
+      return (j.hits || []).length;
+    });
+    ok('launcher search route returns hits', routeHits >= 1, 'hits=' + routeHits);
+
     // B11: a failed read must not look healthy (green dot + '0/0').
     await page.route('**/api/console*', (route) => route.fulfill({ status: 500, body: 'boom' }));
     await page.route('**/turnstile/console-data*', (route) => route.fulfill({ status: 500, body: 'boom' }));
