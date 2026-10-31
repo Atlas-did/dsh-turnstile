@@ -41,7 +41,9 @@
     "test:windows-gate": "node plugins/turnstile-popup/test/windows-gate.test.mjs",
     "watch:fs": "node tools/watch-changes.mjs",
     "watch:reg": "node tools/watch-registry.mjs",
-    "test:reg": "node plugins/turnstile-popup/test/reg-diff.test.mjs"
+    "test:reg": "node plugins/turnstile-popup/test/reg-diff.test.mjs",
+    "launcher": "node tools/launcher.mjs",
+    "hotkey": "node tools/hotkey.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",

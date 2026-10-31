@@ -1,6 +1,8 @@
 param([int]$IdleSeconds = 900)
 $ErrorActionPreference = 'Continue'
-[Console]::OutputEncoding = [Text.Encoding]::UTF8
+# stdin/stdout 都按 UTF-8：否则中文窗口名会被按 GBK 解码成乱码（实测过）
+[Console]::InputEncoding = New-Object System.Text.UTF8Encoding($false)
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 # Win32 fallback for focus: UIA SetFocus can block on a busy app; SetForegroundWindow does not.
@@ -49,10 +51,11 @@ function Handle($req) {
       }
       $hwnd = [IntPtr]$target.Current.NativeWindowHandle
       if ($hwnd -eq [IntPtr]::Zero) { throw 'element has no native window handle (not a top-level window)' }
-      [void][Win32.User]::ShowWindow($hwnd, 5)
-      $ok = [Win32.User]::SetForegroundWindow($hwnd)
+      # SetForegroundWindow can block on a busy app; AppActivate is the reliable, non-blocking path.
+      $sh = New-Object -ComObject WScript.Shell
+      $ok = $sh.AppActivate([int]$target.Current.ProcessId)
       $fg = [Win32.User]::GetForegroundWindow()
-      return @{ focused = (Brief $target 0); handle = $hwnd.ToInt64(); setForeground = $ok; foregroundMatches = ($fg -eq $hwnd) }
+      return @{ focused = (Brief $target 0); handle = $hwnd.ToInt64(); activated = [bool]$ok; foregroundMatches = ($fg -eq $hwnd) }
     }
     'invoke' {
       $hits = FindByName $req.name
@@ -94,7 +97,10 @@ while ((Get-Date) -lt $deadline) {
     $data = Handle $req
     @{ id = $req.id; ok = $true; data = $data } | ConvertTo-Json -Depth 8 -Compress | Write-Output
   } catch {
-    @{ id = (try { $req.id } catch { $null }); ok = $false; error = $_.Exception.Message } | ConvertTo-Json -Depth 4 -Compress | Write-Output
+    # PowerShell 的 try 是语句，不能塞进哈希表当表达式（第一版就是这样永远不回包）
+    $reqId = $null
+    if ($req -ne $null -and $req.id -ne $null) { $reqId = $req.id }
+    @{ id = $reqId; ok = $false; error = $_.Exception.Message } | ConvertTo-Json -Depth 4 -Compress | Write-Output
   }
   [Console]::Out.Flush()
 }
