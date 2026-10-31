@@ -21,6 +21,14 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
   return createServer(async (req, res) => {
     const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
     const json = (code, value) => { res.statusCode = code; res.setHeader('content-type', 'application/json; charset=utf-8'); res.end(JSON.stringify(value)); };
+    if (pathname === '/turnstile/profiles') {
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ home: root, current: 'console-fixture', profiles: [
+        { name: 'console-fixture', dir: profileDir, bundles: 3, rows: 2, disabled: 0, installed: 3, current: true },
+        { name: 'another', dir: join(root, 'tests', 'another-fixture'), bundles: 0, rows: 0, disabled: 0, installed: 0, current: false },
+      ] }));
+      return;
+    }
     if (pathname === '/turnstile/health') {
       const mod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health.js')).href);
       const items = [];

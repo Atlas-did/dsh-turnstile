@@ -253,6 +253,15 @@ try {
     ok('the health scan renders items', healthItems >= 2, String(healthItems));
     const summaryText = await text('[data-testid="health-summary"]').catch(() => '');
     ok('the scan summarises pass/warn/fail', /通过/.test(summaryText), summaryText);
+    // 环境管家: left health, right profile table, both read-only.
+    await click('[data-testid="nav-steward"]');
+    await page.waitForTimeout(1200);
+    ok('the steward page renders a two-column grid', (await page.locator('[data-testid="steward-grid"]').count()) === 1);
+    ok('the steward lists profiles', (await page.locator('[data-testid^="profile-"]').count()) >= 2);
+    ok('the steward shows terminal next steps', (await text('[data-testid="steward-commands"]')).includes('doctor.mjs'));
+    await click('[data-testid="health-run"]');
+    await page.waitForTimeout(1000);
+    ok('the steward runs the health scan in place', (await page.locator('[data-testid="health-summary"]').count()) === 1);
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {

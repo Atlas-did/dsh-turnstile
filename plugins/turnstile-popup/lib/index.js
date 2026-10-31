@@ -1,6 +1,6 @@
 // Host side: GET /turnstile/plugins and POST /turnstile/toggle.
 // The browser cannot write files, so every change happens here with a backup.
-import { readFileSync, writeFileSync, existsSync, copyFileSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, copyFileSync, statSync, readdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { makePlan, applyPlan, describePlan } from "./txn.js";
@@ -396,6 +396,33 @@ export function apply(ctx, config) {
   }), "turnstile: POST /turnstile/designer");
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
+    path: "/turnstile/profiles",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      const home = process.env.DSH_HOME || "";
+      const root = join(home, "profiles");
+      const out = [];
+      if (existsSync(root)) {
+        for (const name of readdirSync(root)) {
+          const dir = join(root, name);
+          let bundles = 0;
+          try { bundles = (JSON.parse(readFileSync(join(dir, "package.json"), "utf8")).dsh?.profile?.bundles || []).length; } catch {}
+          let rows = 0; let disabled = 0;
+          try {
+            const patch = readFileSync(join(dir, "cordis.patch.yml"), "utf8");
+            rows = (patch.match(/^- id:/gm) || []).length;
+            disabled = (patch.match(/disabled:\s*true/g) || []).length;
+          } catch {}
+          let installed = 0;
+          try { installed = readdirSync(join(dir, "node_modules")).length; } catch {}
+          out.push({ name, dir, bundles, rows, disabled, installed, current: name === profile });
+        }
+      }
+      sendJson(res, 200, { home, profiles: out, current: profile });
+    },
+  }), "turnstile: GET /turnstile/profiles");
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
     path: "/turnstile/health",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
@@ -411,7 +438,9 @@ export function apply(ctx, config) {
       try { if (existsSync(endpoint)) endpointMtime = statSync(endpoint).mtimeMs; } catch {}
       items.push(health.bridgeItem({ exists: existsSync(endpoint), mtimeMs: endpointMtime }));
       const prof = { name: profile, dir };
-      for (const name of ["dsh-free-search", "@ace-zone/dsh-market", "@agents-anywhere/dsh-bridge-next"]) {
+      // Either market package counts: the tutorial names one, a machine may already carry another.
+      for (const entry of [["dshmarket", "@ace-zone/dsh-market"], ["dsh-free-search"], ["@agents-anywhere/dsh-bridge-next"]]) {
+        const name = entry.find((n) => existsSync(join(prof.dir, "node_modules", n))) || entry[0];
         const installed = existsSync(join(prof.dir, "node_modules", name));
         const patchText = existsSync(join(prof.dir, "cordis.patch.yml")) ? readFileSync(join(prof.dir, "cordis.patch.yml"), "utf8") : "";
         const disabled = new RegExp("id:\\s*" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*\\n\\s*disabled:\\s*true").test(patchText);
