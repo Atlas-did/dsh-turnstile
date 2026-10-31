@@ -83,3 +83,18 @@ logs/aa        10 文件  9,225 条（seq 唯一）
 logs/control    1 文件  1,014 条（0 ERROR，健康对照）
 logs/plugin     2 文件     80 条（PARSE_ERROR 32 / ERR_STREAM_WRITE_AFTER_END 6）
 ```
+## 七、计数契约（S2 必须按此实现，2026-10-31 实测）
+
+| 通道 | 失败信号 | 条数 | 明细 |
+|---|---|---|---|
+| codex | `unknown-variant` | **236** | 全部 ERROR |
+| dsh | `sync-failed` | **92** | 46 条 `sync.failed` + 46 条 `bridge.sync_failed` |
+| ingest | `ingest-failed` + `sync-interrupted` | **173** | ingest-failed 124（含 ingest request failed 112 = 72w/40e、ingestSnapshot 8e、auth 8 = 4w/4e，去重 4）+ sync-interrupted 49（全 warning） |
+| plugin-bridge | `parse-error` | **32** | 全部 ERROR（2.0.2 时代） |
+
+**易错点（都被我踩过）**：
+
+1. `dsh-bridge` 的 ERROR 总计 93 条，但其中 1 条是 `session.visibility_read.failed`，**不是同步失败** → 判 92。
+2. `ingest request failed` 有 72 条 WARNING、40 条 ERROR —— **按 level 筛会漏掉 72 条**。
+3. `sync interrupted` 与 `resubscribing` 是同一批 49 条记录的两种措辞，别重复计数。
+4. `aa` 与 `control` 必须分开扫；同扫会得到 10,239（重复 1,014）。
