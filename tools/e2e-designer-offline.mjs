@@ -120,6 +120,19 @@ try {
   const injected = await page.request.post(base + '/turnstile/designer', { data: { dryRun: true, operations: [{ type: 'toggle', package: 'plug-alpha', row: 'attacker-row', disable: true }] } });
   const injectedBody = await injected.json();
   ok('server ignores browser-supplied row ids', injectedBody.operations?.[0]?.row === 'alpha-row');
+  // Batch slice: a multi-selection in the table becomes several queue entries behind one preview.
+  await click('[data-testid="nav-plugins"]');
+  await page.waitForTimeout(300);
+  await page.locator('[data-testid="plugin-plug-alpha"]').click();
+  await page.locator('[data-testid="plugin-plug-beta"]').click({ modifiers: ['Control'] });
+  await click('[data-testid="nav-designer"]');
+  await page.waitForTimeout(300);
+  await click('[data-testid="palette-Common"]');
+  const before = await page.locator('[data-testid^="command-delete-"]').count();
+  await click('[data-testid="designer-batch-disable"]');
+  await page.waitForTimeout(250);
+  const after = await page.locator('[data-testid^="command-delete-"]').count();
+  ok('batch adds one queue entry per selected plugin', after >= before + 2, before + '->' + after);
   ok('no uncaught designer browser errors', errors.length === 0, errors.join(' | ').slice(0, 200));
 } catch (error) {
   ok('designer e2e completed without throwing', false, String(error?.stack || error).slice(0, 500));

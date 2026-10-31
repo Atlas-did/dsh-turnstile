@@ -147,6 +147,23 @@
     state.notice = skipped.length ? '已跳过无配置行的插件：' + skipped.join(', ') : '已为共享面生成四角分散方案。';
     mutate(() => eligible.forEach((item, i) => ds.operations.push({ type: 'anchor', package: item.name, anchor: anchors[i % anchors.length] })));
   }
+  // Batch slice: the table's multi-selection becomes queue entries, so one preview covers all of them.
+  // Row-less plugins are reported, never silently dropped.
+  function applyBatchToQueue(disable) {
+    const S = window.TurnstileSelection;
+    const picked = (state.picked || { ids: [] }).ids;
+    if (!S || !picked.length) { ds.error = '先在插件清单里多选若干插件（Ctrl / Shift）。'; render(); return; }
+    const rows = state.data.plugins.filter((x) => picked.indexOf(x.name) !== -1);
+    const batch = S.batchToggle(rows, disable);
+    if (!batch.ops.length) { ds.error = '所选插件都没有可写配置行。'; render(); return; }
+    const room = 100 - ds.operations.length;
+    if (room <= 0) { ds.error = '一次最多生成 100 条命令。'; render(); return; }
+    mutate(() => batch.ops.slice(0, room).forEach((op) => ds.operations.push(op)));
+    const parts = ['已加入 ' + Math.min(batch.ops.length, room) + ' 条批量命令'];
+    if (batch.ops.length > room) parts.push('队列已满，' + (batch.ops.length - room) + ' 条未加入');
+    if (batch.skipped.length) parts.push('跳过 ' + batch.skipped.length + ' 个：' + batch.skipped.map((s) => s.name).join(', '));
+    state.notice = parts.join('；');
+  }
   function paletteButton(label, fn, id) { return btn(label, fn, id, 'btn'); }
   function renderPalette() {
     const box = node('div', { class: 'designer-palette' });
@@ -156,6 +173,8 @@
       box.append(paletteButton(eff.disabled ? '启用插件' : '停用插件', () => addOperation({ type: 'toggle', disable: !eff.disabled }), 'designer-add-toggle'));
       box.append(paletteButton('写入位置', () => addAnchor(ds.anchorDraft || eff.anchor), 'designer-add-anchor'));
       box.append(paletteButton('清除位置', () => addAnchor(''), 'designer-clear-anchor'));
+      box.append(paletteButton('批量停用已选', () => applyBatchToQueue(true), 'designer-batch-disable'));
+      box.append(paletteButton('批量启用已选', () => applyBatchToQueue(false), 'designer-batch-enable'));
     } else if (ds.palette === 'Layout') {
       ['top-left', 'top-right', 'bottom-left', 'bottom-right'].forEach((anchor) => box.append(paletteButton(anchor, () => addAnchor(anchor), 'align-' + anchor)));
       box.append(paletteButton('共享面四角分散', spreadSurface, 'align-spread'));
