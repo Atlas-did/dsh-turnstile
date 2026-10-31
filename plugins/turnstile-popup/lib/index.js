@@ -1,6 +1,6 @@
 // Host side: GET /turnstile/plugins and POST /turnstile/toggle.
 // The browser cannot write files, so every change happens here with a backup.
-import { readFileSync, writeFileSync, existsSync, copyFileSync, statSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, copyFileSync, statSync, readdirSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
@@ -611,6 +611,58 @@ export function apply(ctx, config) {
     },
   }), "turnstile: GET /turnstile/occupancy");
 
+  // 页面搭建器：/turnstile/builder 是画布 UI，page-model.js 是它的数据层，page JSON 存在 state 里。
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/builder",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      const file = join(dirname(fileURLToPath(import.meta.url)), "builder.html");
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+      res.end(readFileSync(file, "utf8"));
+    },
+  }), "turnstile: GET /turnstile/builder");
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/page-model.js",
+    handler: async (req, res) => {
+      const file = join(dirname(fileURLToPath(import.meta.url)), "page-model.js");
+      // 浏览器按经典脚本加载（没有 import/export），所以这里剥掉 export 关键字；
+      // 文件本身仍是 ESM，node 侧测试可以直接 import（同其它 lib 模块的处理方式）。
+      const src = readFileSync(file, "utf8").replace(/^export\s+(?=(function|const|let|class))/gm, "");
+      res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
+      res.end(src);
+    },
+  }), "turnstile: GET /turnstile/page-model.js");
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/page",
+    handler: async (req, res) => {
+      const file = join(stateBase(), "page-" + profile + ".json");
+      if (req.method === "GET") {
+        if (!existsSync(file)) return sendJson(res, 200, { status: "not-generated", file });
+        try { return sendJson(res, 200, JSON.parse(readFileSync(file, "utf8"))); }
+        catch (e) { return sendJson(res, 500, { error: "读不出页面文件：" + String(e.message).slice(0, 120) }); }
+      }
+      if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
+      // 写前先校验：没有 schema 标记或根节点不是对象，一律拒绝（B8 的纪律）。
+      let body = "";
+      await new Promise((resolve) => { req.on("data", (c) => { body += c; if (body.length > 2e6) req.destroy(); }); req.on("end", resolve); });
+      let parsed;
+      try { parsed = JSON.parse(body); } catch { return sendJson(res, 400, { error: "body 不是 JSON" }); }
+      if (!parsed || !parsed.page || typeof parsed.page !== "object" || !parsed.page.schema || !parsed.page.root) {
+        return sendJson(res, 400, { error: "页面缺少 schema 或 root" });
+      }
+      try {
+        mkdirSync(dirname(file), { recursive: true });
+        if (existsSync(file)) copyFileSync(file, file + ".bak-" + Date.now());
+        writeFileSync(file, JSON.stringify(parsed.page, null, 2) + "\n");
+        return sendJson(res, 200, { ok: true, file });
+      } catch (e) { return sendJson(res, 500, { error: String(e.message).slice(0, 160) }); }
+    },
+  }), "turnstile: GET/POST /turnstile/page");
   // B11: there used to be two shells (/turnstile/ = a 6 KB light summary, /turnstile/console = the
   // real 44 KB console). Two shells showing the same data differently is how "same data, two verdicts"
   // happens; keep one, and redirect the old address so existing links still work.

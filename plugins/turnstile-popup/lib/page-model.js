@@ -1,0 +1,220 @@
+'use strict';
+// 页面搭建器的数据层：组件注册表 + 命令 + 快照。
+//
+// 抄的是三个项目的「机制」，不是代码：
+//   Designable  —— 组件自己声明能力（能不能拖、能不能装子节点、能不能改大小），引擎只读声明不猜；
+//   wxFormBuilder —— 命令模式（每步可逆）+ 保留快照（能跳回某个时刻）；
+//   LowCodeEngine/Formily —— 属性面板由 propsSchema 生成（类型/默认值/枚举）。
+//
+// 纯数据：不碰 DOM、不碰网络，方便直接在 node 里测。
+
+export const PAGE_SCHEMA = 'mini/page@1';
+
+/** 组件注册表：每种组件的默认属性、可放子节点、可改大小的声明。 */
+export const COMPONENTS = Object.freeze({
+  heading: {
+    label: '标题',
+    capabilities: { draggable: true, droppable: false, acceptsChildren: false },
+    defaults: { text: '未命名标题', level: 2 },
+    propsSchema: {
+      text: { type: 'string', label: '文字', default: '未命名标题' },
+      level: { type: 'enum', label: '级别', default: 2, options: [1, 2, 3] },
+    },
+  },
+  text: {
+    label: '文本',
+    capabilities: { draggable: true, droppable: false, acceptsChildren: false },
+    defaults: { text: '一段说明' },
+    propsSchema: { text: { type: 'string', label: '文字', default: '一段说明', multiline: true } },
+  },
+  panel: {
+    label: '面板',
+    capabilities: { draggable: true, droppable: true, acceptsChildren: true },
+    defaults: { title: '面板', padding: 12 },
+    propsSchema: {
+      title: { type: 'string', label: '标题', default: '面板' },
+      padding: { type: 'number', label: '内边距', default: 12, min: 0, max: 48 },
+    },
+  },
+  stack: {
+    label: '堆叠（Sizer）',
+    capabilities: { draggable: true, droppable: true, acceptsChildren: true },
+    defaults: { direction: 'column', gap: 8 },
+    propsSchema: {
+      direction: { type: 'enum', label: '方向', default: 'column', options: ['row', 'column'] },
+      gap: { type: 'number', label: '间距', default: 8, min: 0, max: 40 },
+    },
+  },
+  grid: {
+    label: '网格（Sizer）',
+    capabilities: { draggable: true, droppable: true, acceptsChildren: true },
+    defaults: { columns: 2, gap: 10 },
+    propsSchema: {
+      columns: { type: 'number', label: '列数', default: 2, min: 1, max: 6 },
+      gap: { type: 'number', label: '间距', default: 10, min: 0, max: 40 },
+    },
+  },
+  stat: {
+    label: '指标卡',
+    capabilities: { draggable: true, droppable: false, acceptsChildren: false },
+    defaults: { value: '0', label: '指标', tone: 'neutral' },
+    propsSchema: {
+      label: { type: 'string', label: '名称', default: '指标' },
+      value: { type: 'string', label: '数值', default: '0' },
+      tone: { type: 'enum', label: '色调', default: 'neutral', options: ['neutral', 'good', 'warn', 'bad'] },
+    },
+  },
+});
+
+let seq = 0;
+export function resetIds() { seq = 0; }
+export function nextId(type) { seq += 1; return type + '-' + seq; }
+
+export function newNode(type, props = {}) {
+  const spec = COMPONENTS[type];
+  if (!spec) throw new Error('unknown component: ' + type);
+  return { id: nextId(type), type, props: { ...spec.defaults, ...props }, children: [] };
+}
+
+export function newPage() {
+  const root = newNode('stack', { direction: 'column', gap: 10 });
+  return { schema: PAGE_SCHEMA, root, meta: { createdAt: new Date().toISOString() } };
+}
+
+export function findNode(node, id) {
+  if (!node) return null;
+  if (node.id === id) return node;
+  for (const c of node.children || []) { const hit = findNode(c, id); if (hit) return hit; }
+  return null;
+}
+
+export function findParent(node, id, parent = null) {
+  if (!node) return null;
+  if (node.id === id) return parent;
+  for (const c of node.children || []) { const hit = findParent(c, id, node); if (hit) return hit; }
+  return null;
+}
+
+export function capabilitiesOf(type) {
+  const spec = COMPONENTS[type];
+  return spec ? spec.capabilities : { draggable: false, droppable: false, acceptsChildren: false };
+}
+/** 命令层：每个命令都返回新的 page（不可变），失败时抛错并说明原因。 */
+export function applyCommand(page, cmd) {
+  const next = JSON.parse(JSON.stringify(page));
+  switch (cmd.type) {
+    case 'add': {
+      const parent = findNode(next.root, cmd.parentId) || next.root;
+      const caps = capabilitiesOf(parent.type);
+      if (!caps.acceptsChildren) throw new Error(parent.type + ' 不接受子节点');
+      const node = newNode(cmd.component, cmd.props || {});
+      const at = Number.isInteger(cmd.index) ? Math.max(0, Math.min(cmd.index, parent.children.length)) : parent.children.length;
+      parent.children.splice(at, 0, node);
+      return { page: next, focus: node.id };
+    }
+    case 'move': {
+      const node = findNode(next.root, cmd.nodeId);
+      if (!node) throw new Error('找不到节点 ' + cmd.nodeId);
+      if (cmd.nodeId === next.root.id) throw new Error('根节点不能移动');
+      if (!capabilitiesOf(node.type).draggable) throw new Error(node.type + ' 声明为不可拖拽');
+      const from = findParent(next.root, cmd.nodeId);
+      const to = findNode(next.root, cmd.parentId);
+      if (!from || !to) throw new Error('移动目标不存在');
+      if (!capabilitiesOf(to.type).acceptsChildren) throw new Error(to.type + ' 不接受子节点');
+      if (findNode(node, to.id)) throw new Error('不能把节点移到它自己的子树里');
+      from.children = from.children.filter((c) => c.id !== node.id);
+      const at = Number.isInteger(cmd.index) ? Math.max(0, Math.min(cmd.index, to.children.length)) : to.children.length;
+      to.children.splice(at, 0, node);
+      return { page: next, focus: node.id };
+    }
+    case 'remove': {
+      if (cmd.nodeId === next.root.id) throw new Error('根节点不能删除');
+      const parent = findParent(next.root, cmd.nodeId);
+      if (!parent) throw new Error('找不到节点 ' + cmd.nodeId);
+      parent.children = parent.children.filter((c) => c.id !== cmd.nodeId);
+      return { page: next, focus: parent.id };
+    }
+    case 'setProp': {
+      const node = findNode(next.root, cmd.nodeId);
+      if (!node) throw new Error('找不到节点 ' + cmd.nodeId);
+      const spec = (COMPONENTS[node.type].propsSchema || {})[cmd.key];
+      if (!spec) throw new Error(node.type + ' 没有属性 ' + cmd.key);
+      node.props[cmd.key] = coerce(spec, cmd.value);
+      return { page: next, focus: node.id };
+    }
+    default:
+      throw new Error('未知命令 ' + cmd.type);
+  }
+}
+
+/** 按声明把输入强制成正确类型；不合法就抛错（面板会显示原因）。 */
+export function coerce(spec, value) {
+  if (spec.type === 'number') {
+    const n = Number(value);
+    if (Number.isNaN(n)) throw new Error('需要数字');
+    if (spec.min !== undefined && n < spec.min) throw new Error('不能小于 ' + spec.min);
+    if (spec.max !== undefined && n > spec.max) throw new Error('不能大于 ' + spec.max);
+    return n;
+  }
+  if (spec.type === 'enum') {
+    const hit = (spec.options || []).find((o) => String(o) === String(value));
+    if (hit === undefined) throw new Error('可选值只有 ' + (spec.options || []).join(' / '));
+    return hit;
+  }
+  return String(value);
+}
+
+/**
+ * 命令栈：past / future + 快照。
+ * 与普通 undo 的区别：每次提交留一份快照（label + 时间 + 页面深拷贝），可以**跳到任意时刻**，
+ * 不只是退一步。这是 wxFormBuilder「命令栈」+ Designable「历史」的合体。
+ */
+export function createStack(page, snapshotLimit = 40) {
+  return {
+    current: page,
+    past: [],
+    future: [],
+    snapshots: [{ label: '初始', at: new Date().toISOString(), page: JSON.parse(JSON.stringify(page)) }],
+    snapshotLimit,
+  };
+}
+
+export function run(stack, cmd) {
+  const { page, focus } = applyCommand(stack.current, cmd);
+  const past = stack.past.concat([{ cmd, page: stack.current }]);
+  const snapshot = { label: labelOf(cmd), at: new Date().toISOString(), page: JSON.parse(JSON.stringify(page)) };
+  const snapshots = stack.snapshots.concat([snapshot]).slice(-stack.snapshotLimit);
+  return { ...stack, current: page, past, future: [], snapshots, focus };
+}
+
+export function undo(stack) {
+  if (!stack.past.length) return stack;
+  const last = stack.past[stack.past.length - 1];
+  return { ...stack, current: last.page, past: stack.past.slice(0, -1), future: [stack.current].concat(stack.future) };
+}
+
+export function redo(stack) {
+  if (!stack.future.length) return stack;
+  const next = stack.future[0];
+  return { ...stack, current: next, past: stack.past.concat([{ cmd: null, page: stack.current }]), future: stack.future.slice(1) };
+}
+
+/** 跳到某个快照：后续仍可撤销（不丢历史）。 */
+export function jumpTo(stack, index) {
+  const snap = stack.snapshots[index];
+  if (!snap) return stack;
+  return { ...stack, current: JSON.parse(JSON.stringify(snap.page)), past: stack.past.concat([{ cmd: { type: 'jump', index }, page: stack.current }]), future: [] };
+}
+
+export function labelOf(cmd) {
+  if (!cmd) return '未知';
+  if (cmd.type === 'add') return '添加 ' + cmd.component;
+  if (cmd.type === 'move') return '移动节点';
+  if (cmd.type === 'remove') return '删除节点';
+  if (cmd.type === 'setProp') return '改 ' + cmd.key;
+  return cmd.type;
+}
+
+if (typeof window !== 'undefined') {
+  window.TurnstilePageModel = { PAGE_SCHEMA, COMPONENTS, newPage, newNode, findNode, findParent, capabilitiesOf, applyCommand, coerce, createStack, run, undo, redo, jumpTo, labelOf };
+}

@@ -1,0 +1,200 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>Turnstile 页面搭建器</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:13px/1.5 ui-sans-serif,system-ui,"Microsoft YaHei";background:#0d141c;color:#dce3ea;height:100vh;display:grid;grid-template-rows:46px 1fr 26px}
+.top{display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid #22303d;background:#111a23}
+.top b{font-size:14px;margin-right:8px}.top .sp{flex:1}
+button{font:inherit;padding:4px 10px;border:1px solid #2b3a49;border-radius:6px;background:#16212b;color:#dce3ea;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+.body{display:grid;grid-template-columns:190px 1fr 260px;min-height:0}
+.palette,.inspector{border-right:1px solid #22303d;padding:10px;overflow:auto;background:#0f1720}
+.inspector{border-right:0;border-left:1px solid #22303d}
+.palette h4,.inspector h4{margin:0 0 8px;font-size:12px;color:#8fa3b5;letter-spacing:.04em}
+.block{padding:7px 9px;margin-bottom:6px;border:1px solid #2b3a49;border-radius:6px;background:#16212b;cursor:grab}
+.block small{display:block;color:#7d8fa1;font-size:11px}
+.canvas{padding:14px;overflow:auto}
+.node{border:1px dashed #2f4254;border-radius:8px;padding:8px;margin:6px 0;position:relative}
+.node.sel{border-color:#5aa9ff;box-shadow:0 0 0 1px #5aa9ff55}
+.node.drop{border-color:#f5a623;background:#f5a62312}
+.node .tag{position:absolute;top:-9px;left:8px;font-size:10px;background:#0d141c;color:#7d8fa1;padding:0 4px}
+.stack-row{display:flex;gap:8px;flex-wrap:wrap}.stack-column{display:flex;flex-direction:column}
+.grid{display:grid}.heading{font-size:18px;font-weight:700}.text{color:#b9c7d4}
+.stat{background:#16212b;border:1px solid #2b3a49;border-radius:8px;padding:10px 12px}
+.stat b{display:block;font-size:20px}.stat.good b{color:#4ec97c}.stat.warn b{color:#e8b53d}.stat.bad b{color:#e86161}
+.field{margin-bottom:9px}.field label{display:block;font-size:11px;color:#8fa3b5;margin-bottom:3px}
+.field input,.field select,.field textarea{width:100%;padding:5px 7px;border:1px solid #2b3a49;border-radius:5px;background:#0d141c;color:#dce3ea;font:inherit}
+.err{color:#e86161;font-size:11px;margin-top:3px}
+.bar{border-top:1px solid #22303d;display:flex;align-items:center;gap:12px;padding:0 14px;font-size:11px;color:#8fa3b5}
+.snaps{max-height:180px;overflow:auto}.snaps button{display:block;width:100%;text-align:left;margin-bottom:4px;font-size:11px}
+</style></head><body>
+<div class="top">
+  <b>页面搭建器</b><span style="color:#7d8fa1;font-size:11px">mini · 拖进来 · 改属性 · 可撤销 · 可跳快照</span><span class="sp"></span>
+  <button id="undo" data-testid="undo">↶ 撤销</button><button id="redo" data-testid="redo">↷ 重做</button>
+  <button id="save" data-testid="save">保存</button>
+</div>
+<div class="body">
+  <div class="palette"><h4>组件（拖到画布）</h4><div id="palette" data-testid="palette"></div>
+    <h4 style="margin-top:14px">快照</h4><div class="snaps" id="snaps" data-testid="snaps"></div></div>
+  <div class="canvas"><div id="canvas" data-testid="canvas"></div></div>
+  <div class="inspector"><h4>属性</h4><div id="inspector" data-testid="inspector"><p style="color:#7d8fa1">选中一个节点</p></div></div>
+</div>
+<div class="bar"><span id="status" data-testid="status">就绪</span><span class="sp"></span><span id="snapinfo"></span></div>
+<script src="/turnstile/page-model.js"></script>
+<script>
+'use strict';
+const M = window.TurnstilePageModel;
+const token = new URLSearchParams(location.search).get('token') || '';
+const api = (p, init) => fetch(p + (p.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token), init);
+let stack = M.createStack(M.newPage());
+let selectedId = stack.current.root.id;
+let dragPayload = null;
+let pendingType = null;
+
+function addToSelected() {
+  if (!pendingType) return;
+  try { stack = M.run(stack, { type: 'add', parentId: selectedId, component: pendingType }); selectedId = stack.focus; status('已添加 ' + pendingType); pendingType = null; render(); }
+  catch (e) { status(e.message); }
+}
+
+function status(text) { document.getElementById('status').textContent = text; }
+
+function renderPalette() {
+  const box = document.getElementById('palette');
+  box.replaceChildren();
+  for (const [type, spec] of Object.entries(M.COMPONENTS)) {
+    const el = document.createElement('div');
+    el.className = 'block'; el.draggable = spec.capabilities.draggable;
+    el.dataset.testid = 'palette-' + type; el.dataset.type = type;
+    el.innerHTML = '<b>' + spec.label + '</b><small>' + type + (spec.capabilities.acceptsChildren ? ' · 可放子节点' : ' · 叶子') + '</small>';
+    el.addEventListener('dragstart', (e) => { dragPayload = { kind: 'new', type }; e.dataTransfer.setData('text/plain', type); });
+    // 点击两下也能加：点组件 → 点目标容器。拖动不是所有人的习惯（也方便键盘/触屏）。
+    el.addEventListener('click', () => { pendingType = type; status('已选中组件 ' + type + '，点一个容器放进去'); });
+    el.addEventListener('dblclick', () => { pendingType = type; addToSelected(); });
+    box.append(el);
+  }
+}
+
+function renderNode(node) {
+  const wrap = document.createElement('div');
+  wrap.className = 'node' + (node.id === selectedId ? ' sel' : '');
+  wrap.dataset.testid = 'node-' + node.id;
+  wrap.dataset.nodeId = node.id;
+  const tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = node.type;
+  wrap.append(tag);
+  const caps = M.capabilitiesOf(node.type);
+  if (caps.draggable) { wrap.draggable = true; wrap.addEventListener('dragstart', (e) => { dragPayload = { kind: 'move', id: node.id }; e.dataTransfer.setData('text/plain', node.id); }); }
+  if (caps.acceptsChildren) {
+    wrap.addEventListener('dragover', (e) => { e.preventDefault(); wrap.classList.add('drop'); });
+    wrap.addEventListener('dragleave', () => wrap.classList.remove('drop'));
+    wrap.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); wrap.classList.remove('drop'); dropInto(node.id); });
+  }
+  wrap.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (pendingType) {
+      // 点击放置：优先放进被点的容器，容器不接受就退回它的父级
+      const target = (M.capabilitiesOf(node.type).acceptsChildren) ? node.id : (M.findParent(stack.current.root, node.id) || stack.current.root).id;
+      try { stack = M.run(stack, { type: 'add', parentId: target, component: pendingType }); selectedId = stack.focus; status('已添加 ' + pendingType); pendingType = null; render(); return; }
+      catch (err) { status(err.message); }
+    }
+    selectedId = node.id; render();
+  });
+  wrap.append(renderBody(node));
+  if (caps.acceptsChildren) { const kids = document.createElement('div'); kids.className = node.type === 'grid' ? 'grid' : (node.props.direction === 'row' ? 'stack-row' : 'stack-column'); if (node.type === 'grid') kids.style.gridTemplateColumns = 'repeat(' + node.props.columns + ', minmax(0,1fr))'; kids.style.gap = (node.props.gap || 0) + 'px'; for (const c of node.children) kids.append(renderNode(c)); wrap.append(kids); }
+  return wrap;
+}function renderBody(node) {
+  const p = node.props || {};
+  const el = document.createElement('div');
+  if (node.type === 'heading') { el.className = 'heading'; el.textContent = p.text; el.dataset.testid = 'view-heading'; }
+  else if (node.type === 'text') { el.className = 'text'; el.textContent = p.text; el.dataset.testid = 'view-text'; }
+  else if (node.type === 'panel') { el.style.padding = (p.padding || 0) + 'px'; el.innerHTML = '<b>' + (p.title || '') + '</b>'; }
+  else if (node.type === 'stat') { el.className = 'stat ' + (p.tone || 'neutral'); el.dataset.testid = 'view-stat'; el.innerHTML = '<b>' + (p.value || '') + '</b><small>' + (p.label || '') + '</small>'; }
+  return el;
+}
+
+function renderInspector() {
+  const box = document.getElementById('inspector');
+  const node = M.findNode(stack.current.root, selectedId);
+  if (!node) { box.replaceChildren(Object.assign(document.createElement('p'), { textContent: '选中一个节点', style: 'color:#7d8fa1' })); return; }
+  const spec = M.COMPONENTS[node.type];
+  const head = document.createElement('p'); head.style.color = '#8fa3b5'; head.textContent = spec.label + ' · ' + node.id;
+  const box2 = document.createElement('div');
+  for (const [key, field] of Object.entries(spec.propsSchema || {})) {
+    const wrap = document.createElement('div'); wrap.className = 'field';
+    const label = document.createElement('label'); label.textContent = field.label + '（' + field.type + (field.default !== undefined ? ' · 默认 ' + field.default : '') + '）';
+    let input;
+    if (field.type === 'enum') {
+      input = document.createElement('select');
+      for (const o of field.options || []) { const op = document.createElement('option'); op.value = o; op.textContent = String(o); if (String(node.props[key]) === String(o)) op.selected = true; input.append(op); }
+    } else if (field.type === 'number') {
+      input = document.createElement('input'); input.type = 'number'; input.value = node.props[key]; if (field.min !== undefined) input.min = field.min; if (field.max !== undefined) input.max = field.max;
+    } else {
+      input = document.createElement('input'); input.type = 'text'; input.value = node.props[key] == null ? '' : node.props[key];
+    }
+    input.dataset.testid = 'prop-' + key;
+    input.addEventListener('change', () => {
+      try { stack = M.run(stack, { type: 'setProp', nodeId: node.id, key, value: input.value }); status('已修改 ' + key); render(); }
+      catch (e) { const err = document.createElement('div'); err.className = 'err'; err.dataset.testid = 'prop-error'; err.textContent = e.message; wrap.append(err); }
+    });
+    wrap.append(label, input); box2.append(wrap);
+  }
+  const del = document.createElement('button'); del.textContent = '删除节点'; del.dataset.testid = 'remove-node';
+  del.disabled = node.id === stack.current.root.id;
+  del.addEventListener('click', () => { try { stack = M.run(stack, { type: 'remove', nodeId: node.id }); selectedId = stack.current.root.id; render(); } catch (e) { status(e.message); } });
+  box2.append(del);
+  box.replaceChildren(head, box2);
+}
+
+function renderSnaps() {
+  const box = document.getElementById('snaps');
+  box.replaceChildren();
+  stack.snapshots.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.dataset.testid = 'snap-' + i;
+    b.textContent = (i + 1) + '. ' + s.label + ' · ' + s.at.slice(11, 19);
+    b.addEventListener('click', () => { stack = M.jumpTo(stack, i); status('跳到快照 ' + (i + 1)); render(); });
+    box.append(b);
+  });
+  document.getElementById('snapinfo').textContent = stack.snapshots.length + ' 个快照 · ' + stack.past.length + ' 步可撤销';
+}
+
+function dropInto(parentId) {
+  const target = M.findNode(stack.current.root, parentId);
+  if (!target) { status('落点不存在'); return; }
+  if (!M.capabilitiesOf(target.type).acceptsChildren) { status(target.type + ' 不接受子节点'); return; }
+  try {
+    if (dragPayload && dragPayload.kind === 'new') {
+      stack = M.run(stack, { type: 'add', parentId, component: dragPayload.type });
+      selectedId = stack.focus; status('已添加 ' + dragPayload.type);
+    } else if (dragPayload && dragPayload.kind === 'move') {
+      if (dragPayload.id === parentId) { status('不能移动到自身'); return; }
+      stack = M.run(stack, { type: 'move', nodeId: dragPayload.id, parentId });
+      selectedId = dragPayload.id; status('已移动');
+    }
+    render();
+  } catch (e) { status(e.message); }
+}
+
+async function save() {
+  status('保存中…');
+  try {
+    const r = await api('/turnstile/page', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ page: stack.current }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    status('已保存 ' + new Date().toLocaleTimeString());
+  } catch (e) { status('保存失败：' + e.message); }
+}
+
+function render() {
+  const canvas = document.getElementById('canvas');
+  canvas.replaceChildren(renderNode(stack.current.root));
+  document.getElementById('undo').disabled = stack.past.length === 0;
+  document.getElementById('redo').disabled = stack.future.length === 0;
+  renderInspector(); renderSnaps();
+}
+
+document.getElementById('undo').addEventListener('click', () => { stack = M.undo(stack); status('已撤销'); render(); });
+document.getElementById('redo').addEventListener('click', () => { stack = M.redo(stack); status('已重做'); render(); });
+document.getElementById('save').addEventListener('click', save);
+
+renderPalette(); render();
+status('拖一个组件到画布开始');
+</script></body></html>
