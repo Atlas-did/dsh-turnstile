@@ -1,6 +1,6 @@
 // Self-test for the gate itself: every scanner must still catch its fixture.
 // usage: node tools/selftest.mjs
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,13 +9,26 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const MINI = join(root, 'home/profiles/mini');
 const DESK = (process.env.DSH_HOME || '') + '/profiles/desktop';
 
+// B2: `bash -lc` does not exist on Windows, so every shell-backed case failed there while the
+// tool itself was fine. Pick the platform's own shell; on Windows use cmd /c (no bash needed).
+const SHELL = process.platform === 'win32'
+  ? { cmd: 'cmd.exe', args: ['/d', '/s', '/c'] }
+  : { cmd: 'bash', args: ['-lc'] };
+
 function runCmd(shellCommand) {
   try {
-    const out = execFileSync('bash', ['-lc', shellCommand], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
+    const out = execFileSync(SHELL.cmd, [...SHELL.args, shellCommand], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 });
     return { code: 0, out: String(out) };
   } catch (e) {
     return { code: e.status ?? 1, out: String((e.stdout || '') + (e.stderr || '')) };
   }
+}
+
+// B2: feeding stdin through a shell pipeline (`printf ... | node ...`) is Unix-only. spawnSync
+// gives the same behaviour on every platform without a shell in between.
+function runNodeWithInput(script, args, input) {
+  const r = spawnSync(process.execPath, [script, ...args], { cwd: root, input, encoding: 'utf8', timeout: 120000 });
+  return { code: r.status === null ? 1 : r.status, out: String((r.stdout || '') + (r.stderr || '')) };
 }
 
 function run(script, ...args) {
@@ -42,7 +55,7 @@ check('risk ignores commented imports', r.code === 0 && /GREEN/.test(r.out) && /
 // scan. The probe must see it, and --strict must fail on that gap.
 // A known service assigned only in a comment or a string must not be reported.
 // menu mode: toggling then quitting must not touch the file.
-r = runCmd('printf "t 1\\nq\\n" | node tools/manage.mjs "' + join(root, 'tests/manage-fixture') + '" --menu');
+r = runNodeWithInput(join(root, 'tools/manage.mjs'), [join(root, 'tests/manage-fixture'), '--menu'], 't 1\nq\n');
 check('manage menu toggles without writing', /\[ \]/.test(r.out) && !/已写入/.test(r.out), 'exit=' + r.code);
 
 r = run('tools/conflict.mjs', join(root, 'tests/conflict-fixture'));

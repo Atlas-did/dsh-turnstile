@@ -1,7 +1,13 @@
 // A profile-owned hook rule must change the designer's behaviour, not just sit in a file.
 import { createConsoleServer } from './console-server.mjs';
 import { copyTreeSafe } from './safe-copy.mjs';
-import { chromium } from 'playwright-core';
+// B2: playwright-core is an optional dependency - a static import made this file die with
+// exit 1 before its own 'no browser' branch (exit 3) could run.
+let chromium;
+try { ({ chromium } = await import('playwright-core')); } catch {
+  console.error('needs playwright-core (npm i -D playwright-core) and a system Edge');
+  process.exit(3);
+}
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';

@@ -6,9 +6,10 @@ import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { importsOf } from './scan.mjs';
 import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
+import { requireProfile } from './config.mjs';
 silenceWhenJson();
 
-const dir = process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop';
+const dir = requireProfile(process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop', 'node tools/risk.mjs <profileDir>');
 const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
 const deps = Object.keys(pkg.dependencies || {});
 const nm = join(dir, 'node_modules');

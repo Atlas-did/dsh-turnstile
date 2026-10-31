@@ -21,6 +21,17 @@ export function resolveDshBin() {
 export const DSH_BIN = resolveDshBin();
 export function profileDir(name, home = DSH_HOME) { return join(home, 'profiles', name); }
 
+// B3: a CLI handed a path that is not a profile must say so, not die in the fs layer.
+export function requireProfile(dir, usage, hint = '') {
+  if (!dir) { console.error('usage: ' + usage + (hint ? '\n  ' + hint : '')); process.exit(2); }
+  if (!existsSync(join(dir, 'package.json'))) {
+    console.error('not a profile (no package.json): ' + dir);
+    console.error('usage: ' + usage + (hint ? '\n  ' + hint : ''));
+    process.exit(2);
+  }
+  return dir;
+}
+
 /**
  * Where tools write their own state (reports, history, maps).
  * A globally installed package lives in a read-only tree, so state belongs next to the user's

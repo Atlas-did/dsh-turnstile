@@ -3,7 +3,13 @@
 // usage: node tools/capture.mjs --port 18770 --log <dsh log> --out shot.png
 //          [--selector <css>] [--full] [--wait 1500] [--url <explicit url>]
 // exit 0 wrote a png | 2 usage | 3 could not capture (no browser / no page) 
-import { chromium } from 'playwright-core';
+// B2: playwright-core is an optional dependency - a static import made this file die with
+// exit 1 before its own 'no browser' branch (exit 3) could run.
+let chromium;
+try { ({ chromium } = await import('playwright-core')); } catch {
+  console.error('needs playwright-core (npm i -D playwright-core) and a system Edge');
+  process.exit(3);
+}
 import { readFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 

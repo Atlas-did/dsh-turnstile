@@ -20,6 +20,9 @@ for (let i = 0; i < argv.length; i++) {
   else if (argv[i] === '--budget') budget = Number(argv[++i]);
   else if (!profileName) profileName = argv[i];
 }
+// B9: a path given positionally means the same thing as --dir (preflight/manage accept paths,
+// so doctor rejecting one was an inconsistency, not a policy).
+if (!dir && profileName && /[\\/]/.test(profileName) && existsSync(profileName)) dir = profileName;
 if (dir) { profileName = dir.split(/[\\/]/).pop(); home = dirname(dirname(dir)); }
 if (!profileName) { console.error('usage: node tools/doctor.mjs <profileName> [--home <DSH_HOME>]'); process.exit(2); }
 if (!home) home = join(root, 'home');
@@ -38,7 +41,12 @@ try {
 let rows = [];
 try { rows = yaml.load(dumpText, { schema }) || []; } catch (e) { rows = []; }
 const dumpBytes = Buffer.byteLength(dumpText);
-console.log('   bundles ' + bundles.length + '   deps ' + deps.length + '   composed ' + dumpBytes + ' B = ' + (100 * dumpBytes / budget).toFixed(1) + '% of ' + budget);
+// B10: a failed composition is UNKNOWN, not zero bytes - reporting 0% of budget reads as healthy.
+if (!dumpBytes) {
+  console.log('   bundles ' + bundles.length + '   deps ' + deps.length + '   composed unknown (no --dump-config; set DSH_BIN)');
+} else {
+  console.log('   bundles ' + bundles.length + '   deps ' + deps.length + '   composed ' + dumpBytes + ' B = ' + (100 * dumpBytes / budget).toFixed(1) + '% of ' + budget);
+}
 console.log(bar('已停用'));
 const patchPath = join(profileDir, 'cordis.patch.yml');
 const patchText = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : '';

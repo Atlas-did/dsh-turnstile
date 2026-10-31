@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 // Real-mouse test for the command designer. Only a temporary profile copy is writable.
-import { chromium } from 'playwright-core';
+// B2: playwright-core is an optional dependency - a static import made this file die with
+// exit 1 before its own 'no browser' branch (exit 3) could run.
+let chromium;
+try { ({ chromium } = await import('playwright-core')); } catch {
+  console.error('needs playwright-core (npm i -D playwright-core) and a system Edge');
+  process.exit(3);
+}
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';

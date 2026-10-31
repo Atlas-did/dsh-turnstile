@@ -4,7 +4,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-const dir = process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop';
+const dir = requireProfile(process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop', 'node tools/engines.mjs <profileDir>');
 const runtime = process.argv[3] || runtimeVersion;
 const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
 const bundles = (pkg.dsh?.profile?.bundles || []).filter((b) => !b.startsWith('@deepseek-ai/'));
@@ -14,6 +14,7 @@ const compat = existsSync(compatPath) ? JSON.parse(readFileSync(compatPath, 'utf
 
 import { checkCompatibility, runtimeVersion, usingHostEvaluator } from './version.mjs';
 import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
+import { requireProfile } from './config.mjs';
 silenceWhenJson();
 // Compatibility is decided by the host's own evaluator when it is reachable — we do not
 // reimplement semver here. `checkCompatibility` returns null when the plugin loads.
@@ -47,11 +48,14 @@ const engineFindings = skipped.map((r) => ({
 if (wantsJson()) {
   emitJson('engines', engineFindings, skipped.length ? 5 : 0);
 } else {
+  // B10: an empty runtime means the version gate could NOT run. Say so instead of printing ok:true.
+  if (!runtime) console.error('NOTE: runtime version unknown (set DSH_BIN or DSH_VERSION) - no plugin was evaluated against engines.dsh.');
   console.log(JSON.stringify({
-    profile: dir, runtime, bundles: bundles.length,
+    profile: dir, runtime,
     skipped: skipped.map((r) => r.name + '@' + r.version + '  engines=' + r.engine),
     exempted: exempted.map((r) => r.name + '@' + r.version),
     ok: skipped.length === 0,
+    evaluated: Boolean(runtime),
   }, null, 2));
 }
 process.exitCode = skipped.length ? 5 : 0;

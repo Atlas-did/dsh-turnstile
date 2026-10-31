@@ -1,6 +1,12 @@
 // Virtual list: a node with hundreds of children must not build hundreds of DOM cards.
 import { createConsoleServer } from './console-server.mjs';
-import { chromium } from 'playwright-core';
+// B2: playwright-core is an optional dependency - a static import made this file die with
+// exit 1 before its own 'no browser' branch (exit 3) could run.
+let chromium;
+try { ({ chromium } = await import('playwright-core')); } catch {
+  console.error('needs playwright-core (npm i -D playwright-core) and a system Edge');
+  process.exit(3);
+}
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';

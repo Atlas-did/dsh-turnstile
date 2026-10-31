@@ -9,9 +9,10 @@ import { ROOT } from './config.mjs';
 import { ctxUsage } from './scan.mjs';
 import { runtimeVersion } from './version.mjs';
 import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
+import { requireProfile } from './config.mjs';
 silenceWhenJson();
 
-const dir = process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop';
+const dir = requireProfile(process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop', 'node tools/conflict.mjs <profileDir>');
 const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
 const deps = Object.keys(pkg.dependencies || {});
 const nm = join(dir, 'node_modules');

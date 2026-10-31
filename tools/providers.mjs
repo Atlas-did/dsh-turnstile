@@ -15,6 +15,11 @@ const home = (() => {
   if (e && existsSync(join(e, 'profiles', profile))) return e;
   return join(root, 'home');
 })();
+// B3: without a resolved DSH binary this used to exec `null` and die with a module-loader stack.
+if (!DSH_BIN) {
+  console.error('需要 DSH 可执行文件：设置 DSH_BIN（例如 runtime/node_modules/@deepseek-ai/dsh/lib/bin.js）');
+  process.exit(2);
+}
 const text = execFileSync(process.execPath, [DSH_BIN, profile, '--dump-config'],
   { env: { ...process.env, DSH_HOME: home }, maxBuffer: 64 * 1024 * 1024 }).toString();
 let rows;

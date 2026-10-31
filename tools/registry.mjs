@@ -7,8 +7,9 @@
 // usage: node tools/registry.mjs <profileDir> [runtimeVersion]
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { requireProfile } from './config.mjs';
 
-const dir = process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop';
+const dir = requireProfile(process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop', 'node tools/registry.mjs <profileDir>');
 const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
 const cur = process.argv[3] || '0.2.1-rc.3';
 // explicit exemptions written by `dsh plugin allow-version`

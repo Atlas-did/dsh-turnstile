@@ -4,7 +4,13 @@
 // "a human can hit it".
 // usage: node tools/e2e-panel.mjs --port 18770 --packet <cordis.patch.yml> [--row dsh-talk]
 // exit: 0 pass | 1 fail | 3 skipped (no panel) - never a silent green
-import { chromium } from 'playwright-core';
+// B2: playwright-core is an optional dependency - a static import made this file die with
+// exit 1 before its own 'no browser' branch (exit 3) could run.
+let chromium;
+try { ({ chromium } = await import('playwright-core')); } catch {
+  console.error('needs playwright-core (npm i -D playwright-core) and a system Edge');
+  process.exit(3);
+}
 import { readFileSync, copyFileSync, writeFileSync } from 'node:fs';
 
 const argv = process.argv.slice(2);
