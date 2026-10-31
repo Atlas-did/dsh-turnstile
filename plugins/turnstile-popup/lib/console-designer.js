@@ -39,7 +39,7 @@
   function loadDraft() {
     const id = state.data.profile.dir;
     if (ds.loadedFor === id) return;
-    ds.loadedFor = id; ds.operations = []; ds.past = []; ds.future = []; ds.saved = '[]'; ds.preview = null; ds.previewKey = '';
+    ds.loadedFor = id; ds.operations = []; ds.past = []; ds.future = []; ds.saved = '[]'; ds.preview = null; ds.previewKey = ''; ds.timeline = undefined;
     try {
       const saved = JSON.parse(localStorage.getItem('turnstile.designer.draft.' + state.data.profile.name) || '[]');
       if (Array.isArray(saved)) ds.operations = saved.filter((op) => op && ['toggle', 'anchor'].includes(op.type) && typeof op.package === 'string').slice(0, 100);
@@ -52,7 +52,9 @@
     // The timeline runs beside past/future, never instead of them: undo/redo behaviour is untouched.
     ds.past.push(copy(ds.operations)); if (ds.past.length > 100) ds.past.shift();
     ds.future = []; fn();
-    ds.timeline = (ds.timeline || []).concat([{ time: Date.now(), label: label || '修改队列', snapshot: copy(ds.operations) }]).slice(-100); ds.selectedOp = Math.min(ds.selectedOp, ds.operations.length - 1);
+    const H = window.TurnstileHistory;
+    if (H) { if (!ds.timeline || !Array.isArray(ds.timeline.steps)) ds.timeline = H.createTimeline({ limit: 100 }); H.append(ds.timeline, { state: copy(ds.operations), kind: H.STEP_KIND.EDIT, label: label || '修改队列', at: Date.now() }); }
+    ds.selectedOp = Math.min(ds.selectedOp, ds.operations.length - 1);
     ds.error = ''; ds.dialog = false; persist(); render();
   }
   function addOperation(op) {
@@ -167,23 +169,23 @@
     state.notice = parts.join('；');
   }
   function jumpTo(index) {
-    const t = (ds.timeline || [])[index];
-    if (!t) return;
+    const H = window.TurnstileHistory;
+    if (!H || !ds.timeline || !H.jumpTo(ds.timeline, index)) return;
     ds.future.push(copy(ds.operations));
-    ds.operations = copy(t.snapshot);
-    ds.timeline = ds.timeline.slice(0, index + 1);
+    ds.operations = copy(H.current(ds.timeline) || []);
     ds.selectedOp = Math.min(ds.selectedOp, ds.operations.length - 1);
     ds.previewKey = ''; ds.dialog = false; persist(); render();
   }
   function renderTimeline() {
     const box = node('div', { class: 'designer-timeline', 'data-testid': 'designer-timeline' });
-    const list = ds.timeline || [];
-    box.append(node('div', { class: 'side-title', text: '历史 · ' + list.length }));
-    if (!list.length) { box.append(node('p', { class: 'hint', text: '还没有改动。' })); return box; }
-    list.slice().reverse().forEach((entry, i) => {
-      const at = list.length - 1 - i;
-      const time = new Date(entry.time).toLocaleTimeString('zh-CN', { hour12: false });
-      box.append(btn(time + ' · ' + entry.label + ' · ' + entry.snapshot.length + ' 条', () => jumpTo(at), 'history-' + at, 'history-row'));
+    const H = window.TurnstileHistory;
+    const rowsList = H && ds.timeline && Array.isArray(ds.timeline.steps) ? H.rows(ds.timeline) : [];
+    box.append(node('div', { class: 'side-title', text: '历史 · ' + rowsList.length }));
+    if (!rowsList.length) { box.append(node('p', { class: 'hint', text: '还没有改动。' })); return box; }
+    rowsList.slice().reverse().forEach((row) => {
+      const time = new Date(row.at).toLocaleTimeString('zh-CN', { hour12: false });
+      const count = H && ds.timeline.steps[row.index] ? ds.timeline.steps[row.index].state.length : 0;
+      box.append(btn(time + ' · ' + row.label + ' · ' + count + ' 条', () => jumpTo(row.index), 'history-' + row.index, 'history-row' + (row.current ? ' active' : '')));
     });
     return box;
   }

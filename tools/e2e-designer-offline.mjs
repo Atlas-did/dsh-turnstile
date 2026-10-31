@@ -147,6 +147,11 @@ try {
   const queueAfterJump = await page.locator('[data-testid^="command-delete-"]').count();
   ok('jumping to an earlier entry shortens the queue', queueAfterJump < queueBeforeJump, queueBeforeJump + '->' + queueAfterJump);
   ok('undo remains enabled after a jump', !(await page.locator('[data-testid="designer-undo"]').first().isDisabled()));
+  // The panel must use the shared module, not a private copy: a stale persisted array must not break it.
+  ok('history rows expose time+label+state via the module', await page.evaluate(() => {
+    const row = document.querySelector('[data-testid^="history-"]');
+    return Boolean(row) && /\d{2}:\d{2}:\d{2}/.test(row.textContent) && /条/.test(row.textContent);
+  }));
   ok('no uncaught designer browser errors', errors.length === 0, errors.join(' | ').slice(0, 200));
 } catch (error) {
   ok('designer e2e completed without throwing', false, String(error?.stack || error).slice(0, 500));

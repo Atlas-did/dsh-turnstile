@@ -45,3 +45,27 @@ ds.timeline = ds.timeline.slice(0, index + 1);   // the future beyond the jump i
   **not** enforced in the UI yet. Either the panel adopts the module next round, or the module is
   removed as speculative. Leaving both would be exactly the duplication this project keeps warning about.
 * Labels are coarse (`修改队列`); per-operation labels would need each palette action to name itself.
+## Update: the panel now uses the module (duplication removed)
+
+The gap above was closed the next round. `mutate` appends through `TurnstileHistory.append`, the panel
+renders `TurnstileHistory.rows`, and a jump goes through `TurnstileHistory.jumpTo` + `current`:
+
+```js
+if (!ds.timeline || !Array.isArray(ds.timeline.steps)) ds.timeline = H.createTimeline({ limit: 100 });
+H.append(ds.timeline, { state: copy(ds.operations), kind: H.STEP_KIND.EDIT, label, at: Date.now() });
+```
+
+So the module's rules (transient states excluded, no-op suppressed, future dropped on jump) now apply to
+the real panel; there is one implementation again.
+
+### A bug this surfaced
+
+`persist()` saves `ds`, so a previously persisted **array** timeline came back on reload and
+`rows(timeline)` threw `Cannot read properties of undefined (reading 'map')`, which broke the whole
+designer view (`command-queue` never appeared, e2e timed out at 0/1 checks).
+
+Fix: the draft load clears `ds.timeline`, and both append and render check `Array.isArray(steps)` before
+touching it. The e2e added a check that a history row really carries `HH:MM:SS` and `N 条`, so a silent
+fallback cannot pass.
+
+Designer e2e 34 -> **35/35**.
