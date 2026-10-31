@@ -86,4 +86,11 @@ test('CLI 输出包含修法与回滚点', () => {
   assert.match(out, /回滚:/);
 });
 
+test('live 模式附带 NO_PROXY 判定（level 只能是 pass/warn）', () => {
+  const { data } = json(['--live']);
+  assert.ok(data.noProxy, 'live 结果里必须有 noProxy');
+  assert.ok(['pass', 'warn'].includes(data.noProxy.level), data.noProxy.level);
+  assert.ok(data.noProxy.message.includes('agents-anywhere'), data.noProxy.message);
+});
+
 console.log('DIAGNOSE_TEST_OK ' + passed + ' checks');

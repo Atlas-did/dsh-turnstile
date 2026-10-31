@@ -16,6 +16,7 @@ import { readRecords, readManifest } from './lib/records.mjs';
 import { aggregate, classify, isFailure } from './lib/classify.mjs';
 import { probeLayers } from './lib/probe.mjs';
 import { actionsFor, missingFor } from './lib/actions.mjs';
+import { checkNoProxy } from './lib/proxy.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
@@ -100,6 +101,18 @@ if (wantProbe) {
 const actions = actionsFor(channels);
 const missing = missingFor(channels);
 
+// NO_PROXY：只在 live 模式查（corpus 回放与当前环境无关）
+let noProxy = null;
+if (live) {
+  const host = 'web.agents-anywhere.com';
+  let userValue = '';
+  try {
+    const { execFileSync } = await import('node:child_process');
+    userValue = execFileSync('powershell', ['-NoProfile', '-Command', "[Environment]::GetEnvironmentVariable('NO_PROXY','User')"], { encoding: 'utf8' }).trim();
+  } catch {}
+  noProxy = checkNoProxy({ host, userValue, processValue: process.env.NO_PROXY || process.env.no_proxy || '' });
+}
+
 const result = {
   mode, asOf: asOf || null,
   corpus: corpusArg || null,
@@ -109,6 +122,7 @@ const result = {
   probes,
   actions,
   missing,
+  noProxy,
   verdict: drift.length ? 'corpus-drift'
     : channels.some((c) => c.verdict === 'failing') ? 'failing'
     : channels.some((c) => c.verdict === 'undetermined') ? 'undetermined'
@@ -132,6 +146,7 @@ if (has('--json')) {
     console.log('');
     for (const p of probes) console.log('  probe ' + p.url + '  ' + JSON.stringify(p.layers) + (p.error ? '  ' + p.error : ''));
   }
+  if (noProxy) console.log('\nNO_PROXY  ' + noProxy.level + '  ' + noProxy.message + (noProxy.next ? '\n         → ' + noProxy.next : ''));
   if (actions.length) {
     console.log('');
     console.log('修法:');
