@@ -237,6 +237,13 @@ try {
     ok('row-less plugin disables the patch action', (await rowless.isDisabled()) === true);
     ok('disabled action explains itself', (await text('[data-testid="action-reason"]')).includes('该插件没有 profile 行'));
     ok('capabilities module is loaded in the page', (await page.evaluate(() => typeof window.TurnstileCapabilities)) === 'object');
+    // Multi-select: ctrl adds a second row, and the panel reports the joint state.
+    await click('[data-testid="nav-plugins"]');
+    await page.waitForTimeout(250);
+    await page.locator('[data-testid="plugin-plug-alpha"]').click();
+    await page.locator('[data-testid="plugin-plug-beta"]').click({ modifiers: ['Control'] });
+    const summary = await text('[data-testid="selection-summary"]').catch(() => '');
+    ok('ctrl-click builds a multi-selection', summary.includes('已选 2 个'), summary);
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {
