@@ -43,7 +43,11 @@
     "watch:reg": "node tools/watch-registry.mjs",
     "test:reg": "node plugins/turnstile-popup/test/reg-diff.test.mjs",
     "launcher": "node tools/launcher.mjs",
-    "hotkey": "node tools/hotkey.mjs"
+    "hotkey": "node tools/hotkey.mjs",
+    "inspect": "node tools/inspect-plugin.mjs",
+    "atlas": "node tools/ui-atlas.mjs",
+    "diff-plugins": "node tools/diff-plugins.mjs",
+    "test:look": "node tools/test-look-tools.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",
