@@ -1,7 +1,8 @@
 // Host side: GET /turnstile/plugins and POST /turnstile/toggle.
 // The browser cannot write files, so every change happens here with a backup.
 import { readFileSync, writeFileSync, existsSync, copyFileSync, statSync, readdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
 import { makePlan, applyPlan, describePlan } from "./txn.js";
 import { collectConsoleData } from "./console-data.js";
@@ -51,7 +52,6 @@ function txnWrite(res, patchPath, nextText, args, reason) {
   settleOperation(STATE_DIR(), plan.id, "applied", null);
   return sendJson(res, 200, { ok: true, evidence });
 }
-import { join } from "node:path";
 
 export const inject = ["webServer"];
 
@@ -396,6 +396,33 @@ export function apply(ctx, config) {
   }), "turnstile: POST /turnstile/designer");
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
+    path: "/turnstile/diagnose",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      // Reuse S1/S2 from the repo instead of re-implementing them here (SDS §4/§5).
+      const root = process.env.DSH_TURNSTILE_HOME || "";
+      const home = process.env.USERPROFILE || "";
+      const logsDir = join(home, ".agents-anywhere", "logs");
+      const pluginLogs = join(home, ".agents-anywhere", "dsh-bridge-next", "logs");
+      try {
+        const recordsMod = await import(pathToFileURL(join(root, "tools", "lib", "records.mjs")).href);
+        const classifyMod = await import(pathToFileURL(join(root, "tools", "lib", "classify.mjs")).href);
+        const paths = [];
+        for (const dir of [logsDir, pluginLogs]) {
+          if (!existsSync(dir)) continue;
+          for (const f of readdirSync(dir)) if (f.endsWith(".jsonl")) paths.push(join(dir, f));
+        }
+        const loaded = recordsMod.readRecords(paths);
+        const channels = classifyMod.aggregate(loaded.records, { mode: "all" });
+        const verdict = channels.some((c) => c.verdict === "failing") ? "failing" : channels.length ? "healthy" : "undetermined";
+        return sendJson(res, 200, { verdict, files: loaded.files.length, records: loaded.records.length, channels, at: new Date().toISOString() });
+      } catch (e) {
+        return sendJson(res, 200, { verdict: "undetermined", missing: "无法加载诊断模块：" + String(e && e.message), channels: [] });
+      }
+    },
+  }), "turnstile: GET /turnstile/diagnose");
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
     path: "/turnstile/profiles",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
@@ -433,7 +460,13 @@ export function apply(ctx, config) {
         ? readFileSync(credFile, "utf8").split(/\r?\n/).map((l) => (/^([A-Za-z0-9._-]+)\s*:/.exec(l) || [])[1]).filter(Boolean)
         : [];
       items.push(health.credentialsItem({ exists: existsSync(credFile), keys: credKeys }));
-      const endpoint = join(process.env.USERPROFILE || "", ".agents-anywhere", "dsh-bridge", "endpoint.json");
+      // Two layouts exist in the wild: AA desktop writes ~/.agents-anywhere/dsh-bridge/,
+      // while the 2.x DSH plugin writes <DSH_HOME>/agents-anywhere/bridge/.
+      const candidates = [
+        join(process.env.USERPROFILE || "", ".agents-anywhere", "dsh-bridge", "endpoint.json"),
+        join(home, "agents-anywhere", "bridge", "endpoint.json"),
+      ];
+      const endpoint = candidates.find((p) => existsSync(p)) || candidates[0];
       let endpointMtime = 0;
       try { if (existsSync(endpoint)) endpointMtime = statSync(endpoint).mtimeMs; } catch {}
       items.push(health.bridgeItem({ exists: existsSync(endpoint), mtimeMs: endpointMtime }));

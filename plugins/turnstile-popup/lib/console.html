@@ -83,8 +83,31 @@ function steward(){
     node('div',{class:'panel-head'},[node('strong',{text:'所有 profile'}),btn('刷新',()=>runProfiles(),'steward-refresh')]),
     node('div',{'data-testid':'steward-list'},[node('p',{class:'hint',text:'读取中…'})]),
   ]);
-  main.append(node('div',{class:'steward-grid','data-testid':'steward-grid'},[card,list]));
+  const diagCard=node('section',{class:'panel'},[
+    node('div',{class:'panel-head'},[node('strong',{text:'诊断（日志+通道）'}),btn('跑诊断',()=>runDiagnose(),'diagnose-run')]),
+    node('div',{'data-testid':'diagnose-box'},[node('p',{class:'hint',text:'读 AA 与插件日志，按通道给结论；每条带证据与推翻条件。'})]),
+  ]);
+  main.append(node('div',{class:'steward-grid','data-testid':'steward-grid'},[card,list,diagCard]));
   runHealth();runProfiles();
+}
+async function runDiagnose(){
+  const box=document.querySelector('[data-testid="diagnose-box"]');if(!box)return;
+  box.replaceChildren(node('p',{class:'hint',text:'诊断中…'}));
+  try{
+    const j=await (await fetch('/turnstile/diagnose',{headers:{accept:'application/json'}})).json();
+    const head=node('p',{'data-testid':'diagnose-verdict',text:'结论：'+j.verdict+'（'+j.records+' 条记录 / '+j.files+' 个文件）'});
+    const list=node('div',{class:'action-stack','data-testid':'diagnose-channels'});
+    for(const c of (j.channels||[])){
+      const mark=c.verdict==='failing'?'✗':c.verdict==='healthy'?'✓':'?';
+      const row=node('div',{class:'history-row','data-testid':'channel-'+c.id});
+      row.append(node('strong',{text:mark+' '+c.id+' · '+c.verdict+' · 失败 '+c.counts.failures}));
+      if(c.evidence&&c.evidence.length)row.append(node('small',{text:'证据 '+c.evidence[0].file+':'+c.evidence[0].line}));
+      if(c.falsifier)row.append(node('small',{text:'推翻条件 '+c.falsifier}));
+      list.append(row);
+    }
+    if(!(j.channels||[]).length)list.append(node('p',{class:'hint',text:j.missing||'没有可用日志'}));
+    box.replaceChildren(head,list);
+  }catch(e){box.replaceChildren(node('p',{class:'hint',text:'诊断失败：'+e.message}));}
 }
 async function runProfiles(){
   const box=document.querySelector('[data-testid="steward-list"]');if(!box)return;

@@ -262,6 +262,12 @@ try {
     await click('[data-testid="health-run"]');
     await page.waitForTimeout(1000);
     ok('the steward runs the health scan in place', (await page.locator('[data-testid="health-summary"]').count()) === 1);
+    // 诊断卡片：走 /turnstile/diagnose，通道与推翻条件都要显示
+    await click('[data-testid="diagnose-run"]');
+    await page.waitForTimeout(900);
+    ok('the diagnose card renders a verdict', (await text('[data-testid="diagnose-verdict"]')).includes('failing'));
+    ok('channels are listed with evidence', (await text('[data-testid="channel-codex"]')).includes('aa.jsonl'));
+    ok('every channel states a falsifier', (await text('[data-testid="channel-codex"]')).includes('推翻条件'));
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {

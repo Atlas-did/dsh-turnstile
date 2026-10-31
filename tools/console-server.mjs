@@ -21,6 +21,14 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
   return createServer(async (req, res) => {
     const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
     const json = (code, value) => { res.statusCode = code; res.setHeader('content-type', 'application/json; charset=utf-8'); res.end(JSON.stringify(value)); };
+    if (pathname === '/turnstile/diagnose') {
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ verdict: 'failing', files: 2, records: 42, channels: [
+        { id: 'codex', verdict: 'failing', counts: { failures: 3, signals: { 'unknown-variant': 3 } }, evidence: [{ file: 'aa.jsonl', line: 7 }], falsifier: '出现 sync completed 且无 unknown variant' },
+        { id: 'dsh', verdict: 'healthy', counts: { failures: 0, signals: {} }, evidence: [], falsifier: '出现 sync.failed' },
+      ] }));
+      return;
+    }
     if (pathname === '/turnstile/profiles') {
       res.setHeader('content-type', 'application/json; charset=utf-8');
       res.end(JSON.stringify({ home: root, current: 'console-fixture', profiles: [
