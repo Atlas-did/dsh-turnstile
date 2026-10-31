@@ -36,8 +36,13 @@ export function gitDependencies(deps) {
  * 这一步能抓到「Unexpected token '}'」这类只在注入时暴露的语法错误。
  */
 export function checkClientSource(source) {
+  // 真正的 ESM（顶层 import / export-from）不是宿主按经典脚本注入的那类代码，跳过而不是判红。
+  if (/^\s*(import\s|export\s+\*|export\s*\{)/m.test(String(source || ''))) {
+    return { ok: true, error: '', skipped: 'esm' };
+  }
   const stripped = String(source || '')
-    .replace(/\bexport\s+default\s+(function|class)\b/g, '$1')
+    .replace(/\bexport\s+default\s+function\b/g, 'const __default = function')
+    .replace(/\bexport\s+default\s+class\b/g, 'const __default = class')
     .replace(/\bexport\s+default\s+/g, 'const __default = ')
     .replace(/\bexport\s+(function|const|let|class|async)\b/g, '$1');
   try {
@@ -54,6 +59,7 @@ export function clientBundles(profileDir) {
   if (!existsSync(nm)) return { id: 'pit:client-bundle', level: 'skip', message: '没有 node_modules', next: '' };
   const bad = [];
   const checked = [];
+  const skipped = [];
   const walk = (dir, depth) => {
     if (depth > 2) return;
     for (const entry of readdirSync(dir)) {
@@ -67,6 +73,7 @@ export function clientBundles(profileDir) {
         if (!existsSync(f)) continue;
         checked.push(entry);
         const res = checkClientSource(readFileSync(f, 'utf8'));
+        if (res.skipped) { skipped.push(entry); continue; }
         if (!res.ok) bad.push({ pkg: entry, file: rel, error: res.error.slice(0, 120) });
       }
     }
@@ -77,7 +84,9 @@ export function clientBundles(profileDir) {
       message: bad.length + ' 个 client bundle 解析失败：' + bad.map((b) => b.pkg + ' (' + b.error + ')').join('; '),
       next: '按报错修那个文件，或临时停用该插件', details: bad, checked: checked.length };
   }
-  return { id: 'pit:client-bundle', level: 'pass', message: checked.length + ' 个 client bundle 都能解析', next: '', checked: checked.length };
+  return { id: 'pit:client-bundle', level: 'pass',
+    message: checked.length + ' 个 client bundle 都能解析' + (skipped.length ? '（' + skipped.length + ' 个 ESM 跳过）' : ''),
+    next: '', checked: checked.length, skipped: skipped.length };
 }
 
 /** 汇总：profileDir 上跑全部三条。 */
