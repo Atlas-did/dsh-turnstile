@@ -154,7 +154,14 @@ async function runHealth(){
       if(it.next)row.append(node('small',{text:'→ '+it.next}));
       list.append(row);
     }
-    box.replaceChildren(head,list);
+    const pitBox=node('div',{class:'action-stack','data-testid':'health-pits'});
+    for(const p of (j.pits||[])){
+      const mark=p.level==='pass'?'✓':p.level==='warn'?'!':p.level==='fail'?'✗':'·';
+      const row=node('div',{class:'history-row'},[node('strong',{text:mark+' '+p.message})]);
+      if(p.next)row.append(node('small',{text:'→ '+p.next}));
+      pitBox.append(row);
+    }
+    box.replaceChildren(head,list,pitBox);
   }catch(e){box.replaceChildren(node('p',{class:'hint',text:'体检失败：'+e.message}));}
 }
 function overview(){

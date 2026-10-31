@@ -500,7 +500,14 @@ export function apply(ctx, config) {
         items.push(health.pluginItem({ name, installed, disabled }));
       }
       items.push(health.authItem({ total: null }));
-      sendJson(res, 200, { items, summary: health.summarize(items), profile: prof.name, at: new Date().toISOString() });
+      // 三个坑的检查（双市场 / git 依赖 / client bundle）与 diagnose 同一份实现。
+      let pits = [];
+      const repoRoot = process.env.DSH_TURNSTILE_HOME || "";
+      try {
+        const pitsMod = await import(pathToFileURL(join(repoRoot, "tools", "pits.mjs")).href);
+        pits = pitsMod.runPitChecks(prof.dir);
+      } catch (e) { pits = [{ id: "pit:unavailable", level: "skip", message: "无法加载 pits 模块：" + String(e && e.message), next: "" }]; }
+      sendJson(res, 200, { items, pits, summary: health.summarize(items), profile: prof.name, at: new Date().toISOString() });
     },
   }), "turnstile: GET /turnstile/health");
   ctx.effect(() => ctx.webServer.register({

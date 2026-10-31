@@ -253,6 +253,7 @@ try {
     ok('the health scan renders items', healthItems >= 2, String(healthItems));
     const summaryText = await text('[data-testid="health-summary"]').catch(() => '');
     ok('the scan summarises pass/warn/fail', /通过/.test(summaryText), summaryText);
+    ok('the trap checks render next to the health scan', (await text('[data-testid="health-pits"]')).includes('插件市场'));
     // 环境管家: left health, right profile table, both read-only.
     await click('[data-testid="nav-steward"]');
     await page.waitForTimeout(1200);

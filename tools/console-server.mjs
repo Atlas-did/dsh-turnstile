@@ -46,7 +46,8 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
       items.push(mod.pluginItem({ name: 'dsh-free-search', installed: true, disabled: false }));
       items.push(mod.authItem({ total: null }));
       res.setHeader('content-type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ items, summary: mod.summarize(items), profile: 'console-fixture', at: new Date().toISOString() }));
+      const pits = [{ id: 'pit:duplicate-market', level: 'pass', message: '只有 1 个插件市场', next: '' }, { id: 'pit:client-bundle', level: 'pass', message: '2 个 client bundle 都能解析', next: '' }];
+      res.end(JSON.stringify({ items, pits, summary: mod.summarize(items), profile: 'console-fixture', at: new Date().toISOString() }));
       return;
     }
     if (pathname === '/turnstile/hooks') {
