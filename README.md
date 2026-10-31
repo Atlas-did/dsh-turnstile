@@ -1,329 +1,143 @@
 # dsh-turnstile
 
-**An install-time gate and inspection toolkit for DeepSeek Harness plugins.** Catch a plugin
-before it breaks your environment, and see who occupies which part of the interface.
+DeepSeek Harness（下称 DSH）插件的**闸门 + 体检 + 实验场**工具集。
 
-Every plugin must pass through one at a time - like a turnstile.
+一句话：**装插件之前先过闸门，装完之后看得见它占了什么位置，坏了能回滚。**
 
-> New here? Start with [INSTALL.md](INSTALL.md) (requirements, first run, exit codes, uninstall).
+> English: [README.en.md](README.en.md)
 
-## Quick start (what to run, in order)
+## 三条路径，别混
 
-Everything is read-only unless a command says otherwise. `<profile>` is a DSH profile directory
-(for example `~/.dsh/profiles/desktop`); omit the path where a tool auto-detects it.
-
-```bash
-# 1. Install-time gate: 12 checks in parallel, per-check timeout (default 30s)
-node tools/preflight.mjs <profile>
-
-#    narrow it while iterating
-node tools/preflight.mjs <profile> --only risk,port
-node tools/preflight.mjs <profile> --skip css
-
-#    refresh the ctx-service allowlist when the runtime moved
-node tools/preflight.mjs <profile> --regen
-
-# 2. What would it suggest fixing? (nothing is written without --apply)
-node tools/preflight.mjs <profile> --fix
-node tools/preflight.mjs <profile> --fix --apply    # writes npm aliases, keeps a .bak
-
-# 3. Machine-readable output for a panel/CI
-cat state/report-<profile>.json
-node tools/preflight.mjs <profile> --json
-
-# 4. After a restart: did it actually activate?
-node tools/runtime-diff.mjs state/runtime-<profile>.json --profile <profile>
-
-# 5. It crashed - who was waiting for what?
-node tools/watch.mjs <host log> --last 12
-node tools/watch.mjs <host log> --follow --exit-on-crash
-
-# 6. Toggle a plugin without hand-editing YAML
-node tools/manage.mjs <profile> --list
-node tools/manage.mjs <profile> --disable <package> --yes
-node tools/manage.mjs <profile> --enable  <package> --yes
-```
-
-A green run means: each checker ran, each one finished inside its timeout, and none reported a
-blocking finding. Advisory checks (`engine-gate`, `css-collision`, `ui-placement`) print `WARN`
-and do not block - a skipped plugin is a fact about that plugin, not a broken profile.
-
----
-
-## Why this exists
-
-A single plugin can take the whole harness down, and the failure is usually silent.
-
-Real case from building this tool: a preset bundle declared a prompt variable `{{cwd}}`
-that the runtime never registers. Nothing happens at boot. The host starts fine, the UI loads fine —
-and then the **first conversation** throws:
-
-```
-unknown prompt variable "{{cwd}}" in section "deployment:persona-prefix"
-```
-
-A second real case: the desktop build ships an inspector channel with a byte budget
-(`maxSourceFrameBytes - 4096`). A configuration that grew past it killed the host with
-`inspector: source state exceeds the source-frame byte limit` — and afterwards you simply
-could not create a new conversation. The web/CLI build never shows this, so it passes every local test.
-
-Both are findable **before** installing anything, if you check the right surfaces.
-
-
-### Broken right now? Start here
-
-Static checks answer "is this profile safe to install?". They cannot answer "why is it broken right now" -
-that needs the logs, the network and the versions. That is `diagnose`:
-
-```bash
-node tools/diagnose.mjs --live          # read AA + plugin logs, judge per channel, give a fix + rollback
-node tools/diagnose.mjs --live --probe  # also run DNS -> TCP -> TLS -> HTTP probes
-node tools/diagnose.mjs --corpus tests/corpus/2026-10-31   # replay the frozen 2026-10-31 evidence
-```
-
-Each channel reports `verdict` / `reachable` / `usable` / `evidence` / `falsifier` separately;
-`undetermined` is a legal answer when the evidence is missing. Reachable is not usable - on
-2026-10-31 all three network paths answered 200 while the same logs held 329 ERROR records.
-
-Before installing anything new, check what the machine already has:
-
-```bash
-node tools/preinstall.mjs <profile> <package>   # duplicate markets, same-family names, git deps
-```
-
----
-
-## 30 seconds
-
-```bash
-git clone https://github.com/Atlas-did/dsh-turnstile.git
-cd dsh-turnstile
-npm install                # js-yaml only
-
-# check an existing profile (needs a DSH install, see below)
-DSH_HOME=~/.dsh node tools/preflight.mjs ~/.dsh/profiles/desktop
-
-# or prove the scanners still work first — this never touches your profile
-node tools/selftest.mjs
-```
-
-`preflight` exits `0` when clear, `1` when at least one blocking check fires.
-
-Point it at a real DSH install: `DSH_BIN=/path/to/@deepseek-ai/dsh/lib/bin.js`
-(auto-detected from `node_modules`, `runtime/node_modules`, and the global npm prefix).
-
----
-
-## What each check catches
-
-| Check | Fires when | Real consequence if ignored |
+| 路径 | 是什么 | 什么时候用 |
 |---|---|---|
-| `dependency-risk` | a plugin imports a peer-only, non-official package | module resolution fails at load; the plugin never runs |
-| `conflict-surface` | two plugins assign the same `ctx` service, or a dependency version forks | one plugin silently overwrites the other's service |
-| `engine-gate` | `engines.dsh` excludes the running version | **drop-style**: the plugin is skipped with no error at all |
-| `prompt-vars` | a persona section uses a variable the runtime does not register | first conversation throws; boot looks fine |
-| `import-health` | a module cannot be resolved even before restart | host boots, plugin is dead |
-| `ui-surface` | more than N plugins inject the same UI surface | settings pages pile up; users cannot find anything |
+| **主环境** | 你日常用的桌面 DSH（`~/.dsh/profiles/desktop`） | 只放**已经验证过**的东西 |
+| **mini 实验场** | 这台机器上的第二套 DSH：独立 DSH_HOME、独立 profile、独立端口 | 装插件、改补丁、试 UI，**都在这里炸** |
+| **仓库** | 本仓库的 tools（只读为主，写操作要显式开关） | 三查、体检、对比、推主环境 |
 
-Advisory (never blocking): version matrix (`OK` / `SKIPPED` / `UNCERTIFIED` / `EXEMPTED`), stale decisions,
-and drift — bundles added since the last gate run.
+**mini 是这个项目真正的卖点**：它让你可以在一个**敢弄坏**的环境里做深层次工作，
+验证通过再推主环境——而不是在主环境上一次一次试错。
 
-## The UI threshold is a capacity limit, not an aesthetic complaint
-
-```
-node tools/ui-surfaces.mjs <profileDir>        # default threshold 10
-DSH_UI_THRESHOLD=8 node tools/ui-surfaces.mjs <profileDir>
-```
-
-It prints every UI surface with the plugins injecting it, and exits `11` when a surface
-goes **above** the threshold. In a real desktop profile we measured one settings surface
-injected by **10** plugins, and nine surfaces at three or more.
-
----
-
-## See the whole picture
+## 最短路径（五条命令）
 
 ```bash
-node tools/doctor.mjs <profileName>                    # one table: bundles, disables, gate history, model routes, UI, engine skips
-node tools/gate-map.mjs <profileName>                  # interactive HTML: topology + audit trail
-node tools/mapshot.mjs state/gate-map-x.html out.png   # headless screenshot (needs playwright-core + Edge)
+node tools/risk.mjs       <profile>
+node tools/conflict.mjs   <profile>
+node tools/engines.mjs    <profile>
+node tools/preinstall.mjs <profile> <包名>
+node tools/profile-snapshot.mjs <profile> --take --label 装之前
 ```
 
-`gate-map` answers the questions that are impossible to answer by reading config files:
+装完之后：
 
-- **who overwrote this row, and where** — every row id that appears in more than one layer, with the winning layer and the file path
-- **which UI surface is crowded** — plugin → surface edges, thick and red above the threshold
-- **where it broke** — the last 40 gate runs with the check that blocked them
-
-Plugin nodes and file paths are clickable `vscode://file/...` links, so the report takes you to the line.
-
----
-
-## Boundaries (read this before trusting it)
-
-1. **Static checks only.** Nothing here instruments the runtime. A clean report means "no known failure surface", not "proven working".
-2. **`UNCERTIFIED` is registered, not verified.** The version matrix records what a plugin declares; it does not prove compatibility.
-3. **The gate is DSH-shaped.** It understands `cordis.patch.yml` arrays and `--dump-config`. A major harness change needs an adapter.
-4. **Row-id scope is per parent group.** The same id in two presets is legal; reporting it as a conflict is a false positive. This tool matches the harness's own scope rules.
-5. **No auto-fix.** Findings name the file and the fix; changing your profile stays your call.
-
----
-
-## Every scanner ships with a fixture that must fail
-
-A green result means nothing if the scanner is broken. `tools/selftest.mjs` runs each scanner
-against a fixture that is **supposed** to trip it:
-
-```
-PASS  risk catches RED fixture              exit=6
-PASS  ui-surface blocks crowded fixture     exit=11
-PASS  preflight blocks the fixture          exit=1
-RESULT: gate is healthy (11 cases)
+```bash
+node tools/profile-snapshot.mjs <profile> --diff      # 变了什么
+node tools/ui-surfaces.mjs      <profile>             # 谁占了哪个面
+node tools/sandbox-promote.mjs --dry-run              # 推主环境前先干跑
 ```
 
-Add a check, add its fixture. A scanner without a failing fixture is not trusted here.
+全程**只读**，除非命令里带 `--apply` / `--yes`。
 
----
+## 工具按「你想干什么」分组
 
+### 查
 
----
-
-## What it looks like
-
-![the management panel](docs/img/panel.png)
-
-One panel answers the three questions a plugin install raises, in this order: **can I keep
-working** (verdict + gate summary), **who is fighting whom** (plugin -> UI surface topology, red
-edges are contested), **how bad is it** (per-surface counts, with the number of plugins that
-cannot be repositioned from configuration). Plugin list and slot tree stay collapsed until asked.
-
-Clicking any row opens its properties: row id, state, UI surfaces, and a free-form position field
-that also offers the values the plugin documents about itself. Two clicks later the patch is
-written, with a backup, and the second click puts it back - that round trip is asserted by
-`tools/e2e-panel.mjs` with real input events, not `element.click()`.
-
-## Known limits, and what this repo does about them
-
-A gate that hides its blind spots is worse than no gate. These are real, measured compromises.
-
-| Limit | Status | Evidence |
-|---|---|---|
-| Most checks were text heuristics | **Mostly fixed** | Imports and `ctx.*` now go through a real tokenizer/parser (`es-module-lexer` + `acorn`), with regex only as fallback, and `evidence: ast|text` is printed. Still heuristic: `{{var}}` prompt scanning and `dsh.client.inject` reading. Dynamic registration is covered by the runtime probe instead. |
-| Version rules were re-implemented by hand | Fixed here | `tools/version.mjs` delegates to the host's own `evaluatePluginCompatibility`; fallback is `semver` with includePrerelease. For `^0.2.0-rc.1` vs `0.2.1-rc.3`, plain `semver.satisfies` says false, the host says true. Only the host is authoritative. |
-| `semver` / core-service knowledge is hand-maintained and drifts | Partly open | Version rules no longer drift (delegated). The known-ctx-service allowlist is still a constant; next step is generating it from the installed runtime and failing loudly when the runtime version has no knowledge file. |
-| Deeply tied to DSH internals | By design | It understands `cordis.patch.yml`, `--dump-config` and the inspector byte budget. Another harness needs an adapter, not a flag. |
-| A plugin cannot enumerate what its peers registered | **Proven, not fixed** | Client side: `ctx.slots` is a scoped `SlotRegistry` — `entries()` and `entriesOfSlot('shell.overlay')` both return 0 from inside a plugin (`docs/33-no-live-slot-tree.md`). Server side: `session/event` (tool/call, tool/result) is emitted on the agent's own context and a root plugin never sees it (`docs/32-runtime-probe.md`). Both need an agent/global context, which a plugin cannot reach. |
-| `selftest` reported "healthy" while skipping environment cases | Fixed here | Summary now separates fixture from environment coverage, and `--strict` exits 4 when anything was skipped. A green line no longer means two different things. |
-
-### What a green report actually means
-
-```
-fixture cases passed  -> the scanners still catch what they must catch
-environment cases     -> your profiles were really scanned (needs DSH_HOME)
-skipped               -> neither; coverage you did not get
-```
-
-### Trust levels (planned)
-
-| Class | How it was found | Strength |
-|---|---|---|
-| data | read from package.json / --dump-config | high |
-| resolve | the module was actually resolved | high |
-| ast | parsed with es-module-lexer / acorn | high |
-| text | regex over source (fallback only) | medium |
-| runtime | observed in a live host | highest (see `plugins/turnstile-probe`) |
-
----
-
-## Exit codes (so a green line cannot lie)
-
-| Code | Meaning |
+| 工具 | 一句话 |
 |---|---|
-| `0` | every case ran and passed — full coverage |
-| `1` | at least one case failed |
-| `3` | no failures, but coverage was partial (environment cases skipped) |
-| `4` | `--strict`, and coverage was partial |
+| inspect-plugin.mjs <profile> <pkg> | 一条命令出骨架：声明 / inject 面 / patch 行 / 入口 / slot / 类名 / 源码头 |
+| diff-plugins.mjs <profile> a b | 两个插件差在哪（注入面 / patch 行 / 体积） |
+| ui-surfaces.mjs <profile> | 每个 UI 面被哪些插件注入 |
+| ui-atlas.mjs <profile> | 面 → 插件 → 条目矩阵，导出 HTML/CSV |
+| slot-map-report.mjs --map <slot-map.json> | 运行时：每个插件插了哪些 slot、各几条 |
+| slot-map-report.mjs --against old.json | 运行时：装前后哪个位置多了谁 |
+| arch-graph.mjs <profile> | 架构图候选 JSON |
 
-`--allow-skips` downgrades `3` back to `0` on purpose — use it in CI, where no DSH install
-exists, so the fixture checks stay meaningful instead of silently claiming full coverage.
+### 验
+
+| 工具 | 一句话 |
+|---|---|
+| preflight.mjs <profile> | 12 项并行检查，每项独立超时 |
+| risk / conflict / engines | 三查：装不活的风险 / 服务名冲突 / 版本闸门 |
+| preinstall.mjs <profile> <pkg> | 装前预检 |
+| quicktest.mjs <profile> <port> <log> | 七项体检 |
+| diagnose.mjs --live | 从日志判「能不能连、能不能用、什么能证伪它」 |
+| profile-snapshot.mjs --take/--diff | 装前装后对比 |
+
+### 改
+
+| 工具 | 一句话 |
+|---|---|
+| anchor.mjs | 改插件锚点（干跑默认，--apply 才写，留 .bak） |
+| manage.mjs | 启停插件（写 loader 真正读的那一行） |
+| fix.mjs | 发现 → 修复计划；只有 npm-alias 类会真应用 |
+| ask.mjs | 一句话驱动上面这些，默认干跑 |
+| windows-gate.mjs | Windows 能力闸门：声明才放行，判定写审计 |
+
+### 推
+
+| 工具 | 一句话 |
+|---|---|
+| sandbox-trial / verify | 在 mini 里试装并校验 |
+| sandbox-promote --dry-run | 推主环境的 diff（必须先干跑给人看） |
+| sandbox-snapshot / reset | 快照与回滚 |
+| mini-ctl.mjs status/url/start/stop/cmd | 一句话操控 mini |
+
+## mini 实验场怎么起
 
 ```bash
-node tools/selftest.mjs                # local: 3 if any environment case could not run
-node tools/selftest.mjs --allow-skips  # CI: fixtures only, still fails on a broken scanner
-node tools/selftest.mjs --strict       # release gate: skip anything and it fails
+node tools/mini-ctl.mjs status     # 在跑吗？端口？
+node tools/mini-ctl.mjs start      # 后台起，等到就绪才返回
+node tools/mini-ctl.mjs url        # 带 token 的地址（打印最新那条）
 ```
 
----
+装了本仓库的预设，新建会话时选 **mini 实验场** 就能直接对话操作；
+不选预设也行——`mini-control` 技能用「mini / 控制 mini / 在 mini 装」就能触发。
 
-## The runtime probe (the only check that sees dynamic code)
+## 为什么值得用
 
-Static scanners read text. A plugin can register a service under a computed name and every
-regex in this repo will miss it. `probe` does not read: it **applies the plugin against a
-stub ctx** and records what actually happened.
+DSH 插件会改界面、抢同一批 slot、写同一份配置。出事时的典型症状：
 
-```bash
-node tools/probe.mjs <profileDir>            # advisory: reports static blind spots
-node tools/probe.mjs <profileDir> --strict   # exit 7 when the probe saw something static missed
+- 「装完打不开对话」——某插件把 inspector 预算撑爆；
+- 「按钮不见了」——两个插件注入同一 slot，后装的把前面的挤掉；
+- 「改了没生效」——patch 行 id 写错，或 config 是整体替换不是合并。
+
+这些不是「小心一点」能避免的。需要：装之前拦一道，装之后看得见，坏了能退。
+
+## 它不会骗你：几条硬规矩
+
+1. **未验证就标 unverified**，不写成「已支持」。
+2. **绿色必须有意义**：每个扫描器带一个「必须报错」的夹具，夹具不红说明扫描器坏了。
+3. **写操作两段式**：先出计划（diff），再确认写入，且留 .bak。
+4. **退出码有意义**：0 通过 / 1 有问题 / 2 用法错误 / 3 前置条件不满足。
+
+## 边界（先读这个再信任它）
+
+- 它是**静态 + 运行时观测**工具，不是沙箱：不阻止插件干坏事，只在装之前把风险摊开。
+- uia.act 这类「操作别的程序」的能力必须插件先声明 dsh.windows.uia，否则一律拒。
+- mini 上能跑 ≠ 主环境一定行：桌面端有 inspector 通道和字节上限，推送前必须过 sandbox-promote --dry-run。
+- 运行时归属靠 entry id 前缀；核心条目（bash / user）归不上是正常的。
+
+## 目录
+
+```
+plugins/turnstile-popup/   体检面板 + 控制台 + 页面搭建器（DSH 插件形态）
+tools/                     所有 CLI（查 / 验 / 改 / 推）
+skills/                    可直接装进 DSH 的技能
+docs/                      120+ 篇：机制笔记、证据、踩坑、上游阅读
+tests/                     夹具与语料（含必须失败的对照）
 ```
 
-Real output on a fixture whose service name is assembled at runtime:
+## 文档入口
 
-```
-PLUGIN          STATUS   PROVIDED      MISSED-BY-STATIC
-plug-dynamic    ran      sharedStore   sharedStore
-ran 1/1   static blind spots: 1
-STRICT: 1 plugin(s) registered something the static scan missed   (exit 7)
-```
-
-On a real profile most plugins report `import-error` or `apply-error` — they need host
-services the stub does not provide. That is not a failure of the probe: it is the measured
-answer to "what does this plugin actually need?", which static scanning cannot give you.
-
-| Probe status | Meaning |
+| 想了解 | 看 |
 |---|---|
-| `ran` | applied cleanly against the stub; `provided` / `assigned` are observed facts |
-| `apply-error` | reached `apply()` but needed a real service (the error names it) |
-| `import-error` | could not even load — usually a host-provided module |
-| `timeout` / `killed` | exceeded the budget; the child process is killed, the scan continues |
+| 整体架构 | docs/01-architecture.md |
+| 插件 UI 面地图 | docs/02-plugin-ui-map.md |
+| mini 实验场 | docs/117 ~ docs/131 |
+| 能力闸门 / Windows 集成 | docs/118、docs/119 |
+| 运行时 slot 结构 | docs/130-runtime-records-shape.md |
+| 每插件 × 每 slot 分布 | docs/131-slot-distribution.md |
+| 安全修复记录 | docs/129-security-fixes-from-review.md |
 
-Each plugin runs in its own child process, so a hang or a crash cannot take the scan down.
+## 许可
 
----
-
-
-### What each scanner actually uses
-
-| Scanner | Evidence | Can be fooled by |
-|---|---|---|
-| `risk` (imports) | ast via es-module-lexer | computed specifiers: `import(name)` |
-| `conflict` (ctx writes / provides) | ast via acorn | `ctx[key] = ...` with a computed key |
-| `conflict` (known services) | data: generated from the installed runtime's `interface Context` augmentations | a runtime whose d.ts lie about what it provides |
-| `engines` / `version` | host evaluator (`evaluatePluginCompatibility`) | nothing — it is the host's own rule |
-| `prompt-vars` | text | variable names assembled at runtime |
-| `ui-surface` | data: `dsh.client.inject` + patch rows | UI injected from code instead of the manifest |
-| `probe` | runtime: applied against a stub ctx | anything that needs a real service before it registers |
-
----
-
-## Adding a check
-
-1. Write `tools/your-check.mjs` — take a profile dir, exit `0` on clear, non-zero on findings.
-2. Add `tests/your-fixture/` that **must** make it fail.
-3. Register the case in `tools/selftest.mjs`.
-4. Add one line to the table in `tools/preflight.mjs`.
-
-The gate grows by adding checks and their counter-examples, never by loosening an existing one.
-
----
-
-## Docs
-
-| File | Content |
-|---|---|
-| [`docs/21-preflight-gate.md`](docs/21-preflight-gate.md) | the gate contract: what blocks, what only advises |
-| [`docs/26-provider-map.md`](docs/26-provider-map.md) | model routes and the duplicate-id failure that breaks the default model |
-| [`docs/30-gate-map.md`](docs/30-gate-map.md) | the visual audit trail, and the scope bug that made it lie once |
-
-## License
-
-MIT.
+MIT。
