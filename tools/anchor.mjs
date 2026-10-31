@@ -124,6 +124,6 @@ const out = next.join('\n');
 console.log('row: ' + row + '  package: ' + pkgName);
 console.log(next.slice(rowIdx, Math.min(rowIdx + 8, next.length)).join('\n'));
 if (!apply) { console.log(''); console.log('DRY RUN - re-run with --apply to write.'); process.exit(0); }
-copyFileSync(patchPath, patchPath + '.bak-' + Date.now());
-writeFileSync(patchPath, out);
+// B8: same discipline as manage - parse before and after, refuse instead of corrupting.
+try { safeWritePatch(patchPath, out); } catch (e) { console.error(String(e.message)); process.exit(1); }
 console.log(''); console.log('written; restart DSH to take effect.');

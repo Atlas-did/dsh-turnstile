@@ -8,7 +8,7 @@ window.__ModuleLoader__.load({
     exports.apply = function apply(ctx) {
       var React = require("react");
       var h = React.createElement;
-      var FALLBACK = {"profile":"<profile>","generatedAt":"2026-10-30T08:12:06.071Z","rows":[{"name":"turnstile-probe","disabled":false,"engineSkipped":false},{"name":"dsh-better-sidebar","disabled":false,"engineSkipped":false},{"name":"dsh-context","disabled":true,"engineSkipped":false},{"name":"dsh-genui","disabled":false,"engineSkipped":false},{"name":"dsh-token-diet","disabled":true,"engineSkipped":false},{"name":"@changfenhuang/dsh-annotation","disabled":false,"engineSkipped":false},{"name":"@liustack/modlens","disabled":false,"engineSkipped":false},{"name":"dsh-free-search","disabled":false,"engineSkipped":false},{"name":"dsh-meme","disabled":false,"engineSkipped":false},{"name":"dsh-mimir","disabled":false,"engineSkipped":false},{"name":"dsh-ops","disabled":false,"engineSkipped":false},{"name":"dsh-soul-md","disabled":false,"engineSkipped":false},{"name":"dsh-talk","disabled":false,"engineSkipped":true},{"name":"dsh-tool-call-guard","disabled":false,"engineSkipped":false},{"name":"dsh-univer-office","disabled":false,"engineSkipped":false},{"name":"dsh-unlag","disabled":false,"engineSkipped":false},{"name":"dshmarket","disabled":false,"engineSkipped":false},{"name":"dsh-quicktest","disabled":false,"engineSkipped":false},{"name":"dsh-vibe-math","disabled":false,"engineSkipped":false},{"name":"dsh-ultramath","disabled":false,"engineSkipped":false},{"name":"@mars-sea/dsh-commandcode-provider","disabled":false,"engineSkipped":false},{"name":"dsh-api-dashboard","disabled":false,"engineSkipped":false},{"name":"dsh-voice","disabled":false,"engineSkipped":false},{"name":"dsh-whale-musume","disabled":false,"engineSkipped":false},{"name":"turnstile-popup","disabled":false,"engineSkipped":false}]};
+      var FALLBACK = {"profile":"<profile>","rows":[]};
       FALLBACK = FALLBACK || { profile: "mini", rows: [] };
       FALLBACK.rows = FALLBACK.rows || [];
 
@@ -32,9 +32,8 @@ window.__ModuleLoader__.load({
       }
       function visible(list) {
         var known = {};
-        FALLBACK.rows.forEach(function (r) { known[r.name] = r.engineSkipped; });
         return (list || []).filter(function (r) { return r.name.indexOf("@deepseek-ai/") !== 0; }).map(function (r) {
-          return { name: r.name, disabled: !!r.disabled, engineSkipped: known[r.name] || false, row: r.row || "", ui: r.ui || [] };
+          return { name: r.name, disabled: !!r.disabled, engineSkipped: !!(r.engineSkipped || known[r.name]), row: r.row || "", ui: r.ui || [] };
         });
       }
       function shortProfile() {
@@ -116,6 +115,11 @@ window.__ModuleLoader__.load({
               for (var i = 0; i < next.length; i++) if (next[i].name === cur.name) return Object.assign({}, next[i], { anchorOptions: cur.anchorOptions || [] });
               return null;
             });
+          }).catch(function (e) {
+            // B11: a failed read must say so; an empty table reads as "no plugins".
+            setRows([]);
+            setNotice({ kind: "error", text: "插件列表读取失败：" + errorText(e) + "（不是「没有插件」）" });
+            throw e;
           });
         }
         function refresh() {
