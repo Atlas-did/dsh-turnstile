@@ -69,6 +69,28 @@ could not create a new conversation. The web/CLI build never shows this, so it p
 
 Both are findable **before** installing anything, if you check the right surfaces.
 
+
+### Broken right now? Start here
+
+Static checks answer "is this profile safe to install?". They cannot answer "why is it broken right now" -
+that needs the logs, the network and the versions. That is `diagnose`:
+
+```bash
+node tools/diagnose.mjs --live          # read AA + plugin logs, judge per channel, give a fix + rollback
+node tools/diagnose.mjs --live --probe  # also run DNS -> TCP -> TLS -> HTTP probes
+node tools/diagnose.mjs --corpus tests/corpus/2026-10-31   # replay the frozen 2026-10-31 evidence
+```
+
+Each channel reports `verdict` / `reachable` / `usable` / `evidence` / `falsifier` separately;
+`undetermined` is a legal answer when the evidence is missing. Reachable is not usable - on
+2026-10-31 all three network paths answered 200 while the same logs held 329 ERROR records.
+
+Before installing anything new, check what the machine already has:
+
+```bash
+node tools/preinstall.mjs <profile> <package>   # duplicate markets, same-family names, git deps
+```
+
 ---
 
 ## 30 seconds

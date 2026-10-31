@@ -29,3 +29,15 @@ jobs:
       # A commented-out bad import must stay green: this is the AST-vs-regex guarantee.
       - name: ast fixture must not report commented imports
         run: node tools/risk.mjs tests/ast-fixture
+      # The 2026-10-31 frozen corpus must keep producing the same verdicts.
+      # If this goes red, either the code regressed or the corpus was tampered with (drift check).
+      - name: diagnose acceptance (A/B/C/D/E against the frozen corpus)
+        run: node tools/test-diagnose.mjs
+      - name: records layer counts
+        run: node tools/test-records.mjs
+      - name: trap regressions (duplicate market, git deps, client bundle parse)
+        run: node tools/test-pits.mjs
+      - name: preinstall gate
+        run: node tools/test-preinstall.mjs
+      - name: NO_PROXY effectiveness
+        run: node tools/test-proxy.mjs
