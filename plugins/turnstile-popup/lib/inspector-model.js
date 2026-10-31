@@ -7,6 +7,10 @@
 // Here a "page" is pure data: properties (read-only facts) and actions (commands with an explicit
 // enabled flag and a reason when disabled). Rendering and clicking stay in the browser.
 
+// Capability model. The browser has it on window (loaded before this file by console.html);
+// Node tests inject the same module onto globalThis.window before importing this file.
+const capsOf = () => (typeof window !== 'undefined' ? window.TurnstileCapabilities : globalThis.__caps);
+
 export function buildInspector(selection, data) {
   const out = { title: '属性检查器', subtitle: '', properties: [], actions: [] };
   if (!selection || !data) return out;
@@ -22,10 +26,11 @@ export function buildInspector(selection, data) {
       { label: 'UI 面', value: ((p.ui || []).length || 0) + ' 个' + ((p.ui || []).length ? ': ' + p.ui.join(', ') : '') },
       { label: '位置', value: p.anchor || '(未声明，硬编码)' },
     ];
+    const caps = capsOf().pluginCapabilities(p).capabilities;
     out.actions = [
-      { id: 'toggle', label: p.disabled ? '启用插件' : '停用插件', enabled: (p.rows || []).length > 0, reason: (p.rows || []).length ? '' : '没有配置行，无法写补丁' },
-      { id: 'anchor', label: '改位置', enabled: (p.rows || []).length > 0, reason: (p.rows || []).length ? '' : '没有配置行，无法写补丁' },
-      { id: 'locate', label: '在架构中定位', enabled: true, reason: '' },
+      { id: 'toggle', label: p.disabled ? '启用插件' : '停用插件', enabled: caps.toggle.allowed, reason: caps.toggle.reason },
+      { id: 'anchor', label: '改位置', enabled: caps.anchor.allowed, reason: caps.anchor.reason },
+      { id: 'locate', label: '在架构中定位', enabled: caps.locate.allowed, reason: caps.locate.reason },
     ];
     return out;
   }
@@ -40,7 +45,8 @@ export function buildInspector(selection, data) {
       { label: '插件', value: (s.plugins || []).map((p) => p.name).join(', ') },
       { label: '可配置', value: String(((s.plugins || []).length - ((s.hardcoded || []).length))) },
     ];
-    out.actions = [{ id: 'fuse', label: '生成融合建议', enabled: s.count > 1, reason: s.count > 1 ? '' : '只有一个插件，无需融合' }];
+    const caps = capsOf().surfaceCapabilities(s).capabilities;
+    out.actions = [{ id: 'fuse', label: '生成融合建议', enabled: caps.fuse.allowed, reason: caps.fuse.reason }];
     return out;
   }
 

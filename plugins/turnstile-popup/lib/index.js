@@ -297,6 +297,32 @@ export function apply(ctx, config) {
 
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
+    path: "/turnstile/capabilities.js",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      const here = dirname(fileURLToPath(import.meta.url));
+      const src = readFileSync(join(here, "capabilities.js"), "utf8")
+        .replace(/\bexport\s+(function|const|class)/g, "$1");
+      res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
+      res.end(src);
+    },
+  }), "turnstile: GET /turnstile/capabilities.js");
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/history-timeline.js",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      const here = dirname(fileURLToPath(import.meta.url));
+      const src = readFileSync(join(here, "history-timeline.js"), "utf8")
+        .replace(/\bexport\s+(function|const|class)/g, "$1");
+      res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
+      res.end(src);
+    },
+  }), "turnstile: GET /turnstile/history-timeline.js");
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
     path: "/turnstile/diff-state.js",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });

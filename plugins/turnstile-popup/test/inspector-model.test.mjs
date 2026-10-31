@@ -1,5 +1,10 @@
 // Inspector model: properties are facts, actions are commands, and a disabled action must say why.
 import assert from 'node:assert';
+import * as capabilities from '../lib/capabilities.js';
+
+// The inspector asks the browser-facing module for capabilities; in Node we hand it the same module.
+globalThis.__caps = capabilities;
+
 import { buildInspector } from '../lib/inspector-model.js';
 
 let passed = 0;
@@ -38,7 +43,7 @@ test('an action without a config row is disabled and explains itself', () => {
   const m = buildInspector({ kind: 'plugin', title: 'plug-beta' }, data);
   const toggle = m.actions.find((a) => a.id === 'toggle');
   assert.strictEqual(toggle.enabled, false);
-  assert.match(toggle.reason, /没有配置行/);
+  assert.match(toggle.reason, /没有 profile 行/);
   assert.strictEqual(m.actions.find((a) => a.id === 'locate').enabled, true);
 });
 

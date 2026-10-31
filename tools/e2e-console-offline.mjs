@@ -235,7 +235,8 @@ try {
     await click('[data-testid="inspector-actions"]');
     const rowless = page.locator('[data-testid="action-toggle"]').first();
     ok('row-less plugin disables the patch action', (await rowless.isDisabled()) === true);
-    ok('disabled action explains itself', (await text('[data-testid="action-reason"]')).includes('没有配置行'));
+    ok('disabled action explains itself', (await text('[data-testid="action-reason"]')).includes('该插件没有 profile 行'));
+    ok('capabilities module is loaded in the page', (await page.evaluate(() => typeof window.TurnstileCapabilities)) === 'object');
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {
