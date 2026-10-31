@@ -41,8 +41,8 @@ body[data-health="failed"] .statusbar{color:#ffb3b8}
 <script>
 'use strict';
 const $=(id)=>document.getElementById(id);
-const state={data:null,view:'overview',query:'',selected:null,inspectorTab:'properties',archId:'profile',pluginStatus:'all',busy:false,focus:false,hideInspector:false,delta:null,sort:{key:'name',dir:1},context:null,patchPreview:null,notice:''};
-const views=[['steward','环境管家','◎'],['overview','总览','⌂'],['designer','配置设计器','▧'],['checks','门禁检查','✓'],['plugins','插件','▤'],['surfaces','UI 占用','▦'],['architecture','深层架构','⌘'],['history','历史','◷'],['launcher','启动器','⌕']];
+const state={data:null,view:'overview',query:'',selected:null,inspectorTab:'properties',archId:'profile',pluginStatus:'all',busy:false,focus:false,hideInspector:false,delta:null,sort:{key:'name',dir:1},context:null,patchPreview:null,notice:'',skeleton:null};
+const views=[['steward','环境管家','◎'],['overview','总览','⌂'],['designer','配置设计器','▧'],['checks','门禁检查','✓'],['plugins','插件','▤'],['surfaces','UI 占用','▦'],['architecture','深层架构','⌘'],['history','历史','◷'],['launcher','启动器','⌕'],['skeleton','插件骨架','◫']];
 function node(tag,props={},children=[]){const n=document.createElement(tag);for(const [k,v] of Object.entries(props)){if(k==='class')n.className=v;else if(k==='text')n.textContent=v;else if(k.startsWith('on'))n.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined)n.setAttribute(k,v);}for(const c of children){if(c===null||c===undefined)continue;n.append(c.nodeType?c:document.createTextNode(String(c)));}return n;}
 function btn(text,onClick,testid,cls='btn'){return node('button',{type:'button',class:cls,text,'data-testid':testid,onclick:onClick});}
 function chip(text,kind=''){return node('span',{class:'chip '+kind,text});}
@@ -225,10 +225,48 @@ function renderOverlays(){
   if(state.context){const c=state.context,p=c.plugin;const menu=node('div',{class:'context-menu','data-testid':'context-menu',style:'left:'+c.x+'px;top:'+c.y+'px'});menu.append(btn('属性',()=>{state.context=null;state.hideInspector=false;state.inspectorTab='properties';render();},'context-properties'),btn('在架构中定位',()=>{state.context=null;locate(p.architectureId);},'context-locate'),btn(p.disabled?'预览启用 patch':'预览停用 patch',()=>previewToggle(p),'context-toggle','btn'+(p.disabled?'':' danger')));document.body.append(menu);}
   if(state.patchPreview){const p=state.patchPreview;const confirm=btn(p.disable?'确认停用并备份':'确认启用并备份',applyToggle,'confirm-toggle','btn'+(p.disable?' danger':''));confirm.disabled=p.before===p.after||state.busy;const dialog=node('div',{class:'patch-dialog','data-testid':'patch-dialog'});const card=node('section',{class:'patch-card'},[node('h2',{text:'生成 cordis.patch.yml'}),node('div',{class:'hint',text:p.plugin.name+' · '+(p.disable?'停用':'启用')+' · 预览不写文件；确认后保留备份，重启 mini 生效。'}),node('div',{class:'patch-diff'},[node('div',{},[node('strong',{text:'当前'}),node('pre',{'data-testid':'patch-before',text:p.before||'(空文件)'})]),node('div',{},[node('strong',{text:'生成结果'}),node('pre',{'data-testid':'patch-after',text:p.after})])]),node('div',{class:'patch-actions'},[btn('取消',()=>{state.patchPreview=null;renderOverlays();},'cancel-toggle'),confirm])]);dialog.append(card);document.body.append(dialog);}
 }
+function esc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+async function loadSkeleton(name){
+  state.skeleton={name,data:null,error:'读取中…'};skeleton();
+  try{
+    const r=await fetch('/turnstile/inspect?pkg='+encodeURIComponent(name)+tokenSuffix().replace('?','&'),{headers:{accept:'application/json'}});
+    const j=await r.json();
+    state.skeleton={name,data:j.error?null:j,error:j.error||''};
+  }catch(e){state.skeleton={name,data:null,error:'读取失败：'+e.message};}
+  skeleton();
+}
+function skeleton(){
+  const main=$('main');
+  main.replaceChildren();
+  main.append(pageHead('插件骨架','看声明、inject 面、patch 行、slot、类名——不用再翻 node_modules。'));
+  const box=node('section',{class:'panel'});
+  const input=node('input',{placeholder:'插件名，例如 dsh-mimir','data-testid':'skeleton-input'});
+  input.value=(state.skeleton&&state.skeleton.name)||'';
+  input.addEventListener('keydown',(e)=>{if(e.key==='Enter')loadSkeleton(input.value.trim());});
+  box.append(node('div',{class:'panel-head'},[node('strong',{text:'插件'}),btn('查看',()=>loadSkeleton(input.value.trim()),'skeleton-go')]),input);
+  const s=state.skeleton;
+  if(s){
+    if(s.error)box.append(node('p',{class:'hint','data-testid':'skeleton-error',text:s.error}));
+    else{
+      const d=s.data||{};
+      const line=(k,v)=>node('div',{class:'history-row'},[node('strong',{text:k}),node('small',{text:String(v===''||v==null?'（无）':v)})]);
+      const out=node('div',{'data-testid':'skeleton'});
+      out.append(line('插件',d.pkg+(d.version?' @'+d.version:'')),
+        line('状态',(d.installed?'已安装':'未安装')+(d.inBundles?' · 在 bundles':'')+(d.disabled?' · 已停用':'')),
+        line('inject 面',(d.injects||[]).map(x=>x.replace('@deepseek-ai/dsh-client-','')).join(', ')),
+        line('patch 行',(d.patchRows||[]).join(', ')),
+        line('入口',d.entry),
+        line('slot',(d.slotKeys||[]).join(', ')),
+        line('类名',(d.classNames||[]).slice(0,10).join(', ')));
+      box.append(out);
+    }
+  }
+  main.append(box);
+}
 let launcherState={q:'',hits:[],busy:false,error:''};
 async function launcherSearch(q){
   launcherState.busy=true;launcherState.q=q;
-  try{const r=await fetch('/turnstile/search?q='+encodeURIComponent(q)+tokenSuffix(),{headers:{accept:'application/json'}});
+  try{const r=await fetch('/turnstile/search?q='+encodeURIComponent(q)+tokenSuffix().replace('?','&'),{headers:{accept:'application/json'}});
     const j=await r.json();
     if(!r.ok){launcherState.error=j.error||('HTTP '+r.status);launcherState.hits=[];}
     else{launcherState.error='';launcherState.hits=j.hits||[];}
@@ -237,6 +275,7 @@ async function launcherSearch(q){
 }
 function launcher(){
   const main=$('main');
+  main.replaceChildren();
   main.append(pageHead('启动器','搜文件（索引在 state/launcher-index.json）。输入即搜，Enter 打开第一条。'));
   const box=node('section',{class:'panel'});
   const input=node('input',{placeholder:'搜文件名/路径…','data-testid':'launcher-input',style:'width:100%;padding:8px;border:1px solid #2b3a49;border-radius:6px;background:#0d141c;color:#dce3ea;font:inherit'});
@@ -257,7 +296,7 @@ function launcher(){
   box.append(list);
   main.append(box);
 }
-function render(){renderTop();if(!state.data)return;renderNav();$('main').replaceChildren();({steward,overview,designer,checks,plugins,surfaces,architecture,history,launcher}[state.view]||overview)();renderInspector();renderOverlays();}
+function render(){renderTop();if(!state.data)return;renderNav();$('main').replaceChildren();({steward,overview,designer,checks,plugins,surfaces,architecture,history,launcher,skeleton}[state.view]||overview)();renderInspector();renderOverlays();}
 $('global-search').addEventListener('input',e=>{state.query=e.target.value.trim();persistView();render();});
 $('refresh').addEventListener('click',load);
 $('export').addEventListener('click',exportFiltered);

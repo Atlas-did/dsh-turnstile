@@ -37,6 +37,16 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
       ] }));
       return;
     }
+    if (pathname === '/turnstile/inspect') {
+      const pkg = new URL(req.url, 'http://x').searchParams.get('pkg') || '';
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({
+        pkg, version: '1.2.3', installed: true, inBundles: true, disabled: false,
+        injects: ['@deepseek-ai/dsh-client-ui-settings'], patchRows: ['fixture-row'], entry: 'lib/client.js',
+        slotKeys: ['shell.overlay'], classNames: ['fixture-btn'], head: ['// fixture client'],
+      }));
+      return;
+    }
     if (pathname === '/turnstile/search') {
       const q = (new URL(req.url, 'http://x').searchParams.get('q') || '');
       const hits = q ? [{ path: 'C:/x/tools/launcher.mjs', name: 'launcher.mjs', score: 800 }, { path: 'C:/x/docs/launcher.md', name: 'launcher.md', score: 600 }] : [];

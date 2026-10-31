@@ -405,6 +405,14 @@ window.__ModuleLoader__.load({
           h("footer", { style: { marginTop: "10px", color: C.muted, fontSize: "10.5px", lineHeight: 1.5 } }, "写操作会保留备份；插件状态与位置变更需重启 DSH 后生效。"));
       }
 
+      // 把观测到的 slot 记录交给宿主存盘（供 tools/ui-atlas.mjs 的运行时列使用）。
+      try {
+        var t0 = (location.search.match(/[?&]token=([^&]+)/) || [])[1] || "";
+        fetch("/turnstile/slot-map" + (t0 ? "?token=" + encodeURIComponent(t0) : ""), {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ slots: globalSlotsSnapshot() }),
+        }).catch(function () {});
+      } catch (e) {}
       try { window.__DSH_SLOTS_SNAPSHOT__ = globalSlotsSnapshot; } catch (e) {}
       ctx.slots.inject("shell.overlay", function () {
         return ctx.slots.register({ name: "shell.overlay", id: "turnstile.plugin-list" }, Card);

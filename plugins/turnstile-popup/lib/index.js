@@ -640,6 +640,45 @@ export function apply(ctx, config) {
     },
   }), "turnstile: GET /turnstile/page-model.js");
 
+  // 运行时 slot 快照：客户端（在 DSH 页面里）观测到的注入记录，POST 到这里存盘，供 ui-atlas 使用。
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/slot-map",
+    handler: async (req, res) => {
+      if (req.method === "GET") {
+        const f = join(stateBase(), "slot-map-" + profile + ".json");
+        if (!existsSync(f)) return sendJson(res, 200, { status: "not-generated", file: f });
+        try { return sendJson(res, 200, JSON.parse(readFileSync(f, "utf8"))); } catch (e) { return sendJson(res, 500, { error: String(e.message).slice(0, 120) }); }
+      }
+      if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
+      let body = "";
+      await new Promise((resolve) => { req.on("data", (c) => { body += c; if (body.length > 1e6) req.destroy(); }); req.on("end", resolve); });
+      let parsed; try { parsed = JSON.parse(body); } catch { return sendJson(res, 400, { error: "body 不是 JSON" }); }
+      if (!parsed || !Array.isArray(parsed.slots)) return sendJson(res, 400, { error: "缺少 slots 数组" });
+      try {
+        const f = join(stateBase(), "slot-map-" + profile + ".json");
+        mkdirSync(dirname(f), { recursive: true });
+        writeFileSync(f, JSON.stringify({ at: new Date().toISOString(), profile, slots: parsed.slots }, null, 0));
+        return sendJson(res, 200, { ok: true, file: f, slots: parsed.slots.length });
+      } catch (e) { return sendJson(res, 500, { error: String(e.message).slice(0, 160) }); }
+    },
+  }), "turnstile: GET/POST /turnstile/slot-map");
+  // 插件骨架：控制台点一行就调这里（与 CLI 共用 lib/plugin-inspect.js）。
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/inspect",
+    handler: async (req, res) => {
+      const m = /[?&]pkg=([^&]*)/.exec(String(req.url || ""));
+      if (!m) return sendJson(res, 400, { error: "缺少 pkg" });
+      const pkgName = decodeURIComponent(m[1]);
+      try {
+        const libDir = dirname(fileURLToPath(import.meta.url));
+        const mod = await import(pathToFileURL(join(libDir, "plugin-inspect.js")).href);
+        const r = mod.inspectPlugin(dir, pkgName, { lines: 12 });
+        return sendJson(res, r.ok ? 200 : (r.code === 3 ? 200 : 500), r.data || { error: r.reason });
+      } catch (e) { return sendJson(res, 500, { error: String(e.message).slice(0, 160) }); }
+    },
+  }), "turnstile: GET /turnstile/inspect");
   // 启动器：搜索 state/launcher-index.json（由 tools/launcher.mjs index 生成）。
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",

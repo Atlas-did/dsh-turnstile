@@ -39,15 +39,28 @@ for (const name of bundles) {
 // profile 自己的 patch 行单独列（它不是插件，但会覆盖插件行为）
 for (const m of patchText.matchAll(/^\s*-\s*id:\s*([\w.@/-]+)/gm)) push('profile-patch', { plugin: '(profile)', kind: 'patch', detail: m[1] });
 
-const rows = [...surfaces.entries()].map(([surface, list]) => ({ surface, count: new Set(list.map((l) => l.plugin)).size, entries: list }))
+// 运行时列（可选）：控制台把客户端观测到的 slot 记录 POST 到 /turnstile/slot-map，
+// 存在 state/slot-map-<profile>.json。它统计的是「注入条目数」，不是 DOM 节点数——这点要说清。
+const slotMapFile = val('--slot-map') || join(process.env.DSH_TURNSTILE_STATE || '.', 'slot-map-' + basename(profileDir) + '.json');
+let runtime = null;
+if (existsSync(slotMapFile)) {
+  try { runtime = JSON.parse(readFileSync(slotMapFile, 'utf8')); } catch { runtime = null; }
+}
+const runtimeCount = (surface) => {
+  if (!runtime || !Array.isArray(runtime.slots)) return null;
+  const hit = runtime.slots.find((s) => String(s.slot) === surface || String(s.slot).endsWith(surface));
+  return hit ? hit.count : null;
+};
+
+const rows = [...surfaces.entries()].map(([surface, list]) => ({ surface, count: new Set(list.map((l) => l.plugin)).size, entries: list, runtime: runtimeCount(surface) }))
   .sort((a, b) => b.count - a.count || a.surface.localeCompare(b.surface));
 
 if (argv.includes('--json')) { console.log(JSON.stringify({ profile: profileDir, bundles: bundles.length, surfaces: rows }, null, 1)); process.exit(0); }
 
 const csvOut = val('--csv');
 if (csvOut) {
-  const lines = ['surface,plugin,kind,detail'];
-  for (const r of rows) for (const e of r.entries) lines.push([r.surface, e.plugin, e.kind, e.detail].map((x) => '"' + String(x).replace(/"/g, '""') + '"').join(','));
+  const lines = ['surface,plugin,kind,detail,runtimeCount'];
+  for (const r of rows) for (const e of r.entries) lines.push([r.surface, e.plugin, e.kind, e.detail, r.runtime == null ? '' : r.runtime].map((x) => '"' + String(x).replace(/"/g, '""') + '"').join(','));
   writeFileSync(csvOut, lines.join('\n') + '\n');
   console.log('CSV 已写 ' + csvOut + '（' + (lines.length - 1) + ' 行）');
 }
@@ -63,7 +76,7 @@ const html = [
   '.hot{color:#e3b341;font-weight:600}.pl{color:#b9c7d4}code{color:#7d8fa1;font-size:11px}</style>',
   '<h1>UI 面 → 插件 → 注入条目</h1>',
   '<div class="sub">profile ' + esc(profileDir) + ' · bundles ' + bundles.length + ' · 面 ' + rows.length + '</div>',
-  '<table><thead><tr><th>UI 面</th><th>插件数</th><th>谁在里面（注入 / patch 行）</th></tr></thead><tbody>',
+  '<table><thead><tr><th>UI 面</th><th>插件数</th><th>运行时条目</th><th>谁在里面（注入 / patch 行）</th></tr></thead><tbody>',
 ];
 for (const r of rows) {
   const plugins = [...new Set(r.entries.map((e) => e.plugin))];
@@ -71,7 +84,7 @@ for (const r of rows) {
     const rowIds = r.entries.filter((e) => e.plugin === p && e.kind === 'patch').map((e) => e.detail);
     return '<span class="pl">' + esc(p) + '</span>' + (rowIds.length ? ' <code>' + esc(rowIds.join(',')) + '</code>' : '');
   }).join('<br>');
-  html.push('<tr><td>' + esc(r.surface) + '</td><td class="' + (r.count >= 5 ? 'hot' : 'n') + '">' + r.count + '</td><td>' + cells + '</td></tr>');
+  html.push('<tr><td>' + esc(r.surface) + '</td><td class="' + (r.count >= 5 ? 'hot' : 'n') + '">' + r.count + '</td><td>' + (r.runtime == null ? '<span class="pl">—</span>' : r.runtime) + '</td><td>' + cells + '</td></tr>');
 }
 html.push('</tbody></table>');
 mkdirSync(join(out, '..'), { recursive: true });

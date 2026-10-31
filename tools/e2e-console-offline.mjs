@@ -277,6 +277,17 @@ try {
     ok('channels are listed with evidence', (await text('[data-testid="channel-codex"]')).includes('aa.jsonl'));
     ok('every channel states a falsifier', (await text('[data-testid="channel-codex"]')).includes('推翻条件'));
     ok('the fix actions carry a rollback point', (await text('[data-testid="diagnose-actions"]')).includes('回滚'));
+    // 插件骨架视图：输入包名 -> 出骨架（声明/面/patch 行/slot）
+    await page.locator('[data-testid="nav-skeleton"]').click();
+    await page.waitForTimeout(250);
+    await page.locator('[data-testid="skeleton-input"]').fill('fixture-plugin');
+    await page.locator('[data-testid="skeleton-go"]').click();
+    await page.waitForTimeout(700);
+    const skel = await text('[data-testid="skeleton"]');
+    ok('skeleton view shows inject surfaces', skel.includes('ui-settings'));
+    ok('skeleton view shows patch rows', skel.includes('fixture-row'));
+    ok('skeleton view shows slots', skel.includes('shell.overlay'));
+
     // 启动器视图：输入即搜，结果带路径
     await page.locator('[data-testid="nav-launcher"]').click();
     await page.waitForTimeout(300);
@@ -288,6 +299,12 @@ try {
       return (j.hits || []).length;
     });
     ok('launcher search route returns hits', routeHits >= 1, 'hits=' + routeHits);
+    // 修掉 ?token 拼接后，UI 真的能渲染出结果（之前这条是 unverified）
+    await page.locator('[data-testid="launcher-input"]').fill('launcher');
+    await page.locator('[data-testid="launcher-input"]').press('Enter');
+    await page.waitForTimeout(900);
+    const launcherText = await page.locator('[data-testid="launcher-results"]').innerText().catch(() => '');
+    ok('launcher results render in the UI', launcherText.includes('launcher.mjs'), JSON.stringify(launcherText.slice(0, 60)));
 
     // B11: a failed read must not look healthy (green dot + '0/0').
     await page.route('**/api/console*', (route) => route.fulfill({ status: 500, body: 'boom' }));
