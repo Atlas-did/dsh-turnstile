@@ -27,3 +27,7 @@ shots/
 
 # runtime view state must never be committed inside a fixture
 tests/**/.turnstile/turnstile-view.json
+
+# the 2026-10-31 evidence corpus is frozen test data, not runtime logs
+!tests/corpus/**/logs/
+!tests/corpus/**/logs/**
