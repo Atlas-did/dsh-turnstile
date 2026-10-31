@@ -116,10 +116,12 @@ const failed = blocking;
 
 // Machine-readable report for panels/CI. Written unless --no-report.
 if (!isFlag('--no-report')) {
-  const reportPath = (() => { const i = argv.indexOf('--report'); return i >= 0 ? argv[i + 1] : join(root, 'state', 'report-' + (dir.split(/[\\/]/).pop()) + '.json'); })();
+  // B17: the panel reads this through DSH_TURNSTILE_STATE; writing elsewhere made the two disagree.
+  const stateDir = process.env.DSH_TURNSTILE_STATE || join(root, 'state');
+  const reportPath = (() => { const i = argv.indexOf('--report'); return i >= 0 ? argv[i + 1] : join(stateDir, 'report-' + (dir.split(/[\\/]/).pop()) + '.json'); })();
   try {
     const { mkdirSync } = await import('node:fs');
-    mkdirSync(join(root, 'state'), { recursive: true });
+    mkdirSync(stateDir, { recursive: true });
     writeFileSync(reportPath, JSON.stringify({
       profile: dir,
       generatedAt: new Date().toISOString(),

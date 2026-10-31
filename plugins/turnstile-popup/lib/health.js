@@ -8,11 +8,16 @@ export function item(id, level, message, next) {
 
 /** credentials: only key names are ever inspected, never values. */
 export function credentialsItem({ exists, keys, required }) {
-  const req = required && required.length ? required : ['agnes-api-key'];
+  // B15: no hard-coded key names. A check that only knows the author's machine reports nonsense
+  // on a clean profile; without a declared requirement it only says what is there.
+  const req = Array.isArray(required) && required.length ? required.slice() : [];
   if (!exists) return item('credentials', 'fail', '凭据文件不存在（还没登录过）', '在 DSH 里登录一次');
   const have = new Set(Array.isArray(keys) ? keys : []);
   const missing = req.filter((k) => !have.has(k));
   if (missing.length) return item('credentials', 'warn', '缺少凭据键：' + missing.join(', '), '把凭据写进 ~/.dsh/.credentials.yaml 后重启客户端');
+  if (!req.length) {
+    return item('credentials', 'pass', '凭据文件可读，共 ' + have.size + ' 个键' + (have.size ? '（' + [...have].slice(0, 3).join(', ') + '）' : '（空）'), '');
+  }
   return item('credentials', 'pass', '需要的凭据键都在');
 }
 
@@ -22,6 +27,17 @@ export function bridgeItem({ exists, mtimeMs, now, maxAgeMs }) {
   const age = (now || Date.now()) - Number(mtimeMs || 0);
   if (age > max) return item('bridge', 'warn', 'endpoint.json ' + Math.round(age / 60000) + ' 分钟没更新，桥接可能没在跑', '重启 DSH 与 AA 桌面端');
   return item('bridge', 'pass', '桥接端点新鲜');
+}
+
+// B15/B16: a profile declares bundles; some of them come from the host (the asar), not from the
+// profile's node_modules. Calling those "missing" is how a clean profile got four red rows.
+export function bundlesItem({ total, hostProvided, missing }) {
+  const host = Array.isArray(hostProvided) ? hostProvided : [];
+  const miss = Array.isArray(missing) ? missing : [];
+  if (miss.length) {
+    return item('bundles', 'fail', '缺包：' + miss.slice(0, 4).join(', ') + (miss.length > 4 ? ' 等 ' + miss.length + ' 个' : ''), 'pnpm add 这些包，或从 bundles 里删掉');
+  }
+  return item('bundles', 'pass', total + ' 个 bundle 都能解析' + (host.length ? '（' + host.length + ' 个由宿主提供）' : ''), '');
 }
 
 export function pluginItem({ name, installed, disabled }) {
@@ -49,4 +65,4 @@ export function summarize(items) {
   return { pass: count('pass'), warn: count('warn'), fail: count('fail'), skip: count('skip'), total: list.length };
 }
 
-if (typeof window !== 'undefined') window.TurnstileHealth = { item, credentialsItem, bridgeItem, pluginItem, engineItem, authItem, summarize };
+if (typeof window !== 'undefined') window.TurnstileHealth = { item, credentialsItem, bridgeItem, bundlesItem, pluginItem, engineItem, authItem, summarize };

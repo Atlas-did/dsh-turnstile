@@ -3,6 +3,7 @@
 import { readFileSync, writeFileSync, existsSync, copyFileSync, statSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { makePlan, applyPlan, describePlan } from "./txn.js";
 import { collectConsoleData } from "./console-data.js";
@@ -14,6 +15,11 @@ import { designerTransaction } from "./designer-ops.js";
 import { beginOperation, settleOperation, recoverJournal } from "./journal.js";
 
 const STATE_DIR = () => process.env.DSH_TURNSTILE_STATE || join(process.env.DSH_TURNSTILE_HOME || process.cwd(), "state");
+// B17: every endpoint must read the same state base, or two of them disagree about the same data.
+// Order: explicit override, the toolkit's own state dir, then the DSH home convention.
+const stateBase = () => process.env.DSH_TURNSTILE_STATE
+  || (process.env.DSH_TURNSTILE_HOME ? join(process.env.DSH_TURNSTILE_HOME, "state") : "")
+  || join(process.env.DSH_HOME || join(process.env.USERPROFILE || "", ".dsh"), "turnstile-state");
 
 // Reject anything that is not the host's own page: 401 for no credential, 403 for a foreign origin.
 // Named after the host capability it mirrors: reject a request that the host would reject.
@@ -511,16 +517,33 @@ export function apply(ctx, config) {
       const endpoint = candidates.find((p) => existsSync(p)) || candidates[0];
       let endpointMtime = 0;
       try { if (existsSync(endpoint)) endpointMtime = statSync(endpoint).mtimeMs; } catch {}
-      items.push(health.bridgeItem({ exists: existsSync(endpoint), mtimeMs: endpointMtime }));
-      const prof = { name: profile, dir };
-      // Either market package counts: the tutorial names one, a machine may already carry another.
-      for (const entry of [["dshmarket", "@ace-zone/dsh-market"], ["dsh-free-search"], ["@agents-anywhere/dsh-bridge-next"]]) {
-        const name = entry.find((n) => existsSync(join(prof.dir, "node_modules", n))) || entry[0];
-        const installed = existsSync(join(prof.dir, "node_modules", name));
-        const patchText = existsSync(join(prof.dir, "cordis.patch.yml")) ? readFileSync(join(prof.dir, "cordis.patch.yml"), "utf8") : "";
-        const disabled = new RegExp("id:\\s*" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*\\n\\s*disabled:\\s*true").test(patchText);
-        items.push(health.pluginItem({ name, installed, disabled }));
+      // B15: only talk about the bridge when this profile actually has a bridge plugin; a clean
+      // profile has no reason to hear about someone else's endpoint file.
+      const bridgeInstalled = existsSync(join(dir, "node_modules", "@agents-anywhere", "dsh-bridge-next"));
+      if (bridgeInstalled || existsSync(endpoint)) {
+        items.push(health.bridgeItem({ exists: existsSync(endpoint), mtimeMs: endpointMtime }));
       }
+      const prof = { name: profile, dir };
+      // B15: report what this profile actually declares, not a list of the author's plugins.
+      let bundles = [];
+      try { bundles = (JSON.parse(readFileSync(join(prof.dir, "package.json"), "utf8")).dsh || {}).profile?.bundles || []; } catch {}
+      const patchText = existsSync(join(prof.dir, "cordis.patch.yml")) ? readFileSync(join(prof.dir, "cordis.patch.yml"), "utf8") : "";
+      // B16: a bundle the host ships (asar) is not missing just because the profile lacks it.
+      const hostProvided = [];
+      const missingBundles = [];
+      for (const n of bundles) {
+        if (existsSync(join(prof.dir, "node_modules", n))) continue;
+        let hostHas = false;
+        // Resolve from the running host entry: the host ships bundles under runtime/node_modules,
+        // which is not on the profile's resolution chain.
+        for (const base of [process.argv[1], import.meta.url]) {
+          if (hostHas || !base) continue;
+          try { createRequire(base).resolve(n); hostHas = true; } catch {}
+        }
+        if (hostHas) hostProvided.push(n); else missingBundles.push(n);
+      }
+      const disabledCount = (patchText.match(/disabled:\s*true/g) || []).length;
+      items.push(health.bundlesItem({ total: bundles.length, hostProvided, missing: missingBundles }));
       items.push(health.authItem({ total: null }));
       // 三个坑的检查（双市场 / git 依赖 / client bundle）与 diagnose 同一份实现。
       let pits = [];
@@ -564,8 +587,9 @@ export function apply(ctx, config) {
     path: "/turnstile/report",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
-      const file = join(process.env.DSH_TURNSTILE_HOME || "C:/Users/finef/Desktop/mini-harness/oss/dsh-turnstile", "state", "report-" + profile + ".json");
-      if (!existsSync(file)) return sendJson(res, 404, { error: "no-report", file });
+      // B17: one state base for every endpoint, and a missing report is data, not a 404.
+      const file = join(stateBase(), "report-" + profile + ".json");
+      if (!existsSync(file)) return sendJson(res, 200, { status: "not-generated", file, hint: "node tools/preflight.mjs <profile>" });
       try {
         sendJson(res, 200, JSON.parse(readFileSync(file, "utf8")));
       } catch (e) {
@@ -580,9 +604,8 @@ export function apply(ctx, config) {
     path: "/turnstile/occupancy",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
-      const stateBase = process.env.DSH_TURNSTILE_STATE || join(process.env.DSH_HOME || join(process.env.USERPROFILE || "", ".dsh"), "turnstile-state");
-      const file = join(stateBase, "occupancy-" + profile + ".json");
-      if (!existsSync(file)) return sendJson(res, 404, { error: "no-occupancy", file });
+      const file = join(stateBase(), "occupancy-" + profile + ".json");
+      if (!existsSync(file)) return sendJson(res, 200, { status: "not-generated", file, hint: "node tools/occupancy.mjs <profile> --out" });
       try { sendJson(res, 200, JSON.parse(readFileSync(file, "utf8"))); }
       catch (e) { sendJson(res, 500, { error: String((e && e.message) || e).slice(0, 160) }); }
     },

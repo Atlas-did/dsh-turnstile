@@ -69,8 +69,10 @@ try {
       { name: "dependency-risk", ok: true, findings: [] },
     ],
   }));
-  const turnstileState = join(tmp, "turnstile-state");
-  write(join(turnstileState, "occupancy-mini.json"), JSON.stringify({
+  // B17: one state dir, not two. The panel previously read the report from HOME/state and the
+  // occupancy map from STATE, so the two could describe different moments.
+  const turnstileState = join(tmp, "state");
+  write(join(tmp, "state", "occupancy-mini.json"), JSON.stringify({
     findings: [{ surface: "ui-settings" }],
     surfaces: [{
       surface: "ui-settings", plugins: ["plug-alpha", "plug-gamma"], count: 2,
