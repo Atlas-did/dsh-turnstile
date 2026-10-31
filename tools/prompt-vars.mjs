@@ -9,7 +9,11 @@ import { requireProfile } from './config.mjs';
 silenceWhenJson();
 
 const ALLOWED = new Set(['provider', 'model']);
-const dir = requireProfile(process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop', 'node tools/prompt-vars.mjs <profileDir>');
+const arg = process.argv[2] || '';
+const resolved = arg && !/[\\/]/.test(arg) && !existsSync(join(arg, 'package.json'))
+  ? join(process.env.DSH_HOME || '', 'profiles', arg)
+  : (process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop');
+const dir = requireProfile(resolved, 'node tools/prompt-vars.mjs <profileDir|profileName>');
 const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
 const deps = Object.keys(pkg.dependencies || {});
 const nm = join(dir, 'node_modules');

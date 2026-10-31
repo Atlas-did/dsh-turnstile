@@ -11,7 +11,11 @@ import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
 import { requireProfile } from './config.mjs';
 silenceWhenJson();
 
-const dir = requireProfile(process.argv[2] || ((process.env.DSH_HOME || '') + '/profiles/desktop'), 'node tools/import-health.mjs <profileDir>');
+const arg = process.argv[2] || '';
+const resolved = arg && !/[\\/]/.test(arg) && !existsSync(join(arg, 'package.json'))
+  ? join(process.env.DSH_HOME || '', 'profiles', arg)
+  : (process.argv[2] || ((process.env.DSH_HOME || '') + '/profiles/desktop'));
+const dir = requireProfile(resolved, 'node tools/import-health.mjs <profileDir|profileName>');
 const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
 const deps = Object.keys(pkg.dependencies || {});
 const bundles = (pkg.dsh?.profile?.bundles) || [];

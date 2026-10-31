@@ -4,7 +4,12 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-const dir = requireProfile(process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop', 'node tools/engines.mjs <profileDir>');
+// Accept a path OR a profile name (preflight and doctor take names too; rejecting one was my bug).
+const arg = process.argv[2] || '';
+const resolved = arg && !/[\\/]/.test(arg) && !existsSync(join(arg, 'package.json'))
+  ? join(process.env.DSH_HOME || '', 'profiles', arg)
+  : (arg || (process.env.DSH_HOME || '') + '/profiles/desktop');
+const dir = requireProfile(resolved, 'node tools/engines.mjs <profileDir|profileName>');
 const runtime = process.argv[3] || runtimeVersion;
 const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
 const bundles = (pkg.dsh?.profile?.bundles || []).filter((b) => !b.startsWith('@deepseek-ai/'));

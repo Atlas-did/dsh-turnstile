@@ -9,7 +9,11 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { requireProfile } from './config.mjs';
 
-const dir = requireProfile(process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop', 'node tools/registry.mjs <profileDir>');
+const arg = process.argv[2] || '';
+const resolved = arg && !/[\\/]/.test(arg) && !existsSync(join(arg, 'package.json'))
+  ? join(process.env.DSH_HOME || '', 'profiles', arg)
+  : (process.argv[2] || (process.env.DSH_HOME || '') + '/profiles/desktop');
+const dir = requireProfile(resolved, 'node tools/registry.mjs <profileDir|profileName>');
 const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
 const cur = process.argv[3] || '0.2.1-rc.3';
 // explicit exemptions written by `dsh plugin allow-version`
