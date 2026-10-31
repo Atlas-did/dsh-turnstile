@@ -66,3 +66,20 @@ tests/corpus/2026-10-31/logs/aa/healthy-window-0814.jsonl   1014 records   ERROR
 node tools/log-format.mjs tests/corpus/2026-10-31/logs/aa/healthy-window-0814.jsonl
 # levels: debug=920 info=94    没有 error
 ```
+## 六、勘误与目录调整（第 3 轮后）
+
+| 原写法 | 实际 | 处理 |
+|---|---|---|
+| 「12 个文件 / 3,894,089 字节」 | 13 个 / 4,269,432 | 已按 manifest 更正（manifest 现为完整 64 位 sha256） |
+| `healthy-window-0814.jsonl` 放在 `logs/aa/` | 它是 runtime 块的**逐字复制**（1014 条 seq 全重合），同扫会得到 10,239 条而非 9,225 | **已移到 `logs/control/`**，两目录永不同扫 |
+| 「ingest request failed 112 条」 | 其中 **72 条 WARNING、40 条 ERROR**（我按 ERROR 筛只拿到 0，会漏掉整条通道） | severity 与 failure 分开统计 |
+| 「按文件判故障」 | dsh 的 93 条 ERROR 散在 6 个文件（30/52/0/3/6/2），`runtime-…03996` 与 `…07986` 是 0 条 | 判定必须跨文件聚合，不能按单文件 |
+| 时间戳 | dsh-bridge 用 `Z`，connector 用 `+08:00`，直接按字符串切窗差 8 小时 | S1 统一转 ISO-UTC |
+
+冻结后的真实口径：
+
+```
+logs/aa        10 文件  9,225 条（seq 唯一）
+logs/control    1 文件  1,014 条（0 ERROR，健康对照）
+logs/plugin     2 文件     80 条（PARSE_ERROR 32 / ERR_STREAM_WRITE_AFTER_END 6）
+```

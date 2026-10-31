@@ -1,71 +1,77 @@
 {
- "frozenAt": "2026-10-31T08:48:45.479Z",
- "note": "read-only evidence for diagnose acceptance; do not edit",
+ "frozenAt": "2026-10-31T08:54:04.908Z",
+ "note": "read-only evidence for diagnose acceptance; logs/aa and logs/control must never be scanned together (control duplicates 1014 records)",
+ "laws": [
+  "record = e.record || e",
+  "ts normalized to UTC ISO",
+  "dedupe by seq",
+  "only *.jsonl under logs/{aa,control,plugin}"
+ ],
  "files": [
-  {
-   "path": "logs/aa/healthy-window-0814.jsonl",
-   "bytes": 375343,
-   "sha256": "95759cb6e1f7110b"
-  },
   {
    "path": "logs/aa/runtime-00000000000000000001.jsonl",
    "bytes": 395157,
-   "sha256": "ee002c79e290d0f4"
+   "sha256": "ee002c79e290d0f496ace74022813984c7b82d3eafae17e637c66ea36ff20f29"
   },
   {
    "path": "logs/aa/runtime-00000000000000001001.jsonl",
    "bytes": 390314,
-   "sha256": "88e875b4bcd4db0d"
+   "sha256": "88e875b4bcd4db0d77e8b28213e964b7b2944c5d84a0e634146334d90d8f7db9"
   },
   {
    "path": "logs/aa/runtime-00000000000000002001.jsonl",
    "bytes": 455158,
-   "sha256": "beedf63ab82bcc7b"
+   "sha256": "beedf63ab82bcc7b1d99441fd06d9e4ef2ab13a70e95a36477139907f457cabb"
   },
   {
    "path": "logs/aa/runtime-00000000000000003001.jsonl",
    "bytes": 504874,
-   "sha256": "a99bd5fc8b92562c"
+   "sha256": "a99bd5fc8b92562c6a8fe19c9e4ce7f4becf2b8afb5e3a48cf20f379ff57e400"
   },
   {
    "path": "logs/aa/runtime-00000000000000003996.jsonl",
    "bytes": 393560,
-   "sha256": "8dcb7d830818e380"
+   "sha256": "8dcb7d830818e38065113b2254355ac8989aeed504c330133d6260c08c743cf7"
   },
   {
    "path": "logs/aa/runtime-00000000000000004996.jsonl",
    "bytes": 405032,
-   "sha256": "483ff979ac3cfab9"
+   "sha256": "483ff979ac3cfab9d960ba6b149a22162a4c9c4e724d765297de935ec89f9ebc"
   },
   {
    "path": "logs/aa/runtime-00000000000000005996.jsonl",
    "bytes": 405148,
-   "sha256": "3f029b9d00491f73"
+   "sha256": "3f029b9d00491f73a0cdf1a6680a68ab07502b5789af08e85ffbfcf8834d97f4"
   },
   {
    "path": "logs/aa/runtime-00000000000000006990.jsonl",
    "bytes": 396729,
-   "sha256": "cedf2a0e0d39b80b"
+   "sha256": "cedf2a0e0d39b80b9a7bf8053bdd946feb228d0aa7ead401abfd9a9a0f48f52b"
   },
   {
    "path": "logs/aa/runtime-00000000000000007986.jsonl",
    "bytes": 396011,
-   "sha256": "19d884f96f29ab29"
+   "sha256": "19d884f96f29ab29289abc2763369a570315830140a73fa2327374cfba0cb015"
   },
   {
    "path": "logs/aa/runtime-00000000000000008986.jsonl",
    "bytes": 96961,
-   "sha256": "5bfa4a139b93356d"
+   "sha256": "5bfa4a139b93356d5ad56acb4549c3e8a00e342db29c82fd85c58ddf0b5d2aa0"
+  },
+  {
+   "path": "logs/control/healthy-window-0814.jsonl",
+   "bytes": 375343,
+   "sha256": "95759cb6e1f7110bf02b6d59d34b01fea3582bacf972791e4792db6b5ba618d0"
   },
   {
    "path": "logs/plugin/dsh-runtime.jsonl",
    "bytes": 54746,
-   "sha256": "1d9347e51200d49a"
+   "sha256": "1d9347e51200d49a5b5ad1190bbff75800a0b6be59b0a573980b21c011af51e1"
   },
   {
    "path": "logs/plugin/onboarding.jsonl",
    "bytes": 399,
-   "sha256": "34b0c6890e24fe8f"
+   "sha256": "34b0c6890e24fe8f80970b68a71e8ffa3a7c8f8be7d5c6cf1bc2a4e060dc6e07"
   }
  ]
 }
