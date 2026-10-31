@@ -60,5 +60,21 @@ threw = '';
 try { applyCommand(page, { type: 'remove', nodeId: page.root.id }); } catch (e) { threw = e.message; }
 ok('根节点不能删除', /根节点/.test(threw), threw);
 
+// 新组件与样式：表/图/图 + setStyle
+const t1 = applyCommand(newPage(), { type: 'add', parentId: 'stack-root', component: 'table' });
+ok('table 有列声明默认值', t1.page.root.children[0].props.columns.length > 0);
+const c1 = applyCommand(t1.page, { type: 'add', parentId: 'stack-root', component: 'chart' }).page;
+ok('chart 渲染数据可解析', c1.root.children[1].props.series.split('\n').length === 3);
+threw = '';
+try { applyCommand(c1, { type: 'setProp', nodeId: c1.root.children[1].id, key: 'kind', value: 'pie' }); } catch (e) { threw = e.message; }
+ok('chart 类型枚举受限', /可选值/.test(threw), threw);
+const styled = applyCommand(c1, { type: 'setStyle', nodeId: c1.root.children[0].id, key: 'tone', value: 'panel' }).page;
+ok('样式写入节点', styled.root.children[0].style.tone === 'panel');
+threw = '';
+try { applyCommand(styled, { type: 'setStyle', nodeId: styled.root.children[0].id, key: 'bogus', value: 'x' }); } catch (e) { threw = e.message; }
+ok('未知样式项被拒', /没有样式项/.test(threw), threw);
+const imgBad = applyCommand(styled, { type: 'add', parentId: 'stack-root', component: 'image' }).page;
+ok('图片默认没有地址（渲染器会拒绝）', imgBad.root.children[2].props.src === '');
+
 console.log(fail ? 'PAGEMODEL_TEST_FAILED ' + fail : 'PAGEMODEL_TEST_OK');
 process.exitCode = fail ? 1 : 0;

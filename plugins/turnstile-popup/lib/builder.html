@@ -40,6 +40,7 @@ button:disabled{opacity:.45;cursor:default}
 </div>
 <div class="bar"><span id="status" data-testid="status">就绪</span><span class="sp"></span><span id="snapinfo"></span></div>
 <script src="/turnstile/page-model.js"></script>
+<script src="/turnstile/page-render.js"></script>
 <script>
 'use strict';
 const M = window.TurnstilePageModel;
@@ -102,6 +103,12 @@ function renderNode(node) {
   if (caps.acceptsChildren) { const kids = document.createElement('div'); kids.className = node.type === 'grid' ? 'grid' : (node.props.direction === 'row' ? 'stack-row' : 'stack-column'); if (node.type === 'grid') kids.style.gridTemplateColumns = 'repeat(' + node.props.columns + ', minmax(0,1fr))'; kids.style.gap = (node.props.gap || 0) + 'px'; for (const c of node.children) kids.append(renderNode(c)); wrap.append(kids); }
   return wrap;
 }function renderBody(node) {
+  // 内容渲染统一交给 page-render.js：搭建器和宿主内页面用同一份实现，不会再出现「预览和画布不一致」。
+  if (window.TurnstilePageRender) {
+    const box = window.TurnstilePageRender.renderBody(node);
+    box.dataset.testid = 'view-' + node.type;
+    return box;
+  }
   const p = node.props || {};
   const el = document.createElement('div');
   if (node.type === 'heading') { el.className = 'heading'; el.textContent = p.text; el.dataset.testid = 'view-heading'; }
@@ -137,11 +144,33 @@ function renderInspector() {
     });
     wrap.append(label, input); box2.append(wrap);
   }
+  // 样式面板：共用 STYLE_SCHEMA，按声明生成控件（Designable/Formily 那套）
+  const styleHead = document.createElement('h4'); styleHead.textContent = '样式'; styleHead.style.margin = '14px 0 8px'; styleHead.style.color = '#8fa3b5'; styleHead.style.fontSize = '12px';
+  const styleBox = document.createElement('div');
+  node.style = node.style || M.defaultStyle();
+  for (const [key, field] of Object.entries(M.STYLE_SCHEMA)) {
+    const wrap = document.createElement('div'); wrap.className = 'field';
+    const label = document.createElement('label'); label.textContent = '样式 · ' + field.label;
+    let input;
+    if (field.type === 'enum') {
+      input = document.createElement('select');
+      for (const o of field.options) { const op = document.createElement('option'); op.value = o; op.textContent = String(o); if (String(node.style[key]) === String(o)) op.selected = true; input.append(op); }
+    } else {
+      input = document.createElement('input'); input.type = 'number'; input.value = node.style[key]; if (field.min !== undefined) input.min = field.min; if (field.max !== undefined) input.max = field.max;
+    }
+    input.dataset.testid = 'style-' + key;
+    input.addEventListener('change', () => {
+      try { stack = M.run(stack, { type: 'setStyle', nodeId: node.id, key, value: input.value }); status('样式 ' + key + ' 已改'); render(); }
+      catch (e) { const err = document.createElement('div'); err.className = 'err'; err.dataset.testid = 'style-error'; err.textContent = e.message; wrap.append(err); }
+    });
+    wrap.append(label, input); styleBox.append(wrap);
+  }
+
   const del = document.createElement('button'); del.textContent = '删除节点'; del.dataset.testid = 'remove-node';
   del.disabled = node.id === stack.current.root.id;
   del.addEventListener('click', () => { try { stack = M.run(stack, { type: 'remove', nodeId: node.id }); selectedId = stack.current.root.id; render(); } catch (e) { status(e.message); } });
   box2.append(del);
-  box.replaceChildren(head, box2);
+  box.replaceChildren(head, box2, styleHead, styleBox);
 }
 
 function renderSnaps() {

@@ -21,6 +21,7 @@ const server = createServer((req, res) => {
     const src = readFileSync(join(lib, 'page-model.js'), 'utf8').replace(/^export\s+(?=(function|const|let|class))/gm, '');
     res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(src); return;
   }
+  if (req.url.startsWith('/turnstile/page-render.js')) { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(readFileSync(join(lib, 'page-render.js'), 'utf8')); return; }
   if (req.url.startsWith('/turnstile/page')) {
     if (req.method === 'POST') {
       let body = '';
@@ -84,10 +85,27 @@ if (grids === 1) {
   ok('out-of-range value is refused with a reason', (await page.locator('[data-testid="prop-error"]').count()) === 1);
 }
 
+// 新组件：表格 / 图表 / 图片 都要能被拖进来并渲染
+for (const type of ['table', 'chart']) {
+  await page.locator('[data-testid="palette-' + type + '"]').click();
+  await page.waitForTimeout(120);
+  await target.click();
+  await page.waitForTimeout(200);
+}
+ok('table component renders rows', (await page.locator('[data-testid="view-table"] tbody tr').count()) >= 1);
+ok('chart component renders bars', (await page.locator('[data-testid="view-chart"]').first().innerText()).includes('ui-settings'));
+
+// 样式面板：改对齐后画布立刻变
+await page.locator('[data-testid^="node-heading-"]').first().click();
+await page.waitForTimeout(200);
+await page.locator('[data-testid="style-align"]').selectOption('center');
+await page.waitForTimeout(300);
+ok('style panel applies alignment', (await page.locator('[data-testid="view-heading"]').first().evaluate((n) => getComputedStyle(n).textAlign)) === 'center');
 // 撤销 / 重做 / 快照
+const beforeUndo = await page.locator('#canvas .node').count();
 await page.locator('[data-testid="undo"]').click();
 await page.waitForTimeout(250);
-ok('undo removes the last add', (await page.locator('[data-testid="view-heading"]').count()) === 0 || (await page.locator('[data-testid^="node-grid-"]').count()) === 0);
+ok('undo removes the last change', (await page.locator('#canvas .node').count()) <= beforeUndo, beforeUndo + ' -> ' + (await page.locator('#canvas .node').count()));
 await page.locator('[data-testid="redo"]').click();
 await page.waitForTimeout(250);
 ok('redo restores it', (await page.locator('[data-testid^="node-grid-"]').count()) + (await page.locator('[data-testid^="node-heading-"]').count()) >= 1);

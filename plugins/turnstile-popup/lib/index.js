@@ -617,9 +617,11 @@ export function apply(ctx, config) {
     path: "/turnstile/builder",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
-      const file = join(dirname(fileURLToPath(import.meta.url)), "builder.html");
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
-      res.end(readFileSync(file, "utf8"));
+      try {
+        const file = join(dirname(fileURLToPath(import.meta.url)), "builder.html");
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+        res.end(readFileSync(file, "utf8"));
+      } catch (e) { sendJson(res, 500, { error: "builder.html 读不出：" + String(e.message).slice(0, 160) }); }
     },
   }), "turnstile: GET /turnstile/builder");
 
@@ -627,15 +629,51 @@ export function apply(ctx, config) {
     kind: "exact",
     path: "/turnstile/page-model.js",
     handler: async (req, res) => {
-      const file = join(dirname(fileURLToPath(import.meta.url)), "page-model.js");
-      // 浏览器按经典脚本加载（没有 import/export），所以这里剥掉 export 关键字；
-      // 文件本身仍是 ESM，node 侧测试可以直接 import（同其它 lib 模块的处理方式）。
-      const src = readFileSync(file, "utf8").replace(/^export\s+(?=(function|const|let|class))/gm, "");
-      res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
-      res.end(src);
+      try {
+        const file = join(dirname(fileURLToPath(import.meta.url)), "page-model.js");
+        // 浏览器按经典脚本加载（没有 import/export），所以这里剥掉 export 关键字；
+        // 文件本身仍是 ESM，node 侧测试可以直接 import（同其它 lib 模块的处理方式）。
+        const src = readFileSync(file, "utf8").replace(/^export\s+(?=(function|const|let|class))/gm, "");
+        res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
+        res.end(src);
+      } catch (e) { sendJson(res, 500, { error: "page-model.js 读不出：" + String(e.message).slice(0, 160) }); }
     },
   }), "turnstile: GET /turnstile/page-model.js");
 
+  // 宿主内页面：/turnstile/view 只读渲染 state 里的页面 JSON（搭建器负责编辑）。
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/view",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      const html = [
+        "<!DOCTYPE html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\"><title>页面</title>",
+        "<style>*{box-sizing:border-box}body{margin:0;padding:16px;background:#0d141c;color:#dce3ea;font:13px/1.5 ui-sans-serif,system-ui,'Microsoft YaHei'}",
+        ".empty{color:#8fa3b5}</style></head><body><div id=\"root\"></div>",
+        "<script src=\"/turnstile/page-render.js\"></script>",
+        "<script>var t=new URLSearchParams(location.search).get('token')||'';",
+        "fetch('/turnstile/page'+'?token='+encodeURIComponent(t)).then(function(r){return r.json()}).then(function(j){",
+        "  var root=document.getElementById('root');",
+        "  if(!j||!j.root){root.innerHTML='<p class=empty>还没有页面：先到 /turnstile/builder 搭一个并保存。</p>';return;}",
+        "  root.append(window.TurnstilePageRender.render(j.root));",
+        "}).catch(function(e){document.getElementById('root').innerHTML='<p class=empty>读取失败：'+e.message+'</p>';});</script></body></html>",
+      ].join("");
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+      res.end(html);
+    },
+  }), "turnstile: GET /turnstile/view");
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/page-render.js",
+    handler: async (req, res) => {
+      try {
+        const file = join(dirname(fileURLToPath(import.meta.url)), "page-render.js");
+        res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
+        res.end(readFileSync(file, "utf8"));
+      } catch (e) { sendJson(res, 500, { error: "page-render.js 读不出：" + String(e.message).slice(0, 160) }); }
+    },
+  }), "turnstile: GET /turnstile/page-render.js");
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
     path: "/turnstile/page",

@@ -285,6 +285,28 @@ window.__ModuleLoader__.load({
               h("div", { style: { fontSize: "16px", fontWeight: 650, letterSpacing: ".01em" } }, "插件闸门"),
               h("div", { style: { color: C.muted, fontSize: "11px", marginTop: "2px" } }, shortProfile() + " · 安装前检查与界面占用")),
             h("button", { type: "button", "data-testid": "inspect", title: "准星：点选页面元素，解析 slot 与条目归属", "aria-label": "准星定位", "aria-pressed": inspectMode, onClick: function () { setInspectMode(!inspectMode); setInspectRect(null); }, style: Object.assign({}, S.button, { borderColor: inspectMode ? C.amber : C.line, color: inspectMode ? C.amber : C.text }) }, inspectMode ? "点选目标" : "准星"),
+            h("button", { type: "button", "data-testid": "page-open", title: "在宿主内打开搭建好的页面", "aria-label": "页面", onClick: function () {
+              var t = (location.search.match(/[?&]token=([^&]+)/) || [])[1] || "";
+              var box = document.getElementById("turnstile-page-overlay");
+              if (box) { box.remove(); return; }
+              box = document.createElement("div");
+              box.id = "turnstile-page-overlay";
+              box.setAttribute("data-testid", "page-overlay");
+              box.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:#0d141c;display:grid;grid-template-rows:38px 1fr";
+              var bar = document.createElement("div");
+              bar.style.cssText = "display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid #22303d;color:#dce3ea;font:12px ui-sans-serif,system-ui";
+              bar.textContent = "页面（搭建器产出·只读）";
+              var close = document.createElement("button");
+              close.textContent = "关闭";
+              close.style.cssText = "margin-left:auto;padding:3px 10px;border:1px solid #2b3a49;border-radius:6px;background:#16212b;color:#dce3ea;cursor:pointer";
+              close.onclick = function () { box.remove(); };
+              bar.append(close);
+              var frame = document.createElement("iframe");
+              frame.src = "/turnstile/view" + (t ? "?token=" + encodeURIComponent(t) : "");
+              frame.style.cssText = "border:0;width:100%;height:100%;background:#0d141c";
+              box.append(bar, frame);
+              document.body.append(box);
+            }, style: S.button }, "页面"),
             h("button", { type: "button", "data-testid": "console-open", title: "在浏览器中打开完整控制台", "aria-label": "打开完整控制台", onClick: function () { var t = (location.search.match(/[?&]token=([^&]+)/) || [])[1] || ""; window.open("/turnstile/console" + (t ? "?token=" + encodeURIComponent(t) : ""), "_blank", "noopener"); }, style: S.button }, "全窗口"),
             h("button", { type: "button", "data-testid": "refresh", title: "重新读取面板数据", "aria-label": "刷新", disabled: Boolean(busy), onClick: refresh, style: Object.assign({}, S.quiet, { opacity: busy ? .5 : 1 }) }, busy === "refresh" ? "…" : "↻"),
             h("button", { type: "button", "data-testid": "close", title: "收起面板", "aria-label": "收起", onClick: function () { setOpen(false); }, style: S.quiet }, "×")),

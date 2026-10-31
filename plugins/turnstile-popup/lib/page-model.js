@@ -54,6 +54,34 @@ export const COMPONENTS = Object.freeze({
       gap: { type: 'number', label: '间距', default: 10, min: 0, max: 40 },
     },
   },
+  table: {
+    label: '表格',
+    capabilities: { draggable: true, droppable: false, acceptsChildren: false },
+    defaults: { columns: '名称, 状态', rows: 'alpha, 启用\nbeta, 停用' },
+    propsSchema: {
+      columns: { type: 'string', label: '列名（逗号分隔）', default: '名称, 状态' },
+      rows: { type: 'string', label: '行（每行一行，逗号分隔）', default: 'alpha, 启用', multiline: true },
+    },
+  },
+  chart: {
+    label: '图表',
+    capabilities: { draggable: true, droppable: false, acceptsChildren: false },
+    defaults: { kind: 'bar', title: '分布', series: 'ui-settings: 7\nui-conversation: 8\nui-renderer: 4' },
+    propsSchema: {
+      kind: { type: 'enum', label: '类型', default: 'bar', options: ['bar', 'line'] },
+      title: { type: 'string', label: '标题', default: '分布' },
+      series: { type: 'string', label: '数据（每行 标签:数值）', default: 'A: 1', multiline: true },
+    },
+  },
+  image: {
+    label: '图片',
+    capabilities: { draggable: true, droppable: false, acceptsChildren: false },
+    defaults: { src: '', alt: '' },
+    propsSchema: {
+      src: { type: 'string', label: '地址（只允许 http(s) 或 /turnstile/）', default: '' },
+      alt: { type: 'string', label: '替代文字', default: '' },
+    },
+  },
   stat: {
     label: '指标卡',
     capabilities: { draggable: true, droppable: false, acceptsChildren: false },
@@ -66,6 +94,19 @@ export const COMPONENTS = Object.freeze({
   },
 });
 
+
+/** 所有组件共用的样式声明（样式面板从这里生成）。 */
+export const STYLE_SCHEMA = Object.freeze({
+  padding: { type: 'number', label: '内边距', default: 0, min: 0, max: 48 },
+  align: { type: 'enum', label: '对齐', default: 'left', options: ['left', 'center', 'right'] },
+  tone: { type: 'enum', label: '底色', default: 'none', options: ['none', 'panel', 'accent'] },
+  width: { type: 'enum', label: '宽度', default: 'auto', options: ['auto', 'half', 'full'] },
+});
+
+export function defaultStyle() {
+  return { padding: 0, align: 'left', tone: 'none', width: 'auto' };
+}
+
 let seq = 0;
 export function resetIds() { seq = 0; }
 export function nextId(type) { seq += 1; return type + '-' + seq; }
@@ -73,7 +114,7 @@ export function nextId(type) { seq += 1; return type + '-' + seq; }
 export function newNode(type, props = {}) {
   const spec = COMPONENTS[type];
   if (!spec) throw new Error('unknown component: ' + type);
-  return { id: nextId(type), type, props: { ...spec.defaults, ...props }, children: [] };
+  return { id: nextId(type), type, props: { ...spec.defaults, ...props }, style: defaultStyle(), children: [] };
 }
 
 export function newPage() {
@@ -133,6 +174,15 @@ export function applyCommand(page, cmd) {
       if (!parent) throw new Error('找不到节点 ' + cmd.nodeId);
       parent.children = parent.children.filter((c) => c.id !== cmd.nodeId);
       return { page: next, focus: parent.id };
+    }
+    case 'setStyle': {
+      const node2 = findNode(next.root, cmd.nodeId);
+      if (!node2) throw new Error('找不到节点 ' + cmd.nodeId);
+      const spec2 = STYLE_SCHEMA[cmd.key];
+      if (!spec2) throw new Error('没有样式项 ' + cmd.key);
+      node2.style = node2.style || defaultStyle();
+      node2.style[cmd.key] = coerce(spec2, cmd.value);
+      return { page: next, focus: node2.id };
     }
     case 'setProp': {
       const node = findNode(next.root, cmd.nodeId);
@@ -212,9 +262,10 @@ export function labelOf(cmd) {
   if (cmd.type === 'move') return '移动节点';
   if (cmd.type === 'remove') return '删除节点';
   if (cmd.type === 'setProp') return '改 ' + cmd.key;
+  if (cmd.type === 'setStyle') return '样式 ' + cmd.key;
   return cmd.type;
 }
 
 if (typeof window !== 'undefined') {
-  window.TurnstilePageModel = { PAGE_SCHEMA, COMPONENTS, newPage, newNode, findNode, findParent, capabilitiesOf, applyCommand, coerce, createStack, run, undo, redo, jumpTo, labelOf };
+  window.TurnstilePageModel = { PAGE_SCHEMA, COMPONENTS, STYLE_SCHEMA, defaultStyle, newPage, newNode, findNode, findParent, capabilitiesOf, applyCommand, coerce, createStack, run, undo, redo, jumpTo, labelOf };
 }
