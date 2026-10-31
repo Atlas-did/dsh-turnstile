@@ -49,7 +49,11 @@
     "diff-plugins": "node tools/diff-plugins.mjs",
     "test:look": "node tools/test-look-tools.mjs",
     "mini": "node tools/mini-ctl.mjs",
-    "test:arch": "node tools/test-arch-graph.mjs"
+    "test:arch": "node tools/test-arch-graph.mjs",
+    "snapshot:profile": "node tools/profile-snapshot.mjs",
+    "ask": "node tools/ask.mjs",
+    "test:snapshot": "node tools/test-profile-snapshot.mjs",
+    "test:ask": "node plugins/turnstile-popup/test/ask.test.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",
