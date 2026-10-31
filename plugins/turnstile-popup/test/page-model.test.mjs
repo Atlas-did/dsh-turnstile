@@ -66,7 +66,7 @@ ok('table 有列声明默认值', t1.page.root.children[0].props.columns.length 
 const c1 = applyCommand(t1.page, { type: 'add', parentId: 'stack-root', component: 'chart' }).page;
 ok('chart 渲染数据可解析', c1.root.children[1].props.series.split('\n').length === 3);
 threw = '';
-try { applyCommand(c1, { type: 'setProp', nodeId: c1.root.children[1].id, key: 'kind', value: 'pie' }); } catch (e) { threw = e.message; }
+try { applyCommand(c1, { type: 'setProp', nodeId: c1.root.children[1].id, key: 'kind', value: 'donut' }); } catch (e) { threw = e.message; }
 ok('chart 类型枚举受限', /可选值/.test(threw), threw);
 const styled = applyCommand(c1, { type: 'setStyle', nodeId: c1.root.children[0].id, key: 'tone', value: 'panel' }).page;
 ok('样式写入节点', styled.root.children[0].style.tone === 'panel');
@@ -75,6 +75,17 @@ try { applyCommand(styled, { type: 'setStyle', nodeId: styled.root.children[0].i
 ok('未知样式项被拒', /没有样式项/.test(threw), threw);
 const imgBad = applyCommand(styled, { type: 'add', parentId: 'stack-root', component: 'image' }).page;
 ok('图片默认没有地址（渲染器会拒绝）', imgBad.root.children[2].props.src === '');
+
+// B3/B4：饼图枚举 + 样式自由值
+const pieTry = applyCommand(newPage(), { type: 'add', parentId: 'stack-root', component: 'chart', props: { kind: 'pie' } });
+ok('图表支持 pie', pieTry.page.root.children[0].props.kind === 'pie');
+const styled2 = applyCommand(pieTry.page, { type: 'setStyle', nodeId: pieTry.page.root.children[0].id, key: 'color', value: '#ff0000' }).page;
+ok('样式接受自由颜色', styled2.root.children[0].style.color === '#ff0000');
+const sz = applyCommand(styled2, { type: 'setStyle', nodeId: styled2.root.children[0].id, key: 'fontSize', value: '22' }).page;
+ok('字号按数字强制', sz.root.children[0].style.fontSize === 22);
+threw = '';
+try { applyCommand(sz, { type: 'setStyle', nodeId: sz.root.children[0].id, key: 'fontSize', value: '99' }); } catch (e) { threw = e.message; }
+ok('字号超范围被拒', /不能大于/.test(threw), threw);
 
 console.log(fail ? 'PAGEMODEL_TEST_FAILED ' + fail : 'PAGEMODEL_TEST_OK');
 process.exitCode = fail ? 1 : 0;

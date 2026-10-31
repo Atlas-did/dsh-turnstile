@@ -12,6 +12,9 @@
     if (s.tone === 'accent') { out.background = '#1c2f45'; out.border = '1px solid #3b6ea8'; out.borderRadius = '8px'; }
     if (s.width === 'half') out.width = '50%';
     if (s.width === 'full') out.width = '100%';
+    if (s.color) out.color = s.color;
+    if (s.fontSize) out.fontSize = s.fontSize + 'px';
+    if (s.radius) out.borderRadius = s.radius + 'px';
     return out;
   }
   function rows(text) {
@@ -31,7 +34,9 @@
     if (p.title) { const t = el('div'); t.textContent = p.title; t.style.fontWeight = '600'; wrap.append(t); }
     const data = series(p.series);
     if (!data.length) { const n = el('div'); n.textContent = '（没有可解析的数据：每行写 标签:数值）'; n.style.color = '#8fa3b5'; wrap.append(n); return wrap; }
+    if (p.kind === 'pie') { wrap.append(pieNode(data)); return wrap; }
     const max = Math.max(...data.map((d) => Math.abs(d.value)), 1);
+    if (p.kind === 'line') { wrap.append(lineNode(data, max)); return wrap; }
     for (const d of data) {
       const row = el('div'); row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.gap = '8px';
       const label = el('span'); label.textContent = d.label; label.style.width = '34%'; label.style.color = '#b9c7d4'; label.style.fontSize = '11px';
@@ -43,6 +48,70 @@
     }
     return wrap;
   }
+  // B3：饼图与带坐标轴的折线，都用内联 SVG（不引第三方库）。
+  function pieNode(data) {
+    const total = data.reduce((a, d) => a + Math.abs(d.value), 0) || 1;
+    const colors = ['#4ec97c', '#69b7ff', '#e8b53d', '#e86161', '#a78bfa', '#3ddad7'];
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 200 200'); svg.style.width = '200px'; svg.style.height = '200px';
+    let angle = -Math.PI / 2;
+    const cx = 100, cy = 100, r = 80;
+    data.forEach((d, i) => {
+      const frac = Math.abs(d.value) / total;
+      const end = angle + frac * Math.PI * 2;
+      const x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle);
+      const x2 = cx + r * Math.cos(end), y2 = cy + r * Math.sin(end);
+      const large = frac > 0.5 ? 1 : 0;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', 'M ' + cx + ' ' + cy + ' L ' + x1.toFixed(1) + ' ' + y1.toFixed(1) + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + x2.toFixed(1) + ' ' + y2.toFixed(1) + ' Z');
+      path.setAttribute('fill', colors[i % colors.length]);
+      svg.append(path);
+      angle = end;
+    });
+    const box = el('div'); box.style.display = 'flex'; box.style.gap = '12px'; box.style.alignItems = 'center';
+    const legend = el('div'); legend.style.display = 'grid'; legend.style.gap = '3px'; legend.style.fontSize = '11px';
+    data.forEach((d, i) => {
+      const row = el('div'); row.style.display = 'flex'; row.style.gap = '6px'; row.style.alignItems = 'center';
+      const dot = el('span'); dot.style.width = '8px'; dot.style.height = '8px'; dot.style.borderRadius = '2px'; dot.style.background = colors[i % colors.length];
+      const t = el('span'); t.textContent = d.label + ' · ' + d.value; t.style.color = '#b9c7d4';
+      row.append(dot, t); legend.append(row);
+    });
+    box.append(svg, legend);
+    return box;
+  }
+
+  function lineNode(data, max) {
+    const W = 320, H = 120, pad = 24;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.style.width = '100%'; svg.style.height = '140px';
+    const step = data.length > 1 ? (W - pad * 2) / (data.length - 1) : 0;
+    const pts = data.map((d, i) => {
+      const x = pad + step * i;
+      const y = H - pad - (Math.abs(d.value) / max) * (H - pad * 2);
+      return [x, y];
+    });
+    // 坐标轴
+    for (const [x1, y1, x2, y2] of [[pad, pad / 2, pad, H - pad], [pad, H - pad, W - pad / 2, H - pad]]) {
+      const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      l.setAttribute('x1', x1); l.setAttribute('y1', y1); l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+      l.setAttribute('stroke', '#2b3a49'); svg.append(l);
+    }
+    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    poly.setAttribute('points', pts.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '));
+    poly.setAttribute('fill', 'none'); poly.setAttribute('stroke', '#69b7ff'); poly.setAttribute('stroke-width', '2');
+    svg.append(poly);
+    data.forEach((d, i) => {
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      c.setAttribute('cx', pts[i][0]); c.setAttribute('cy', pts[i][1]); c.setAttribute('r', '3'); c.setAttribute('fill', '#69b7ff');
+      svg.append(c);
+      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t.setAttribute('x', pts[i][0]); t.setAttribute('y', H - 6); t.setAttribute('fill', '#8fa3b5'); t.setAttribute('font-size', '8'); t.setAttribute('text-anchor', 'middle');
+      t.textContent = d.label.slice(0, 8);
+      svg.append(t);
+    });
+    return svg;
+  }
+
   function tableNode(p) {
     const t = el('table'); t.style.width = '100%'; t.style.borderCollapse = 'collapse'; t.style.fontSize = '12px';
     const head = el('tr');

@@ -84,3 +84,32 @@ node tools/lab.mjs <profile> --uninstall <name>
 
 - 恶意检测是顺手做的一项，不阻塞主线，默认不联网。
 - 任何一步失败，先回滚再报告，不要带着半成品继续。
+## 实验动作清单（C1：哪些必须在 mini 做，哪些绝不能碰主 profile）
+
+### 必须在 mini 做（或至少先在 mini 做一遍）
+
+| 动作 | 命令 | 为什么 |
+|---|---|---|
+| 装/升级/卸载插件 | `node tools/preinstall.mjs` → `sandbox-trial.mjs` | 主 profile 坏了你就没法干活 |
+| 改 `cordis.patch.yml` | `sandbox-snapshot.mjs --take` 再动手 | 一次写坏就是起不来 |
+| 试新的 UI 注入 / 改 client bundle | 在 mini 里装，`e2e` 验完再说 | 渲染失败只在宿主里才看得见 |
+| 换 DSH 版本 / 升级运行时 | mini 用独立 `runtime/` | 版本不兼容会静默跳过插件 |
+
+### 绝不能碰主 profile
+
+- 任何「先删了再说」的修复；
+- 未经 `preinstall` 的第二个同类插件（双市场/双栏就是这么做出来的）；
+- 直接把 mini 的 `node_modules` 拷过去（依赖解析不同，要用 `sandbox-promote` 出清单）。
+
+### 标准流程（一条链）
+
+```bash
+node tools/sandbox-snapshot.mjs <mini> --take --label "试 X 之前"   # 1 先拍
+node tools/preinstall.mjs <mini> <pkg>                              # 2 看会不会撞车
+node tools/sandbox-trial.mjs <mini> <pluginDir> [--keep]            # 3 装+验+自动回滚
+node tools/sandbox-promote.mjs <mini> <main>                        # 4 出变更清单（dry-run）
+node tools/sandbox-promote.mjs <mini> <main> --apply                # 5 确认后才写主 profile
+node tools/lab-journal.mjs --export issue.md                        # 6 留证据
+```
+
+任何一步失败：`sandbox-snapshot.mjs <profile> --restore latest`，然后在 journal 里记一笔，再报告。

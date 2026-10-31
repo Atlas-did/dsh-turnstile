@@ -27,7 +27,13 @@
     "check:preinstall": "node tools/preinstall.mjs",
     "test:console": "node tools/e2e-console-offline.mjs",
     "test:designer": "node tools/e2e-designer-offline.mjs",
-    "test:panel": "node tools/e2e-panel-offline.mjs"
+    "test:panel": "node tools/e2e-panel-offline.mjs",
+    "test:sandbox-lab": "node tools/test-sandbox-lab.mjs",
+    "test:export": "node tools/test-builder-export.mjs",
+    "test:cases": "node tools/test-cases-and-verify.mjs",
+    "sandbox:new": "node tools/new-sandbox.mjs",
+    "sandbox:verify": "node tools/sandbox-verify.mjs",
+    "lab:journal": "node tools/lab-journal.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",

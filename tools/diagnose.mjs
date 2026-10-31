@@ -129,6 +129,29 @@ const result = {
     : channels.length ? 'healthy' : 'undetermined',
 };
 
+// C2：不只给修法文本，给一份可执行的步骤文件（谁做、做什么、怎么回滚）。
+const planPath = flag('--fix-plan');
+if (planPath) {
+  const lines = [
+    '# 修复步骤（由 diagnose 生成 ' + new Date().toISOString().slice(0, 19) + '）',
+    '',
+    '来源：' + (corpusArg || 'live') + ' · 模式 ' + mode + ' · 结论 **' + result.verdict + '**',
+    '',
+  ];
+  if (!actions.length) lines.push('没有需要修的通道。');
+  actions.forEach((a, i) => {
+    lines.push('## ' + (i + 1) + '. ' + a.channel, '', '- 做什么：' + a.text, '- 回滚点：' + a.rollback, '', '```bash', '# 先拍快照（沙盒场景）', 'node tools/sandbox-snapshot.mjs <profile> --take --label "修复 ' + a.channel + ' 之前"', '```', '');
+  });
+  lines.push('## 验证', '', '```bash', 'node tools/diagnose.mjs --live', '```', '');
+  try {
+    const { writeFileSync, mkdirSync } = await import('node:fs');
+    const { dirname } = await import('node:path');
+    mkdirSync(dirname(planPath), { recursive: true });
+    writeFileSync(planPath, lines.join('\n'));
+    console.log('已写步骤文件 ' + planPath);
+  } catch (e) { console.error('步骤文件写不出去：' + String(e.message)); process.exit(1); }
+}
+
 if (has('--json')) {
   console.log(JSON.stringify(result, null, 1));
 } else {

@@ -101,6 +101,25 @@ await page.waitForTimeout(200);
 await page.locator('[data-testid="style-align"]').selectOption('center');
 await page.waitForTimeout(300);
 ok('style panel applies alignment', (await page.locator('[data-testid="view-heading"]').first().evaluate((n) => getComputedStyle(n).textAlign)) === 'center');
+// 饼图与折线（SVG）
+await page.locator('[data-testid="palette-chart"]').click();
+await page.locator('#canvas > .node').first().click();
+await page.waitForTimeout(250);
+await page.locator('[data-testid="prop-kind"]').selectOption('pie');
+await page.waitForTimeout(300);
+ok('pie renders svg slices', (await page.locator('svg path').count()) >= 3);
+await page.locator('[data-testid="prop-kind"]').selectOption('line');
+await page.waitForTimeout(300);
+ok('line renders an axis polyline', (await page.locator('svg polyline').count()) >= 1);
+
+// 样式自由值：颜色/字号
+await page.locator('[data-testid^="node-heading-"]').first().click();
+await page.waitForTimeout(200);
+await page.locator('[data-testid="style-color"]').fill('#ff0000');
+await page.locator('[data-testid="style-color"]').blur();
+await page.waitForTimeout(300);
+ok('free colour applies', (await page.locator('[data-testid="view-heading"]').first().evaluate((n) => getComputedStyle(n).color)).includes('255, 0, 0'));
+
 // 模板：一键套用「体检报告页」
 await page.locator('[data-testid="template-health"]').click();
 await page.waitForTimeout(400);

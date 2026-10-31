@@ -69,7 +69,7 @@ export const COMPONENTS = Object.freeze({
     defaults: { source: 'occupancy', kind: 'bar' },
     propsSchema: {
       source: { type: 'enum', label: '数据源', default: 'occupancy', options: ['occupancy', 'health', 'plugins'] },
-      kind: { type: 'enum', label: '类型', default: 'bar', options: ['bar', 'line'] },
+      kind: { type: 'enum', label: '类型', default: 'bar', options: ['bar', 'line', 'pie'] },
     },
   },
   table: {
@@ -86,7 +86,7 @@ export const COMPONENTS = Object.freeze({
     capabilities: { draggable: true, droppable: false, acceptsChildren: false },
     defaults: { kind: 'bar', title: '分布', series: 'ui-settings: 7\nui-conversation: 8\nui-renderer: 4' },
     propsSchema: {
-      kind: { type: 'enum', label: '类型', default: 'bar', options: ['bar', 'line'] },
+      kind: { type: 'enum', label: '类型', default: 'bar', options: ['bar', 'line', 'pie'] },
       title: { type: 'string', label: '标题', default: '分布' },
       series: { type: 'string', label: '数据（每行 标签:数值）', default: 'A: 1', multiline: true },
     },
@@ -119,10 +119,14 @@ export const STYLE_SCHEMA = Object.freeze({
   align: { type: 'enum', label: '对齐', default: 'left', options: ['left', 'center', 'right'] },
   tone: { type: 'enum', label: '底色', default: 'none', options: ['none', 'panel', 'accent'] },
   width: { type: 'enum', label: '宽度', default: 'auto', options: ['auto', 'half', 'full'] },
+  // B4：自由值，不再只有枚举
+  color: { type: 'string', label: '文字颜色（#rrggbb，空=默认）', default: '' },
+  fontSize: { type: 'number', label: '字号', default: 0, min: 0, max: 40 },
+  radius: { type: 'number', label: '圆角', default: 0, min: 0, max: 24 },
 });
 
 export function defaultStyle() {
-  return { padding: 0, align: 'left', tone: 'none', width: 'auto' };
+  return { padding: 0, align: 'left', tone: 'none', width: 'auto', color: '', fontSize: 0, radius: 0 };
 }
 
 let seq = 0;

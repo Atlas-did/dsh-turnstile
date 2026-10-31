@@ -156,8 +156,10 @@ function renderInspector() {
     if (field.type === 'enum') {
       input = document.createElement('select');
       for (const o of field.options) { const op = document.createElement('option'); op.value = o; op.textContent = String(o); if (String(node.style[key]) === String(o)) op.selected = true; input.append(op); }
-    } else {
+    } else if (field.type === 'number') {
       input = document.createElement('input'); input.type = 'number'; input.value = node.style[key]; if (field.min !== undefined) input.min = field.min; if (field.max !== undefined) input.max = field.max;
+    } else {
+      input = document.createElement('input'); input.type = 'text'; input.value = node.style[key] == null ? '' : node.style[key];
     }
     input.dataset.testid = 'style-' + key;
     input.addEventListener('change', () => {
