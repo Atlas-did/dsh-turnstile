@@ -5,7 +5,7 @@
 // usage: node tools/setup.mjs [--home <dshHome>] [--profile <name>] [--json]
 //                                [--install] [--container <name>] [--yes]
 // exit: 0 plan printed or actions done | 2 usage | 1 an action failed
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, DSH_HOME } from './config.mjs';
@@ -77,9 +77,16 @@ if (wantJson) {
 
 let failed = 0;
 if (has('--install') && has('--yes')) {
-  const pm = (() => { try { execFileSync('pnpm', ['--version'], { stdio: 'ignore' }); return 'pnpm'; } catch { return 'npm'; } })();
+  // Windows package managers are .cmd shims: execFile cannot spawn them without a shell (EINVAL),
+  // so the probe and the install both go through a shell there.
+  const run = (cmd) => (process.platform === 'win32'
+    ? execSync(cmd, { stdio: 'inherit' })
+    : execFileSync(cmd.split(' ')[0], cmd.split(' ').slice(1), { stdio: 'inherit' }));
+  const probe = (name) => { try { run(name + ' --version'); return true; } catch { return false; } };
+  const pm = probe('pnpm') ? 'pnpm' : 'npm';
   try {
-    execFileSync(pm, pm === 'pnpm' ? ['install', '--prefer-offline'] : ['install'], { cwd: target, stdio: 'inherit' });
+    process.chdir(target);
+    run(pm + (pm === 'pnpm' ? ' install --prefer-offline' : ' install'));
     console.log('dependencies installed with ' + pm);
   } catch (e) {
     console.error('install failed: ' + String(e.message).slice(0, 200));

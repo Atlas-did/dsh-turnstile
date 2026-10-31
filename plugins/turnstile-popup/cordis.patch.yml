@@ -3,3 +3,7 @@
       name: turnstile-popup
       config:
         profile: mini
+        # Declared so two plugins cannot silently fight over the same corner (preflight ui-placement).
+        slot: shell.overlay
+        anchor: bottom-right
+        order: 900
