@@ -7,6 +7,31 @@ description: "Mini 实验场：插件试验台与作者工作间。提到「mini
 
 这是一个**模式**，不是一组命令。进入后固定按下面的形状工作。
 
+## 第零步：如果这台机器还没有沙盒（自建，需用户同意）
+
+触发：用户说「帮我建一个试验环境 / 我没有 mini / 我想先在小环境试」。
+**先问一句「建在哪个目录、用哪个端口」，得到确认再动手。** 永远不要建在主 profile 里。
+
+```bash
+# 1. 生成（一条命令产出 profile + 启动器 + 独立 state/logs）
+node tools/new-sandbox.mjs --root <你选的目录> --profiles mini --port 18770 \
+     --dsh-bin <DSH 的 lib/bin.js 路径>
+
+# 2. 启动（Windows 双击 START-MINI.cmd，或直接跑）
+DSH_HOME=<root>/home node <bin.js> mini --no-open --port 18770
+
+# 3. 验证：日志里必须出现这一行，且带 token 的 URL 能打开
+#    dsh web: http://127.0.0.1:18770/?token=...
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18770/    # 401 = 宿主活着（没 token 就该 401）
+```
+
+**已知必须满足的两点**（不满足会静默退出，日志为空）：
+
+1. `package.json` 的 `dsh.profile.bundles` **不能为空**——至少 `@deepseek-ai/dsh-base` 与 `@deepseek-ai/dsh-web-app`，
+   否则宿主没有 web surface，直接退出（实测：空 bundles → 无输出 exit 0）。
+2. `cordis.patch.yml` 用空层 `[]`，并且**任何工具追加前先解析**（往 `[]` 后面追加会写出非法 YAML，见 docs/105）。
+
+建完立刻登记三件事：profile 名、端口、`DSH_HOME`。之后所有命令都用这三样，不碰默认 home。
 ## 三个对象（始终同时考虑）
 
 | 对象 | 它关心什么 | 由此决定的动作 |
