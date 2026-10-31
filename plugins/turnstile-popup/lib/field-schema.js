@@ -72,4 +72,17 @@ export function groupFields(fields, values) {
   return out;
 }
 
-if (typeof window !== 'undefined') window.TurnstileFields = { field, visibleFields, coerce, validateValues, applyEdit, groupFields };
+/**
+ * What control renders this field, and with what value. Pure: the page turns the spec into DOM, so the
+ * decision "which control" belongs to the declaration too.
+ */
+export function controlSpec(f, value) {
+  if (!f) return { kind: 'text', value: '', options: null };
+  const v = value === undefined ? f.defaultValue : value;
+  if (f.type === 'boolean') return { kind: 'checkbox', value: Boolean(v), options: null };
+  if (f.type === 'select') return { kind: 'select', value: v === undefined ? '' : String(v), options: f.options || [] };
+  if (f.type === 'number') return { kind: 'number', value: v === undefined || v === '' ? '' : String(v), options: null };
+  return { kind: 'text', value: v === undefined || v === null ? '' : String(v), options: null };
+}
+
+if (typeof window !== 'undefined') window.TurnstileFields = { field, visibleFields, coerce, validateValues, applyEdit, groupFields, controlSpec };

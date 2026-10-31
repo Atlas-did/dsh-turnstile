@@ -382,7 +382,12 @@
     const ro = readonlyValues(p);
     box.append(groupedInspector('Identity / 标识', 'identity', readonlyGroup(identityDecls(), ro)));
     const config = node('div', {});
-    const check = node('input', { type: 'checkbox', 'data-testid': 'property-disabled', onchange: (e) => addOperation({ type: 'toggle', disable: e.target.checked }) }); check.checked = eff.disabled;
+    // The checkbox is what the declaration says it is: controlSpec decides kind and initial value.
+    const FSx = window.TurnstileFields;
+    const declList = configFields() || [];
+    const specFor = (key) => (FSx ? FSx.controlSpec(declList.find((f) => f.key === key), configValues(p)[key]) : null);
+    const disabledSpec = specFor('disabled');
+    const check = node('input', { type: disabledSpec ? disabledSpec.kind : 'checkbox', 'data-testid': 'property-disabled', 'data-field-kind': disabledSpec ? disabledSpec.kind : 'checkbox', onchange: (e) => addOperation({ type: 'toggle', disable: e.target.checked }) }); check.checked = disabledSpec ? disabledSpec.value : eff.disabled;
     config.append(node('label', { class: 'property-check' }, [check, document.createTextNode('disabled / 停用')]));
     const errBox = node('p', { class: 'hint', 'data-testid': 'field-error-anchor', text: '' });
     const refreshAnchorError = () => {
@@ -392,7 +397,8 @@
       errBox.textContent = hit ? hit.message : '';
       if (hit) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
     };
-    const input = node('input', { class: 'property-input', 'data-testid': 'property-anchor', value: ds.anchorDraft, placeholder: 'anchor token', oninput: (e) => { ds.anchorDraft = e.target.value; refreshAnchorError(); } });
+    const anchorSpec = specFor('anchor');
+    const input = node('input', { class: 'property-input', 'data-testid': 'property-anchor', 'data-field-kind': anchorSpec ? anchorSpec.kind : 'text', value: anchorSpec ? anchorSpec.value : ds.anchorDraft, placeholder: 'anchor token', oninput: (e) => { ds.anchorDraft = e.target.value; refreshAnchorError(); } });
     const declared = configFields();
     const errs = declared ? window.TurnstileFields.validateValues(declared, configValues(p)) : [];
     const anchorErr = errs.find((e) => e.key === 'anchor');

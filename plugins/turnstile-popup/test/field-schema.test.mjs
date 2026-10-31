@@ -1,6 +1,6 @@
 // Field schema: declared once, rendered and validated from the same declaration.
 import assert from 'node:assert';
-import { field, visibleFields, coerce, validateValues, applyEdit, groupFields } from '../lib/field-schema.js';
+import { field, visibleFields, coerce, validateValues, applyEdit, groupFields, controlSpec } from '../lib/field-schema.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -57,6 +57,19 @@ test('grouping preserves declaration order', () => {
   const g = groupFields(fields, { disabled: true });
   assert.deepStrictEqual(g.map((x) => x.group), ['状态', '布局']);
   assert.deepStrictEqual(g[0].fields.map((f) => f.key), ['disabled', 'reason']);
+});
+
+test('the declaration decides which control renders', () => {
+  assert.deepStrictEqual(controlSpec(disabled, true), { kind: 'checkbox', value: true, options: null });
+  assert.deepStrictEqual(controlSpec(anchor, 'top-left'), { kind: 'text', value: 'top-left', options: null });
+  const pick = field({ key: 'anchor', type: 'select', options: [{ value: 'a' }] });
+  assert.strictEqual(controlSpec(pick, 'a').kind, 'select');
+  assert.strictEqual(controlSpec(pick, 'a').options.length, 1);
+});
+
+test('a missing value falls back to the declared default', () => {
+  const num = field({ key: 'n', type: 'number', defaultValue: 5 });
+  assert.deepStrictEqual(controlSpec(num, undefined), { kind: 'number', value: '5', options: null });
 });
 
 console.log('FIELDSCHEMA_TEST_OK ' + passed + ' checks');

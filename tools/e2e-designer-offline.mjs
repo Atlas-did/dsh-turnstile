@@ -180,6 +180,9 @@ try {
   const declaredRows = await page.evaluate(() => ['prop-name', 'prop-version', 'prop-row', 'prop-ui', 'prop-manifest', 'prop-source']
     .filter((id) => document.querySelector('[data-testid="' + id + '"]')).length);
   ok('read-only properties are generated from declarations', declaredRows === 6, String(declaredRows));
+  // Both editable controls declare what they are; the DOM carries the kind the schema chose.
+  ok('the checkbox is the declared kind', (await page.locator('[data-testid="property-disabled"]').first().getAttribute('data-field-kind')) === 'checkbox');
+  ok('the anchor input is the declared kind', (await page.locator('[data-testid="property-anchor"]').first().getAttribute('data-field-kind')) === 'text');
   ok('no uncaught designer browser errors', errors.length === 0, errors.join(' | ').slice(0, 200));
 } catch (error) {
   ok('designer e2e completed without throwing', false, String(error?.stack || error).slice(0, 500));
