@@ -88,7 +88,8 @@
   }
   async function ensurePreview() {
     const key = currentKey();
-    if (ds.busy || ds.previewKey === key) return;
+    // A matching key is not enough: the preview may have been cleared by a cancel or an error.
+    if (ds.busy || (ds.previewKey === key && ds.preview)) return;
     const seq = ++ds.previewSeq; ds.busy = true; ds.error = '';
     try {
       const result = await designerRequest(true);
@@ -363,8 +364,15 @@
     if (ds.error) main.append(node('div', { class: 'designer-error', 'data-testid': 'designer-error', text: ds.error }));
     const undoBtn = btn('↶ 撤销', undo, 'designer-undo'), redoBtn = btn('↷ 重做', redo, 'designer-redo');
     undoBtn.disabled = !ds.past.length; redoBtn.disabled = !ds.future.length;
-    const generate = btn('生成 / 预览', () => { if (ds.previewKey === currentKey() && ds.preview) { ds.dialog = true; render(); } }, 'designer-generate');
-    generate.disabled = !ds.operations.length || ds.busy || ds.previewKey !== currentKey() || !ds.preview || Boolean(ds.error);
+    // One click: compute the preview if it is missing or stale, then open it. Requiring a separate
+    // "check the queue" step first was a wall a first-time user could not get past (docs/81).
+    const generate = btn('生成 / 预览', async () => {
+      if (ds.busy) return;
+      if (!(ds.previewKey === currentKey() && ds.preview)) await ensurePreview();
+      if (ds.preview && !ds.error) { ds.dialog = true; render(); }
+    }, 'designer-generate');
+    // Stale previews no longer disable the button: clicking it recomputes first.
+    generate.disabled = !ds.operations.length || ds.busy || Boolean(ds.error);
     main.append(node('div', { class: 'designer-toolbar' }, [undoBtn, redoBtn, btn('保存草稿', savePoint, 'designer-save'), generate, node('span', { class: dirty() ? 'dirty' : 'hint', 'data-testid': 'designer-dirty', text: dirty() ? '● 相对保存点有修改' : '保存点' })]));
     main.append(renderPalette());
     main.append(renderTimeline());

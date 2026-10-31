@@ -50,3 +50,33 @@ cordis.patch.yml  248ff6e3810389c4  (unchanged from before the run)
 probe route       200
 quicktest         all checks passed
 ```
+## Addendum: the two-step friction is fixed
+
+`生成 / 预览` now computes the preview itself when it is missing or stale, so the separate
+`生成并检查队列` click is optional rather than required. Three changes, all small:
+
+```js
+// 1. the handler computes on demand
+const generate = btn('生成 / 预览', async () => {
+  if (ds.busy) return;
+  if (!(ds.previewKey === currentKey() && ds.preview)) await ensurePreview();
+  if (ds.preview && !ds.error) { ds.dialog = true; render(); }
+}, 'designer-generate');
+
+// 2. a stale preview no longer disables the button
+generate.disabled = !ds.operations.length || ds.busy || Boolean(ds.error);
+
+// 3. a matching key is not enough - a cancel can leave the key set with no preview
+if (ds.busy || (ds.previewKey === key && ds.preview)) return;
+```
+
+**Bug 3 was real and only visible in a long session**: after a cancelled preview the key still matched,
+`ensurePreview` returned early, and the button then did nothing. A fresh page never showed it, which is
+why the first isolated repro passed and the suite failed.
+
+One behaviour is deliberately unchanged: after a **refusal** (for example a duplicate command) the button
+stays disabled until the queue changes. The refusal is the reason there is nothing new to preview, and
+silently clearing it would hide the problem. The e2e documents this by reloading before it tests the
+one-click path.
+
+Designer e2e 42 -> **44/44** (one-click preview, plus proof that a reload restores the draft queue).

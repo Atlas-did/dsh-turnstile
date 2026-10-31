@@ -183,6 +183,17 @@ try {
   // Both editable controls declare what they are; the DOM carries the kind the schema chose.
   ok('the checkbox is the declared kind', (await page.locator('[data-testid="property-disabled"]').first().getAttribute('data-field-kind')) === 'checkbox');
   ok('the anchor input is the declared kind', (await page.locator('[data-testid="property-anchor"]').first().getAttribute('data-field-kind')) === 'text');
+  // One click must be enough: the preview computes itself even when the queue was restored from a draft.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-testid="nav-designer"]');
+  await click('[data-testid="nav-designer"]');
+  await page.waitForTimeout(1000);
+  const restored = await page.locator('[data-testid^="command-delete-"]').count();
+  ok('the draft restores the queue after a reload', restored > 0, String(restored));
+  await page.locator('[data-testid="designer-generate"]').first().click({ force: true });
+  await page.waitForTimeout(3000);
+  ok('one click opens the preview, no separate validate step', (await page.locator('[data-testid="designer-dialog"]').count()) === 1);
+  await page.waitForTimeout(200);
   ok('no uncaught designer browser errors', errors.length === 0, errors.join(' | ').slice(0, 200));
 } catch (error) {
   ok('designer e2e completed without throwing', false, String(error?.stack || error).slice(0, 500));
