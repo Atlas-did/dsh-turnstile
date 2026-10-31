@@ -412,10 +412,17 @@ export function apply(ctx, config) {
           if (!existsSync(dir)) continue;
           for (const f of readdirSync(dir)) if (f.endsWith(".jsonl")) paths.push(join(dir, f));
         }
+        const actionsMod = await import(pathToFileURL(join(root, "tools", "lib", "actions.mjs")).href);
         const loaded = recordsMod.readRecords(paths);
         const channels = classifyMod.aggregate(loaded.records, { mode: "all" });
-        const verdict = channels.some((c) => c.verdict === "failing") ? "failing" : channels.length ? "healthy" : "undetermined";
-        return sendJson(res, 200, { verdict, files: loaded.files.length, records: loaded.records.length, channels, at: new Date().toISOString() });
+        const verdict = channels.some((c) => c.verdict === "failing") ? "failing"
+          : channels.some((c) => c.verdict === "undetermined") ? "undetermined"
+          : channels.length ? "healthy" : "undetermined";
+        return sendJson(res, 200, {
+          verdict, files: loaded.files.length, records: loaded.records.length, channels,
+          actions: actionsMod.actionsFor(channels), missing: actionsMod.missingFor(channels),
+          at: new Date().toISOString(),
+        });
       } catch (e) {
         return sendJson(res, 200, { verdict: "undetermined", missing: "无法加载诊断模块：" + String(e && e.message), channels: [] });
       }

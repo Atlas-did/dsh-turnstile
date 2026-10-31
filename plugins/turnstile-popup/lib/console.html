@@ -105,8 +105,13 @@ async function runDiagnose(){
       if(c.falsifier)row.append(node('small',{text:'推翻条件 '+c.falsifier}));
       list.append(row);
     }
-    if(!(j.channels||[]).length)list.append(node('p',{class:'hint',text:j.missing||'没有可用日志'}));
-    box.replaceChildren(head,list);
+    if(!(j.channels||[]).length)list.append(node('p',{class:'hint',text:'没有可用日志'}));
+    const acts=node('div',{class:'action-stack','data-testid':'diagnose-actions'});
+    for(const a of (j.actions||[])){
+      acts.append(node('div',{class:'history-row'},[node('strong',{text:'· '+a.text}),node('small',{text:'回滚 '+a.rollback})]));
+    }
+    for(const m of (j.missing||[])) acts.append(node('div',{class:'history-row'},[node('strong',{text:'? '+m.channel+' 判不出'}),node('small',{text:'缺 '+m.missing})]));
+    box.replaceChildren(head,list,acts);
   }catch(e){box.replaceChildren(node('p',{class:'hint',text:'诊断失败：'+e.message}));}
 }
 async function runProfiles(){

@@ -15,6 +15,7 @@ import { homedir } from 'node:os';
 import { readRecords, readManifest } from './lib/records.mjs';
 import { aggregate, classify, isFailure } from './lib/classify.mjs';
 import { probeLayers } from './lib/probe.mjs';
+import { actionsFor, missingFor } from './lib/actions.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
@@ -95,15 +96,9 @@ if (wantProbe) {
   for (const u of urls) probes.push(await probeLayers(u, { caFile: ca }));
 }
 
-// 结论 + 修法
-const actions = [];
-for (const ch of channels) {
-  if (ch.verdict !== 'failing') continue;
-  if (ch.id === 'codex') actions.push({ id: 'codex-protocol', text: 'codex-cli 与 AA connector 协议不兼容：升级 AA 桌面端或降级 codex-cli，然后重启 AA', rollback: '无文件改动（仅版本切换）' });
-  if (ch.id === 'ingest') actions.push({ id: 'ingest-path', text: '检查出站：把 agents-anywhere.com 写入 NO_PROXY 后重启 AA（AA 是 Electron，改 shell 变量无效）', rollback: 'HKCU\\Environment\\NO_PROXY 删掉该域名' });
-  if (ch.id === 'dsh') actions.push({ id: 'dsh-sync', text: 'DSH 侧同步失败：确认 DSH 与插件版本一致（node tools/diagnose.mjs --live 复查）', rollback: '无文件改动' });
-  if (ch.id === 'plugin-bridge') actions.push({ id: 'plugin-version', text: '插件本地桥 PARSE_ERROR：插件与桌面端版本不匹配，升级插件到与 AA 同版本', rollback: '保留 node_modules/.bak 备份' });
-}
+// 结论 + 修法（共用 tools/lib/actions.mjs，避免 CLI 与面板各写一份）
+const actions = actionsFor(channels);
+const missing = missingFor(channels);
 
 const result = {
   mode, asOf: asOf || null,
@@ -113,6 +108,7 @@ const result = {
   channels,
   probes,
   actions,
+  missing,
   verdict: drift.length ? 'corpus-drift'
     : channels.some((c) => c.verdict === 'failing') ? 'failing'
     : channels.some((c) => c.verdict === 'undetermined') ? 'undetermined'

@@ -269,6 +269,7 @@ try {
     ok('the diagnose card renders a verdict', (await text('[data-testid="diagnose-verdict"]')).includes('failing'));
     ok('channels are listed with evidence', (await text('[data-testid="channel-codex"]')).includes('aa.jsonl'));
     ok('every channel states a falsifier', (await text('[data-testid="channel-codex"]')).includes('推翻条件'));
+    ok('the fix actions carry a rollback point', (await text('[data-testid="diagnose-actions"]')).includes('回滚'));
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {

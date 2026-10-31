@@ -26,7 +26,7 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
       res.end(JSON.stringify({ verdict: 'failing', files: 2, records: 42, channels: [
         { id: 'codex', verdict: 'failing', counts: { failures: 3, signals: { 'unknown-variant': 3 } }, evidence: [{ file: 'aa.jsonl', line: 7 }], falsifier: '出现 sync completed 且无 unknown variant' },
         { id: 'dsh', verdict: 'healthy', counts: { failures: 0, signals: {} }, evidence: [], falsifier: '出现 sync.failed' },
-      ] }));
+      ], actions: [{ channel: 'codex', text: '升级 AA 或降级 codex-cli', rollback: '只切版本' }], missing: [] }));
       return;
     }
     if (pathname === '/turnstile/profiles') {

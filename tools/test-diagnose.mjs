@@ -6,6 +6,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { tlsErrorIsMethodProblem } from '../tools/lib/probe.mjs';
+import { actionsFor, missingFor } from '../tools/lib/actions.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -64,6 +65,25 @@ test('每条结论都带证据与推翻条件', () => {
     assert.ok(c.falsifier && c.falsifier.length > 5, c.id + ' 缺 falsifier');
     if (c.verdict === 'failing') assert.ok(c.evidence.length > 0, c.id + ' 缺证据');
   }
+});
+
+test('修法只给 failing 的通道，且每条都带回滚点', () => {
+  const acts = actionsFor([{ id: 'codex', verdict: 'failing' }, { id: 'dsh', verdict: 'healthy' }, { id: 'ingest', verdict: 'undetermined' }]);
+  assert.strictEqual(acts.length, 1);
+  assert.strictEqual(acts[0].channel, 'codex');
+  assert.ok(acts[0].rollback.length > 0, '修法必须带回滚点');
+});
+
+test('undetermined 的通道必须说明缺什么', () => {
+  const miss = missingFor([{ id: 'backend', verdict: 'undetermined', missing: '' }, { id: 'x', verdict: 'healthy' }]);
+  assert.strictEqual(miss.length, 1);
+  assert.ok(miss[0].missing.length > 0);
+});
+
+test('CLI 输出包含修法与回滚点', () => {
+  const out = run(['--corpus', corpus]).out;
+  assert.match(out, /修法:/);
+  assert.match(out, /回滚:/);
 });
 
 console.log('DIAGNOSE_TEST_OK ' + passed + ' checks');
