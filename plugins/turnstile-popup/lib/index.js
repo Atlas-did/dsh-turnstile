@@ -445,7 +445,20 @@ export function apply(ctx, config) {
           out.push({ name, dir, bundles, rows, disabled, installed, current: name === profile });
         }
       }
-      sendJson(res, 200, { home, profiles: out, current: profile });
+      // 「最近一次可用」来自 DSH 自己的 verified-bootable 快照；没有就如实说没有。
+      let lastKnownGood = null;
+      try {
+        const snaps = join(home, "profile-snapshots");
+        if (existsSync(snaps)) {
+          const names = readdirSync(snaps).filter((n) => n.indexOf("verified-bootable") === 0).sort();
+          const newest = names[names.length - 1];
+          if (newest) {
+            const at = statSync(join(snaps, newest)).mtimeMs;
+            lastKnownGood = { name: newest, at: new Date(at).toISOString(), ageDays: Math.floor((Date.now() - at) / 86400000) };
+          }
+        }
+      } catch {}
+      sendJson(res, 200, { home, profiles: out, current: profile, lastKnownGood });
     },
   }), "turnstile: GET /turnstile/profiles");
   ctx.effect(() => ctx.webServer.register({

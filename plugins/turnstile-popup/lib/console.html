@@ -129,7 +129,8 @@ async function runProfiles(){
       cmds.append(node('div',{class:'history-row'},[node('strong',{text:'体检（终端）'}),c1]));
       cmds.append(node('div',{class:'history-row'},[node('strong',{text:'安装前预检'}),c2]));
     }
-    box.replaceChildren(node('p',{class:'hint','data-testid':'steward-summary',text:'共 '+(j.profiles||[]).length+' 个 profile，当前 '+j.current}),rows,cmds);
+    const lkg=j.lastKnownGood?('上次可用快照 '+j.lastKnownGood.name+'（'+j.lastKnownGood.ageDays+' 天前）'):'没有 verified-bootable 快照';
+    box.replaceChildren(node('p',{class:'hint','data-testid':'steward-summary',text:'共 '+(j.profiles||[]).length+' 个 profile，当前 '+j.current}),node('p',{class:'hint','data-testid':'steward-lkg',text:lkg}),rows,cmds);
   }catch(e){box.replaceChildren(node('p',{class:'hint',text:'读取失败：'+e.message}));}
 }
 async function runHealth(){

@@ -31,7 +31,7 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
     }
     if (pathname === '/turnstile/profiles') {
       res.setHeader('content-type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ home: root, current: 'console-fixture', profiles: [
+      res.end(JSON.stringify({ home: root, current: 'console-fixture', lastKnownGood: { name: 'verified-bootable-20261002-1508', at: '2026-10-02T07:08:00.000Z', ageDays: 29 }, profiles: [
         { name: 'console-fixture', dir: profileDir, bundles: 3, rows: 2, disabled: 0, installed: 3, current: true },
         { name: 'another', dir: join(root, 'tests', 'another-fixture'), bundles: 0, rows: 0, disabled: 0, installed: 0, current: false },
       ] }));

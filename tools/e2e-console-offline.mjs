@@ -259,6 +259,7 @@ try {
     ok('the steward page renders a two-column grid', (await page.locator('[data-testid="steward-grid"]').count()) === 1);
     ok('the steward lists profiles', (await page.locator('[data-testid^="profile-"]').count()) >= 2);
     ok('the steward shows terminal next steps', (await text('[data-testid="steward-commands"]')).includes('doctor.mjs'));
+    ok('the steward reports the last known good snapshot', (await text('[data-testid="steward-lkg"]')).includes('verified-bootable'));
     await click('[data-testid="health-run"]');
     await page.waitForTimeout(1000);
     ok('the steward runs the health scan in place', (await page.locator('[data-testid="health-summary"]').count()) === 1);
