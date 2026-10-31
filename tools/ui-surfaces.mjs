@@ -4,6 +4,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
+import { patchFiles } from './lib/patch-files.mjs';
 silenceWhenJson();
 const profileDir = process.argv[2];
 const positional = process.argv.slice(3).filter((a) => !a.startsWith('--'));
@@ -18,13 +19,10 @@ for (const name of bundles) {
   if (!existsSync(join(dir, 'package.json'))) continue;
   const j = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
   for (const inj of (j.dsh?.client?.inject || [])) if (/ui-/.test(inj)) add(inj, name);
-  const patch = j.dsh?.bundle?.patch;
-  if (patch) {
-    const pf = join(dir, patch.replace(/^\.\//, ''));
-    if (existsSync(pf)) {
-      const txt = readFileSync(pf, 'utf8');
-      for (const m of txt.matchAll(/^\s*-?\s*id:\s*(ui-[\w-]+)/gm)) add(m[1], name);
-    }
+  for (const pf of patchFiles(dir, j.dsh?.bundle?.patch)) {
+    if (!existsSync(pf)) continue;
+    const txt = readFileSync(pf, 'utf8');
+    for (const m of txt.matchAll(/^\s*-?\s*id:\s*(ui-[\w-]+)/gm)) add(m[1], name);
   }
 }
 const rows = [...surfaces.entries()].map(([ui, s]) => [ui, [...s].sort()]).sort((a, b) => b[1].length - a[1].length);

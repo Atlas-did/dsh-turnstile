@@ -8,6 +8,7 @@ import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { ROOT as root, DSH_BIN, DSH_HOME, loadYaml } from './config.mjs';
 import { checkCompatibility, runtimeVersion } from './version.mjs';
+import { patchFiles } from './lib/patch-files.mjs';
 const { yaml, schema } = loadYaml();
 const jsType = new yaml.Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: (d) => String(d) });
 
@@ -84,9 +85,7 @@ for (const name of bundles) {
   if (!existsSync(join(d, 'package.json'))) continue;
   const j = JSON.parse(readFileSync(join(d, 'package.json'), 'utf8'));
   for (const inj of (j.dsh?.client?.inject || [])) if (/ui-/.test(inj)) addS(inj.replace('@deepseek-ai/dsh-client-', ''), name);
-  const patch = j.dsh?.bundle?.patch;
-  if (patch) {
-    const pf = join(d, patch.replace(/^\.\//, ''));
+  for (const pf of patchFiles(d, j.dsh?.bundle?.patch)) {
     if (existsSync(pf)) for (const m of readFileSync(pf, 'utf8').matchAll(/^\s*-?\s*id:\s*(ui-[\w-]+)/gm)) addS(m[1], name);
   }
 }

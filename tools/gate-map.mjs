@@ -41,7 +41,8 @@ for (const name of bundles) {
   const j = JSON.parse(readFileSync(pjF, 'utf8'));
   const patch = j.dsh?.bundle?.patch;
   if (!patch) continue;
-  const pf = join(d, patch.replace(/^\.\//, ''));
+  const first = Array.isArray(patch) ? patch[0] : patch;
+  const pf = join(d, String(first).replace(/^\.\//, ''));
   if (!existsSync(pf)) continue;
   const ids = [...readFileSync(pf, 'utf8').matchAll(/^-\s+id:\s*([\w.@/-]+)/gm)].map(m => m[1]);
   if (ids.length) layers.push({ layer: name, file: pf.replace(/\\\\/g, '/'), ids });
@@ -70,7 +71,7 @@ for (const name of bundles) {
   for (const inj of (j.dsh?.client?.inject || [])) if (/ui-/.test(inj)) addS(inj.replace('@deepseek-ai/dsh-client-', ''), name, src);
   const patch = j.dsh?.bundle?.patch;
   if (patch) {
-    const pf = join(d, patch.replace(/^\.\//, ''));
+    const pf = join(d, String(Array.isArray(patch) ? patch[0] : patch).replace(/^\.\//, ''));
     if (existsSync(pf)) for (const m of readFileSync(pf, 'utf8').matchAll(/^\s*-?\s*id:\s*(ui-[\w-]+)/gm)) addS(m[1], name, pf.replace(/\\\\/g, '/'));
   }
 }
