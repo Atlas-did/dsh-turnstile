@@ -4,6 +4,8 @@
 // usage: node tools/anchor.mjs <profileDir> --package <pkg> --anchor <top-left|top-right|bottom-left|bottom-right|center> [--apply]
 import { readFileSync, existsSync, writeFileSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { patchFiles } from './lib/patch-files.mjs';
+import { safeWritePatch } from './lib/patch-write.mjs';
 
 // The value space belongs to the plugin, not to us: any short token is accepted.
 // (We only refuse things that would break the YAML line.)
@@ -66,22 +68,33 @@ if (!existsSync(pj)) { console.error('package not installed: ' + pkgName); proce
 const pjJson = JSON.parse(readFileSync(pj, 'utf8'));
 const rowIds = [];
 if (pjJson.dsh && pjJson.dsh.bundle && pjJson.dsh.bundle.patch) {
-  const pf = join(dir, 'node_modules', pkgName, String(pjJson.dsh.bundle.patch).replace(/^\.\//, ''));
-  if (existsSync(pf)) {
+  // B7: dsh.bundle.patch can be a string OR an array, and the row may live in any of the files.
+  // The old code took String(array) - ["a.yml","b.yml"] -> "a.yml,b.yml" - so it never opened one.
+  for (const pf of patchFiles(join(dir, 'node_modules', pkgName), pjJson.dsh.bundle.patch)) {
+    if (!existsSync(pf)) continue;
     const t = readFileSync(pf, 'utf8');
     const re = /-\s*id:\s*([\w.@/-]+)\s*\n\s*name:\s*['"]([^'"]+)['"]/g;
     let m;
     while ((m = re.exec(t))) if (m[2] === pkgName || m[2].indexOf(pkgName + '/') === 0) rowIds.push(m[1]);
     if (!rowIds.length) { const any = /-\s*id:\s*([\w.@/-]+)/g; let m2; while ((m2 = any.exec(t))) rowIds.push(m2[1]); }
+    if (rowIds.length) break;
   }
 }
 if (!rowIds.length) { console.error('cannot determine the loader row id for ' + pkgName); process.exit(2); }
 const row = rowIds[0];
 
-const rowIdx = lines.findIndex((l) => new RegExp('^\\s*-?\\s*id:\\s*' + row.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$').test(l));
+const rowRe = new RegExp('^\\s*-?\\s*id:\\s*' + row.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$');
+let rowIdx = lines.findIndex((l) => rowRe.test(l));
+// B7: a plugin that ships its own patch has no profile row, so "add it there first" made anchor
+// unusable exactly when two plugins fight over one slot. Insert the override instead.
 if (rowIdx === -1) {
-  console.error('row ' + row + ' is not in the profile patch - add it there first (the plugin only declares it, the profile decides config)');
-  process.exit(3);
+  if (clear) { console.error('row ' + row + ' has no profile override to clear'); process.exit(3); }
+  const appended = text.replace(/\s*$/, '') + '\n- id: ' + row + '\n  config:\n    anchor: ' + anchor + '\n';
+  console.log('- id: ' + row + '\n  config:\n    anchor: ' + anchor + '\n');
+  if (!apply) { console.log('dry run: pass --apply to write this override into cordis.patch.yml'); process.exit(0); }
+  try { safeWritePatch(patchPath, appended); } catch (e) { console.error(String(e.message)); process.exit(1); }
+  console.log('wrote override for ' + row + ' (backup kept)');
+  process.exit(0);
 }
 const rowIndent = (lines[rowIdx].match(/^\s*/) || [''])[0].length;
 let end = lines.length;

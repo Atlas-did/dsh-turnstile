@@ -611,17 +611,20 @@ export function apply(ctx, config) {
     },
   }), "turnstile: GET /turnstile/occupancy");
 
-  // Serve the generated architecture diagram so a settings page can embed it.
+  // B11: there used to be two shells (/turnstile/ = a 6 KB light summary, /turnstile/console = the
+  // real 44 KB console). Two shells showing the same data differently is how "same data, two verdicts"
+  // happens; keep one, and redirect the old address so existing links still work.
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
     path: "/turnstile/",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
-      bump("console-page");
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
-      res.end(CONSOLE_HTML);
+      bump("console-redirect");
+      const q = String(req.url || "").includes("token=") ? String(req.url).slice(String(req.url).indexOf("?")) : "";
+      res.writeHead(302, { location: "/turnstile/console" + q, "cache-control": "no-store" });
+      res.end();
     },
-  }), "turnstile: GET /turnstile/ (full-page console)");
+  }), "turnstile: GET /turnstile/ (redirects to /turnstile/console)");
 
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",

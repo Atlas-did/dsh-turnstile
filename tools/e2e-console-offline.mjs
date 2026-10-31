@@ -277,6 +277,15 @@ try {
     ok('channels are listed with evidence', (await text('[data-testid="channel-codex"]')).includes('aa.jsonl'));
     ok('every channel states a falsifier', (await text('[data-testid="channel-codex"]')).includes('推翻条件'));
     ok('the fix actions carry a rollback point', (await text('[data-testid="diagnose-actions"]')).includes('回滚'));
+    // B11: a failed read must not look healthy (green dot + '0/0').
+    await page.route('**/api/console*', (route) => route.fulfill({ status: 500, body: 'boom' }));
+    await page.route('**/turnstile/console-data*', (route) => route.fulfill({ status: 500, body: 'boom' }));
+    await page.locator('[data-testid="console-refresh"]').first().click().catch(() => page.reload());
+    await page.waitForTimeout(1200);
+    ok('a failed read shows a failure, not a green dot', (await text('#connection')).includes('读取失败'));
+    ok('the failure state is exposed for styling', (await page.locator('body').getAttribute('data-health')) === 'failed');
+    await page.unroute('**/api/console*');
+    await page.unroute('**/turnstile/console-data*');
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {
