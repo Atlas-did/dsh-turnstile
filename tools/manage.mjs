@@ -6,6 +6,8 @@
 import { readFileSync, writeFileSync, existsSync, copyFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkCompatibility } from './version.mjs';
+import { loadYaml } from './config.mjs';
+import { safeWritePatch } from './lib/patch-write.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : null; };
@@ -130,8 +132,7 @@ async function menuMode() {
       if (!pending.size) { console.log('  没有待保存的改动'); continue; }
       let next = patchText;
       for (const [rowId, off] of pending) next = toggleInPatch(next, rowId, off);
-      copyFileSync(patchPath, patchPath + '.bak-' + Date.now());
-      writeFileSync(patchPath, next);
+      safeWritePatch(patchPath, next);
       console.log('  已写入 ' + pending.size + ' 项，备份已留。重启 DSH 生效。');
       pending.clear();
       continue;
@@ -243,7 +244,11 @@ if (!confirmed) {
   process.exit(0);
 }
 
-copyFileSync(patchPath, patchPath + '.bak-' + Date.now());
-writeFileSync(patchPath, next);
+try {
+  safeWritePatch(patchPath, next);
+} catch (e) {
+  console.error(String(e.message));
+  process.exit(1);
+}
 console.log((doDisable ? 'disabled ' : 'enabled ') + target + '  (row ' + id + ')');
 console.log('备份已写；生效需要重启 DSH。');

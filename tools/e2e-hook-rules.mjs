@@ -3,12 +3,14 @@ import { createConsoleServer } from './console-server.mjs';
 import { copyTreeSafe } from './safe-copy.mjs';
 import { chromium } from 'playwright-core';
 import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const tmp = mkdtempSync(join(tmpdir(), 'hkr-'));
 const profileDir = join(tmp, 'console-fixture');
-copyTreeSafe(join(dirname(new URL(import.meta.url).pathname.replace(/^\//, '')), '..', 'tests', 'console-fixture'), profileDir);
+// fileURLToPath, not URL.pathname: a non-ASCII user name is percent-encoded there (B12).
+copyTreeSafe(join(dirname(fileURLToPath(import.meta.url)), '..', 'tests', 'console-fixture'), profileDir);
 const stateDir = join(profileDir, '.turnstile');
 mkdirSync(stateDir, { recursive: true });
 writeFileSync(join(stateDir, 'hooks.json'), JSON.stringify({ rules: [

@@ -18,6 +18,8 @@ const flagValue = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv
 const isFlag = (name) => argv.includes(name);
 
 const CHECKS = [
+  // B6: a profile whose own YAML does not parse cannot boot - this must block, not advise.
+  { name: 'profile-yaml', script: 'tools/profile-yaml.mjs', hint: 'the profile itself cannot boot' },
   { name: 'dependency-risk', script: 'tools/risk.mjs', hint: 'RED = imports a peer-only non-official package' },
   { name: 'conflict-surface', script: 'tools/conflict.mjs', hint: 'ctx overwrite / duplicate service / port / version split' },
   { name: 'engine-gate', script: 'tools/engines.mjs', hint: 'plugins the loader will skip', advisory: true },

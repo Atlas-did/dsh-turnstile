@@ -55,6 +55,23 @@ function txnWrite(res, patchPath, nextText, args, reason) {
 
 export const inject = ["webServer"];
 
+// B4: the panel runs inside the host's authenticated page, so a blanket token requirement would
+// break it. What can be enforced without pretending: foreign origins are rejected on every route,
+// and state-changing requests still need the token. Read-only routes are same-origin only.
+const AUTH_EXEMPT = new Set(["/turnstile/"]);
+function guardHandler(handler, path) {
+  if (!path || !path.startsWith("/turnstile/")) return handler;
+  if (AUTH_EXEMPT.has(path)) return handler;
+  return async (req, res) => {
+    const origin = String(req.headers.origin || "");
+    if (origin && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin)) return sendJson(res, 403, { error: "cross-origin" });
+    const writes = req.method !== "GET" && req.method !== "HEAD";
+    if (writes && !requestRejection(req, res)) return;
+    return handler(req, res);
+  };
+}
+
+
 // Devtools-style activity: counts of what the panel asked for, plus a tail of the host log.
 const activity = { startedAt: new Date().toISOString(), calls: {}, logPath: process.env.DSH_TURNSTILE_LOG || '' };
 const bump = (name) => { activity.calls[name] = (activity.calls[name] || 0) + 1; };
@@ -256,7 +273,12 @@ function toggleLegacy(text, rowId, disable) {
 }
 
 export function apply(ctx, config) {
-  const home = process.env.DSH_HOME || "";
+  // B4: wrap register once so no route can forget the gate.
+  const rawRegister = ctx.webServer.register.bind(ctx.webServer);
+  ctx.webServer.register = (options) => rawRegister({ ...options, handler: guardHandler(options.handler, options.path) });
+
+  // B5: the host does not promise DSH_HOME; cwd is never a DSH home, the user profile is.
+  const home = process.env.DSH_HOME || join(process.env.USERPROFILE || "", ".dsh");
   const profile = (config && config.profile) || "mini";
   const dir = join(home, "profiles", profile);
   // A leftover lock or temp file means the previous process died mid-write: surface it, do not retry.
@@ -433,7 +455,7 @@ export function apply(ctx, config) {
     path: "/turnstile/profiles",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
-      const home = process.env.DSH_HOME || "";
+      const home = process.env.DSH_HOME || join(process.env.USERPROFILE || "", ".dsh");
       const root = join(home, "profiles");
       const out = [];
       if (existsSync(root)) {
@@ -474,7 +496,7 @@ export function apply(ctx, config) {
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
       const items = [];
-      const home = process.env.DSH_HOME || "";
+      const home = process.env.DSH_HOME || join(process.env.USERPROFILE || "", ".dsh");
       const credFile = join(home, ".credentials.yaml");
       const credKeys = existsSync(credFile)
         ? readFileSync(credFile, "utf8").split(/\r?\n/).map((l) => (/^([A-Za-z0-9._-]+)\s*:/.exec(l) || [])[1]).filter(Boolean)
@@ -558,7 +580,8 @@ export function apply(ctx, config) {
     path: "/turnstile/occupancy",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
-      const file = join(process.env.DSH_TURNSTILE_STATE || join(process.env.DSH_HOME || process.cwd(), "turnstile-state"), "occupancy-" + profile + ".json");
+      const stateBase = process.env.DSH_TURNSTILE_STATE || join(process.env.DSH_HOME || join(process.env.USERPROFILE || "", ".dsh"), "turnstile-state");
+      const file = join(stateBase, "occupancy-" + profile + ".json");
       if (!existsSync(file)) return sendJson(res, 404, { error: "no-occupancy", file });
       try { sendJson(res, 200, JSON.parse(readFileSync(file, "utf8"))); }
       catch (e) { sendJson(res, 500, { error: String((e && e.message) || e).slice(0, 160) }); }
