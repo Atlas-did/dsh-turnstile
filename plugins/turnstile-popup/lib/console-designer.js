@@ -231,6 +231,35 @@
     if (HK && hooks) HK.runAfter(hooks, 'afterEnqueue', op);
     return true;
   }
+  // The rest of the properties pane, declared rather than hand-written (lib/field-schema.js).
+  function identityDecls() {
+    const FS = window.TurnstileFields;
+    if (!FS) return null;
+    return [
+      FS.field({ key: 'name', label: '名称', group: 'Identity / 标识' }),
+      FS.field({ key: 'version', label: '版本', group: 'Identity / 标识' }),
+      FS.field({ key: 'row', label: '行 ID', group: 'Identity / 标识' }),
+      FS.field({ key: 'ui', label: 'UI 面', group: 'Identity / 标识' }),
+    ];
+  }
+  function sourceDecls() {
+    const FS = window.TurnstileFields;
+    if (!FS) return null;
+    return [
+      FS.field({ key: 'manifest', label: 'manifest', group: 'Source / 来源' }),
+      FS.field({ key: 'source', label: '源码位置', group: 'Source / 来源' }),
+    ];
+  }
+  function readonlyValues(p) {
+    const src = p && p.source ? p.source.file + ':' + (p.source.line || 1) : '';
+    return { name: p ? p.name : '', version: (p && p.version) || '未安装', row: (p && p.row) || '无',
+      ui: p && p.ui && p.ui.length ? p.ui.join(', ') : '无', manifest: (p && p.manifest) || '无', source: src || '无' };
+  }
+  function readonlyGroup(fields, values) {
+    const dl = node('dl', {});
+    for (const f of fields || []) dl.append(node('div', { class: 'prop', 'data-testid': 'prop-' + f.key }, [node('dt', { text: f.label }), node('dd', { text: String(values[f.key] === undefined ? '—' : values[f.key]) })]));
+    return dl;
+  }
   function paletteButton(label, fn, id) { return btn(label, fn, id, 'btn'); }
   function renderPalette() {
     const box = node('div', { class: 'designer-palette' });
@@ -350,7 +379,8 @@
       box.append(stack); return;
     }
     const eff = effective(p);
-    box.append(groupedInspector('Identity / 标识', 'identity', node('dl', {}, [['名称', p.name], ['版本', p.version || '未安装'], ['行 ID', p.row || '无'], ['UI 面', p.ui.join(', ') || '无']].flatMap(([k, v]) => [node('div', { class: 'prop' }, [node('dt', { text: k }), node('dd', { text: String(v) })])]))));
+    const ro = readonlyValues(p);
+    box.append(groupedInspector('Identity / 标识', 'identity', readonlyGroup(identityDecls(), ro)));
     const config = node('div', {});
     const check = node('input', { type: 'checkbox', 'data-testid': 'property-disabled', onchange: (e) => addOperation({ type: 'toggle', disable: e.target.checked }) }); check.checked = eff.disabled;
     config.append(node('label', { class: 'property-check' }, [check, document.createTextNode('disabled / 停用')]));
@@ -372,7 +402,7 @@
     config.append(errBox);
     config.append(node('div', { class: 'action-stack' }, [btn('＋ 加入位置命令', () => addAnchor(ds.anchorDraft), 'property-add-anchor'), btn('＋ 清除位置', () => addAnchor(''), 'property-clear-anchor')]));
     box.append(groupedInspector('Config / 可编辑属性', 'config', config));
-    box.append(groupedInspector('Source / 来源', 'source', node('dl', {}, [node('div', { class: 'prop' }, [node('dt', { text: 'manifest' }), node('dd', { text: p.manifest || '无' })])])));
+    box.append(groupedInspector('Source / 来源', 'source', readonlyGroup(sourceDecls(), ro)));
   }
   const originalInspector = renderInspector;
   renderInspector = function () {

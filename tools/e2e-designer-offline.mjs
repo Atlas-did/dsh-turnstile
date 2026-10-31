@@ -176,6 +176,10 @@ try {
   ok('a before hook refuses the duplicate command', afterFirst === afterSecond, beforeDup + '/' + afterFirst + '/' + afterSecond);
   const refusal = await text('[data-testid="designer-error"]');
   ok('the refusal names the duplicate', refusal.includes('已经有相同的命令'), refusal);
+  // Every read-only row of the properties pane comes from a declaration, not from markup.
+  const declaredRows = await page.evaluate(() => ['prop-name', 'prop-version', 'prop-row', 'prop-ui', 'prop-manifest', 'prop-source']
+    .filter((id) => document.querySelector('[data-testid="' + id + '"]')).length);
+  ok('read-only properties are generated from declarations', declaredRows === 6, String(declaredRows));
   ok('no uncaught designer browser errors', errors.length === 0, errors.join(' | ').slice(0, 200));
 } catch (error) {
   ok('designer e2e completed without throwing', false, String(error?.stack || error).slice(0, 500));
