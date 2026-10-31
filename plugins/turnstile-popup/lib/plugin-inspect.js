@@ -1,17 +1,41 @@
 'use strict';
 // 插件骨架的纯数据层：CLI（tools/inspect-plugin.mjs）与宿主路由（/turnstile/inspect）共用。
 // 不打印、不 exit，只返回 { ok, data } 或 { ok:false, code, reason }。
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
-// patch 文件可能是字符串也可能是数组（B1 那次的教训），本地实现一份最小版本，避免跨目录依赖。
-function patchFiles(pluginDir, patch) {
+import { existsSync, readFileSync, readdirSync, statSync, realpathSync } from 'node:fs';
+import { join, relative, isAbsolute } from 'node:path';
+// 为什么这里又有一份 patchFiles：live 部署时插件被同步到 research/turnstile-popup/，
+// 与 tools/lib/ 不在同一棵树里，静态 import 会 404。所以保留本地实现，
+// 但用测试（tools/test-look-tools.mjs 的「两份 patchFiles 行为一致」）盯住漂移。
+export function patchFiles(pluginDir, patch) {
   if (!patch) return [];
   const list = Array.isArray(patch) ? patch : [patch];
   return list.filter((p) => typeof p === 'string').map((p) => join(pluginDir, p.replace(/^\.\//, '')));
 }
 
+// 包名白名单：普通名或 @scope/name。有它就挡住了 ../、绝对路径、盘符、多级斜杠。
+const PKG_RE = /^(@[\w.-]+\/)?[\w.-]+$/;
+
 export function inspectPlugin(profileDir, pkgName, { lines = 40 } = {}) {
   if (!existsSync(join(profileDir, 'package.json'))) return { ok: false, code: 2, reason: 'not a profile: ' + profileDir };
+  const name = String(pkgName == null ? '' : pkgName);
+  if (!PKG_RE.test(name)) return { ok: false, code: 2, reason: '包名不合法：' + name.slice(0, 60) + '（只接受 name 或 @scope/name）' };
+  // 第二道闸：就算名字合法，也要确认解析结果真的还在 node_modules 下（防符号链接逃逸）。
+  let realRoot = '';
+  let realPkg = '';
+  try {
+    realRoot = realpathSync(join(profileDir, 'node_modules'));
+    realPkg = realpathSync(join(realRoot, name));
+  } catch (e) {
+    let listed = false;
+    try {
+      const pj = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'));
+      listed = ((pj.dsh && pj.dsh.profile && pj.dsh.profile.bundles) || []).includes(name);
+    } catch (e2) {}
+    return { ok: false, code: 3, reason: 'not installed', data: { pkg: name, profile: profileDir, installed: false, inBundles: listed } };
+  }
+  const rel = relative(realRoot, realPkg);
+  if (rel.startsWith('..') || isAbsolute(rel)) return { ok: false, code: 2, reason: '解析到 node_modules 之外，拒绝：' + rel };
+  pkgName = name;
   const profilePkg = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'));
   const bundles = (profilePkg.dsh && profilePkg.dsh.profile && profilePkg.dsh.profile.bundles) || [];
   const inBundles = bundles.includes(pkgName);

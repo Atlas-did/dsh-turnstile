@@ -5,6 +5,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { patchFiles as sharedPatchFiles } from './lib/patch-files.mjs';
+import { patchFiles as localPatchFiles } from '../plugins/turnstile-popup/lib/plugin-inspect.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = here; // 测试文件就在 tools/ 下，直接用本目录
@@ -46,6 +48,21 @@ ok('inspect 抓出类名', insJ.classNames.includes('my-btn'), insJ.classNames.j
 ok('inspect 给了源码头', Array.isArray(insJ.head) && insJ.head.length > 0);
 const missing = run('inspect-plugin.mjs', [prof, 'not-installed']);
 ok('未安装的插件明确报未安装', missing.code === 3 && /未安装/.test(missing.out));
+
+// 路径穿越：不许拼名字逃出 node_modules（真实攻击形状）
+for (const evil of ['../../../secret', '../plug-a', 'a/b', '..']) {
+  const bad = run('inspect-plugin.mjs', [prof, evil]);
+  ok('拒绝穿越包名 ' + evil, bad.code === 2 && /包名不合法|node_modules 之外/.test(bad.out), bad.out.trim().slice(0, 50));
+}
+// 双份实现必须有同一个行为，否则就是手工漂移
+for (const patch of ['./a.patch.yml', ['x.yml', 'y.yml'], null]) {
+  const a1 = JSON.stringify(sharedPatchFiles(join(prof, 'node_modules', 'plug-a'), patch));
+  const a2 = JSON.stringify(localPatchFiles(join(prof, 'node_modules', 'plug-a'), patch));
+  ok('两份 patchFiles 行为一致 ' + JSON.stringify(patch), a1 === a2, a1 + ' vs ' + a2);
+}
+
+const scopedSys = run('inspect-plugin.mjs', [prof, '@scope/nothere']);
+ok('合法 scoped 名字只在「没装」时报未安装', scopedSys.code === 3, String(scopedSys.code));
 
 // ui-atlas
 const html = join(dir, 'atlas.html');

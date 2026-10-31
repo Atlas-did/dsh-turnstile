@@ -67,15 +67,20 @@ export const inject = ["webServer"];
 // slot-map 是「页面自己报上来的 slot 快照」：只含 slot 名与条目数，不含用户内容。
 // 它必须免 token —— DSH 加载后会抹掉 URL 里的 ?token=，插件侧拿不到令牌（实测 401）。
 // 跨源仍由 guardHandler 挡住，所以只允许同源页面/本机工具写入。
-const AUTH_EXEMPT = new Set(["/turnstile/", "/turnstile/slot-map"]);
+// 两档豁免，别再混成一个：
+//   AUTH_EXEMPT  —— 完全绕过 guard（只给静态页 /turnstile/，它不写任何东西）
+//   TOKEN_EXEMPT —— 只免 token，仍然做跨源检查（slot-map 是页面自己报的快照）
+const AUTH_EXEMPT = new Set(["/turnstile/"]);
+const TOKEN_EXEMPT = new Set(["/turnstile/slot-map"]);
 function guardHandler(handler, path) {
   if (!path || !path.startsWith("/turnstile/")) return handler;
   if (AUTH_EXEMPT.has(path)) return handler;
+  const skipToken = TOKEN_EXEMPT.has(path);
   return async (req, res) => {
     const origin = String(req.headers.origin || "");
     if (origin && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin)) return sendJson(res, 403, { error: "cross-origin" });
     const writes = req.method !== "GET" && req.method !== "HEAD";
-    if (writes && !requestRejection(req, res)) return;
+    if (writes && !skipToken && !requestRejection(req, res)) return;
     return handler(req, res);
   };
 }
@@ -678,7 +683,9 @@ export function apply(ctx, config) {
         const libDir = dirname(fileURLToPath(import.meta.url));
         const mod = await import(pathToFileURL(join(libDir, "plugin-inspect.js")).href);
         const r = mod.inspectPlugin(dir, pkgName, { lines: 12 });
-        return sendJson(res, r.ok ? 200 : (r.code === 3 ? 200 : 500), r.data || { error: r.reason });
+        // 3=没装（200，前端好展示）；2=参数非法（400）；其他=500
+        const status = r.ok ? 200 : r.code === 3 ? 200 : r.code === 2 ? 400 : 500;
+        return sendJson(res, status, r.data || { error: r.reason });
       } catch (e) { return sendJson(res, 500, { error: String(e.message).slice(0, 160) }); }
     },
   }), "turnstile: GET /turnstile/inspect");
