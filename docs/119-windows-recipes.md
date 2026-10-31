@@ -133,3 +133,20 @@ const windows = JSON.parse(execFileSync(node, ['tools/win-enumerate.mjs', '--win
 - UIA 对部分软件（自绘 UI、游戏、部分国产客户端）读不到控件树——那里只能退到截图 + OCR。
 - `uia.act`（点/输入）**实现了网关，但还没实现动作本身**：现在能判定、能审计，还不能替你点。
 - 句柄枚举依赖 `handle.exe`，不是内置能力。
+## 9. 注册表变了也能知道（环境变量、文件关联、COM 注册）
+
+```bash
+node tools/watch-registry.mjs --key "HKCU\\Environment" --once        # 先看现在有什么
+node tools/watch-registry.mjs --key "HKCU\\Environment" --duration 10   # 盯着看
+```
+
+实测（在 HKCU\Software\TurnstileProbe 上做增/改/删，跑完已删键）：
+
+```json
+{"name":"extra","event":"added","value":"hi","type":"REG_SZ"}
+{"name":"probe","event":"changed","value":"two","was":"one","type":"REG_SZ"}
+{"name":"extra","event":"removed","was":"hi"}
+```
+
+**实现说明**：轮询 `reg query`（默认 800ms），零依赖；解析与差异在 `lib/reg-diff.js`，5 条单测。
+文件监听管不到注册表，这两件事必须分开做（`watch-changes` vs `watch-registry`）。

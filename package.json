@@ -38,7 +38,10 @@
     "win:probe": "node tools/windows-probe.mjs",
     "win:gate": "node tools/windows-gate.mjs",
     "win:enum": "node tools/win-enumerate.mjs",
-    "test:windows-gate": "node plugins/turnstile-popup/test/windows-gate.test.mjs"
+    "test:windows-gate": "node plugins/turnstile-popup/test/windows-gate.test.mjs",
+    "watch:fs": "node tools/watch-changes.mjs",
+    "watch:reg": "node tools/watch-registry.mjs",
+    "test:reg": "node plugins/turnstile-popup/test/reg-diff.test.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",
