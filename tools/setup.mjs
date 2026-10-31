@@ -94,27 +94,13 @@ if (has('--install') && has('--yes')) {
   }
 }
 if (has('--panel') && has('--yes')) {
-  const src = join(ROOT, 'plugins', 'turnstile-popup');
-  const dst = join(target, 'node_modules', 'turnstile-popup');
+  const srcDir = join(ROOT, 'plugins', 'turnstile-popup');
   try {
-    execFileSync(process.execPath, ['-e', [
-      'const fs=require("fs"),p=require("path");',
-      'const src=process.argv[1],dst=process.argv[2],target=process.argv[3];',
-      'fs.mkdirSync(p.dirname(dst),{recursive:true});',
-      'fs.rmSync(dst,{recursive:true,force:true});',
-      'fs.cpSync(src,dst,{recursive:true});',
-      'const pkgPath=p.join(target,"package.json"),j=JSON.parse(fs.readFileSync(pkgPath,"utf8"));',
-      'j.dependencies=j.dependencies||{};j.dependencies["turnstile-popup"]="link:"+dst;',
-      'j.dsh=j.dsh||{};j.dsh.profile=j.dsh.profile||{};j.dsh.profile.bundles=j.dsh.profile.bundles||[];',
-      'if(!j.dsh.profile.bundles.includes("turnstile-popup"))j.dsh.profile.bundles.push("turnstile-popup");',
-      'fs.copyFileSync(pkgPath,pkgPath+".bak-"+Date.now());',
-      'fs.writeFileSync(pkgPath,JSON.stringify(j,null,2)+"\\n");',
-      'const patch=p.join(target,"cordis.patch.yml");',
-      'if(fs.existsSync(patch)){const t=fs.readFileSync(patch,"utf8");if(!/id:\\s*turnstile-popup/.test(t)){fs.copyFileSync(patch,patch+".bak-"+Date.now());fs.writeFileSync(patch,t.replace(/\\s*$/,"")+"\\n- insert:\\n    - id: turnstile-popup\\n      name: turnstile-popup\\n");}}',
-    ].join(''), src, dst, target], { stdio: 'inherit' });
-    console.log('panel installed into ' + target + ' (restart DSH to load it)');
+    // B13/B14: a dedicated installer merges the patch against the template `[]` and writes a `file:` dep,
+    // so the profile it just touched still boots (and passes this toolkit's own dependency-risk gate).
+    execFileSync(process.execPath, [join(ROOT, 'tools', 'install-panel.mjs'), target, srcDir], { stdio: 'inherit' });
   } catch (e) {
-    console.error('panel install failed: ' + String(e.message).slice(0, 200));
+    console.error('panel install failed: ' + String(e.message).slice(0, 300));
     failed = 1;
   }
 }
