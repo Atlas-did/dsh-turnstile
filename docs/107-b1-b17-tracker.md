@@ -50,3 +50,14 @@ node tools/e2e-panel-offline.mjs     # 面板 29 checks
 |---|---|---|
 | B4 | 部分 | 见上：写操作有 token 门，读操作只有跨源门 |
 | — | 无 | 其余 16 条均已修并带复跑命令 |
+## 附录：同族扫描（目标③「不留同族」）
+
+修完 17 条后，按类别再扫一遍，又抓到 3 处同类问题：
+
+| 同族 | 新发现 | 处理 |
+|---|---|---|
+| 把作者本机数据写进产品 | **面板 `client.js` 的 `FALLBACK` 常量里嵌了作者完整插件清单（20+ 个包名）**，首屏与读取失败时直接渲染这些假数据 | 清空为 `{profile:'<profile>', rows:[]}`；`engineSkipped` 改从 API 行取 |
+| 写路径无校验 | `anchor.mjs` 的 `--apply` 仍是裸 `writeFileSync` | 改走 `safeWritePatch`（写前写后解析） |
+| 读失败当空数据 | 面板 fetch 失败时表格空着，看起来像「没有插件」 | 显式 `插件列表读取失败：…（不是「没有插件」）` |
+
+复跑：`node tools/e2e-panel-offline.mjs`（29/29）、`node tools/anchor.mjs … --apply` + `node tools/profile-yaml.mjs`。
