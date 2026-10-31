@@ -7,7 +7,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
 
-export const MARKET_PATTERN = /(^|[/@])(dsh-market|dshmarket|plugin-market|dsh-market-place)$/i;
+export const MARKET_PATTERN = /(dsh-?market|dsh-?plugin-?market|plugin-?market|market-?place)$/i;
 
 /** 1. 同一个 profile 里出现多个「插件市场」包 → 侧栏会重复入口。 */
 export function duplicateMarkets(packages) {
