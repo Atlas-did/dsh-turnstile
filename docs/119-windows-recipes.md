@@ -150,3 +150,43 @@ node tools/watch-registry.mjs --key "HKCU\\Environment" --duration 10   # 盯着
 
 **实现说明**：轮询 `reg query`（默认 800ms），零依赖；解析与差异在 `lib/reg-diff.js`，5 条单测。
 文件监听管不到注册表，这两件事必须分开做（`watch-changes` vs `watch-registry`）。
+## 10. 真正去操作（uia.act）——必须过闸门，且可中断
+
+```bash
+node tools/uia-act.mjs --profile <dir> --plugin <pkg> focus --name "OpenCode"
+node tools/uia-act.mjs --profile <dir> --plugin <pkg> invoke --name "确定" --timeout 5000
+node tools/uia-act.mjs --profile <dir> --plugin <pkg> toggle --name "启用"
+node tools/uia-act.mjs --profile <dir> --plugin <pkg> set-value --name "搜索" --value "dsh"
+```
+
+**三条硬规则**：
+
+1. **不带 `--profile/--plugin` 直接拒绝**（exit 4）——操作别人的窗口必须有主体；
+2. **没声明 `windows.uia = 'act'` 直接拒绝**（exit 3），并写审计；
+3. **每次请求有超时，Ctrl-C 会关掉常驻进程**（可中断）。
+
+实测：
+
+```
+$ … --plugin reader-x focus --name OpenCode      # reader-x 只声明 read
+DENY  插件只声明了 uia=read，这次需要 act（点按钮/输入文本）   exit=3
+
+$ … --plugin actor-y focus --name OpenCode       # actor-y 声明 act
+focus 成功 · 487ms  {"foregroundMatches":false,"handle":65211404,…}
+```
+
+注意 `foregroundMatches:false`——Windows 有前台锁，`SetForegroundWindow` 可能被系统拒绝。
+我们**如实返回**这个值，而不是假装成功。
+
+## 11. 为什么现在不 fork 了：常驻 UIA 进程
+
+`tools/uia-client.mjs` 起一个常驻 PowerShell（`tools/uia-host.ps1`），用 JSON 行请求/响应：
+
+```
+握手 ~1s（一次性）   之后：windows 466ms / find 2468ms（find 要扫全部后代）
+```
+
+对比「每次 fork 一个 PowerShell」：每次调用都要付启动费。常驻后连续操作才可能。
+
+**踩到的坑**：PowerShell 5.1 在无 BOM 时按 ANSI 读 `.ps1`，脚本里的中文会拆坏引号。
+所以 `.ps1` 里一律 ASCII，中文只留在 JS 层。

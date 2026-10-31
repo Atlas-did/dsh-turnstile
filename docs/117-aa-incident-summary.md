@@ -71,7 +71,7 @@ aa.dsh.v2.Sync.ingestBatch
 | 经 `http://127.0.0.1:7897` | SSL EOF / 超时；CONNECT 返回 200 但隧道随后断 |
 | `ALL_PROXY` | `http://127.0.0.1:7897`（`verge-mihomo`） |
 
-所以不是 AA 配置错，也不是插件错，是**代理本身不可用**。
+所以不是 AA 配置错，也不是插件错。根因是 **Clash 处于 global 模式**（`clash-verge.yaml:3`）：经 7897 的所有请求都被塞进同一个海外节点，节点一抖，直连明明可达的域名也会超时。浏览器之所以没事，是系统代理被 `dev-sidecar`（31181）占着，而它的 `ProxyOverride` 里有 `*.deepseek.com`。
 
 ## 修法（已执行并验证）
 
@@ -96,9 +96,13 @@ aa.dsh.v2.Sync.ingestBatch
 - 会话记录：`provider=deepseek-account`，失败时间 16:30:07，`code=TRANSPORT`（网络层，不是 401/鉴权）
 - DSH 在**启动时**固化代理策略：`dsh-http-proxy` 读 `ALL_PROXY/HTTPS_PROXY` 后 `setGlobalDispatcher`；`dsh-llm-deepseek/lib/index.js:2188` 用的是 `globalThis.fetch`
 - DSH 进程 15:57:42 启动，早于 16:12 的 NO_PROXY 改动 → 它根本没拿到新值
-- 同一个 Clash 在间歇性抽风：16:12 测 google / api.deepseek.com 超时；复测直连与代理各 5/5 都返回 401（可达）
+- 同一个 Clash：global 模式 + 单节点抖动。16:12 经 7897 测 google / api.deepseek.com 超时；直连 5/5 返回 401（可达）
 
-处理：修 Clash（换节点 / 重启内核）；或把 `deepseek.com` 加进 `NO_PROXY` 后**重启 DSH**。
+处理（2026-10-31 23:3x）：
+
+1. Clash 已从「全局」切回「规则」——DSH 不用重启就能恢复
+2. 用户级 `NO_PROXY` 已追加 `deepseek.com,opencode.ai`（旧值保留）；DSH 要**完全退出再启动**才会读到
+3. 别同时让 Clash 和 `dev-sidecar` 管系统代理，否则三层路由会继续互相覆盖
 
 ## 下次照这个顺序判定
 
