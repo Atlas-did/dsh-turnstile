@@ -78,7 +78,7 @@ export const COMPONENTS = Object.freeze({
     capabilities: { draggable: true, droppable: false, acceptsChildren: false },
     defaults: { src: '', alt: '' },
     propsSchema: {
-      src: { type: 'string', label: '地址（只允许 http(s) 或 /turnstile/）', default: '' },
+      src: { type: 'string', label: '地址：http(s)://… 或 asset:绝对路径（docs/img、state 下的图）', default: '' },
       alt: { type: 'string', label: '替代文字', default: '' },
     },
   },

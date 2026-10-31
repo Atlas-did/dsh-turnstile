@@ -66,8 +66,10 @@
     else if (node.type === 'table') { box.append(tableNode(p)); }
     else if (node.type === 'chart') { box.append(chartNode(p)); }
     else if (node.type === 'image') {
-      const src = String(p.src || '');
-      if (!/^(https?:\/\/|\/turnstile\/)/.test(src)) { const n = el('div'); n.textContent = '图片只允许 http(s) 或 /turnstile/ 地址'; n.style.color = '#e3b341'; box.append(n); }
+      const raw = String(p.src || '').trim();
+      // 三种写法：http(s) 外链、/turnstile/ 站内、asset:<本地绝对路径>（经 /turnstile/asset 白名单）。
+      const src = raw.indexOf('asset:') === 0 ? '/turnstile/asset?path=' + encodeURIComponent(raw.slice(6)) : raw;
+      if (!/^(https?:\/\/|\/turnstile\/)/.test(src)) { const n = el('div'); n.textContent = '图片地址要写 http(s):// 、/turnstile/… 或 asset:<绝对路径>'; n.style.color = '#e3b341'; box.append(n); }
       else { const img = el('img'); img.src = src; img.alt = p.alt || ''; img.style.maxWidth = '100%'; box.append(img); }
     }
     return box;

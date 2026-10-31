@@ -1,7 +1,7 @@
 // Host side: GET /turnstile/plugins and POST /turnstile/toggle.
 // The browser cannot write files, so every change happens here with a backup.
 import { readFileSync, writeFileSync, existsSync, copyFileSync, statSync, readdirSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -640,6 +640,33 @@ export function apply(ctx, config) {
     },
   }), "turnstile: GET /turnstile/page-model.js");
 
+  // 本地图片：搭建器要能引用仓库里的图（docs/img、state）或 DSH_TURNSTILE_ASSETS 指定的目录。
+  // 只允许白名单根目录，并且解析后必须仍在其中（防 ../ 穿越）。
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/asset",
+    handler: async (req, res) => {
+      const q = String(req.url || "");
+      const m = /[?&]path=([^&]*)/.exec(q);
+      if (!m) return sendJson(res, 400, { error: "缺少 path" });
+      const wanted = decodeURIComponent(m[1]);
+      const repo = process.env.DSH_TURNSTILE_HOME || "";
+      const roots = [
+        join(repo, "docs", "img"),
+        join(repo, "state"),
+        process.env.DSH_TURNSTILE_ASSETS || "",
+      ].filter(Boolean).map((p) => resolve(p));
+      const target = resolve(wanted);
+      const ok = roots.some((r) => target === r || target.startsWith(r + sep));
+      if (!ok) return sendJson(res, 403, { error: "不在允许的图片目录里", tried: target, roots });
+      if (!existsSync(target)) return sendJson(res, 404, { error: "文件不存在", target });
+      const ext = (target.split(".").pop() || "").toLowerCase();
+      const types = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml" };
+      if (!types[ext]) return sendJson(res, 415, { error: "不是图片：" + ext });
+      res.writeHead(200, { "content-type": types[ext], "cache-control": "no-store" });
+      res.end(readFileSync(target));
+    },
+  }), "turnstile: GET /turnstile/asset");
   // 宿主内页面：/turnstile/view 只读渲染 state 里的页面 JSON（搭建器负责编辑）。
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
