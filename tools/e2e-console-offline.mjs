@@ -299,6 +299,18 @@ try {
     ok('inspect route: traversal is 400', routeStatus.traversal.status === 400 && /包名不合法/.test(routeStatus.traversal.body.error), routeStatus.traversal.status + ' ' + String(routeStatus.traversal.body.error).slice(0, 40));
     ok('inspect route: missing plugin is 200 but installed=false', routeStatus.missing.status === 200 && routeStatus.missing.body.installed === false, routeStatus.missing.status + ' installed=' + routeStatus.missing.body.installed);
 
+    // slot-map 的 POST 路径（之前只手工验证过）
+    const slotPost = await page.evaluate(async () => {
+      const okRes = await fetch('/turnstile/slot-map', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slots: [{ slot: 'shell.overlay', count: 2, entries: ['plug-a:x'] }] }) });
+      const okBody = await okRes.json();
+      const back = await (await fetch('/turnstile/slot-map')).json();
+      const badRes = await fetch('/turnstile/slot-map', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nope: true }) });
+      return { ok: okRes.status, okBody, roundTrip: back, bad: badRes.status };
+    });
+    ok('slot-map POST returns 200 and writes', slotPost.ok === 200 && slotPost.okBody.ok === true, JSON.stringify(slotPost.okBody).slice(0, 60));
+    ok('slot-map GET reads back what was posted', slotPost.roundTrip.slots?.[0]?.slot === 'shell.overlay', JSON.stringify(slotPost.roundTrip).slice(0, 60));
+    ok('slot-map rejects a body without slots', slotPost.bad === 400, String(slotPost.bad));
+
     // 插件骨架视图：输入包名 -> 出骨架（声明/面/patch 行/slot）
     await page.locator('[data-testid="nav-skeleton"]').click();
     await page.waitForTimeout(250);

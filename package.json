@@ -53,7 +53,9 @@
     "snapshot:profile": "node tools/profile-snapshot.mjs",
     "ask": "node tools/ask.mjs",
     "test:snapshot": "node tools/test-profile-snapshot.mjs",
-    "test:ask": "node plugins/turnstile-popup/test/ask.test.mjs"
+    "test:ask": "node plugins/turnstile-popup/test/ask.test.mjs",
+    "slot-report": "node tools/slot-map-report.mjs",
+    "test:slot-report": "node tools/test-slot-map-report.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",

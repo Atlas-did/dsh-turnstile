@@ -49,6 +49,21 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
       const status = r.ok ? 200 : r.code === 3 ? 200 : r.code === 2 ? 400 : 500;
       return json(status, r.data || { error: r.reason });
     }
+    if (pathname === '/turnstile/slot-map') {
+      // 真实落盘（之前只有宿主里那版，e2e 用的是假响应，等于没覆盖）
+      const file = join(state || dir, 'slot-map-fixture.json');
+      if (req.method === 'GET') {
+        if (!existsSync(file)) return json(200, { status: 'not-generated' });
+        try { return json(200, JSON.parse(readFileSync(file, 'utf8'))); } catch (e) { return json(500, { error: 'bad json' }); }
+      }
+      if (req.method !== 'POST') return json(405, { error: 'method' });
+      let body = '';
+      await new Promise((r) => { req.on('data', (c) => { body += c; if (body.length > 1e6) req.destroy(); }); req.on('end', r); });
+      let parsed; try { parsed = JSON.parse(body); } catch (e) { return json(400, { error: 'body 不是 JSON' }); }
+      if (!parsed || !Array.isArray(parsed.slots)) return json(400, { error: '缺少 slots 数组' });
+      writeFileSync(file, JSON.stringify({ at: new Date().toISOString(), slots: parsed.slots }));
+      return json(200, { ok: true, file, slots: parsed.slots.length });
+    }
     if (pathname === '/turnstile/search') {
       const q = (new URL(req.url, 'http://x').searchParams.get('q') || '');
       const hits = q ? [{ path: 'C:/x/tools/launcher.mjs', name: 'launcher.mjs', score: 800 }, { path: 'C:/x/docs/launcher.md', name: 'launcher.md', score: 600 }] : [];
