@@ -133,6 +133,20 @@ try {
   await page.waitForTimeout(250);
   const after = await page.locator('[data-testid^="command-delete-"]').count();
   ok('batch adds one queue entry per selected plugin', after >= before + 2, before + '->' + after);
+  // The history timeline runs beside undo/redo: jumping back must shrink the queue, and undo must still work.
+  await click('[data-testid="palette-Common"]');
+  await click('[data-testid="designer-add-toggle"]');
+  await page.waitForTimeout(200);
+  await click('[data-testid="designer-add-anchor"]');
+  await page.waitForTimeout(250);
+  const histRows = await page.locator('[data-testid^="history-"]').count();
+  ok('history panel lists the applied edits', histRows >= 2, String(histRows));
+  const queueBeforeJump = await page.locator('[data-testid^="command-delete-"]').count();
+  await page.locator('[data-testid="history-0"]').click();
+  await page.waitForTimeout(300);
+  const queueAfterJump = await page.locator('[data-testid^="command-delete-"]').count();
+  ok('jumping to an earlier entry shortens the queue', queueAfterJump < queueBeforeJump, queueBeforeJump + '->' + queueAfterJump);
+  ok('undo remains enabled after a jump', !(await page.locator('[data-testid="designer-undo"]').first().isDisabled()));
   ok('no uncaught designer browser errors', errors.length === 0, errors.join(' | ').slice(0, 200));
 } catch (error) {
   ok('designer e2e completed without throwing', false, String(error?.stack || error).slice(0, 500));

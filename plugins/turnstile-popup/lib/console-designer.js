@@ -8,7 +8,7 @@
   document.head.append(css);
   const ds = {
     loadedFor: '', package: '', palette: 'Common', editor: 'designer', inspector: 'properties',
-    operations: [], past: [], future: [], saved: '[]', selectedOp: -1, anchorDraft: '',
+    operations: [], past: [], future: [], saved: '[]', selectedOp: -1, anchorDraft: '', timeline: [],
     preview: null, previewKey: '', previewSeq: 0, busy: false, error: '', dialog: false,
     groups: { identity: true, config: true, source: true },
   };
@@ -48,9 +48,11 @@
     ds.package = state.selected?.plugin?.name || state.data.plugins[0]?.name || '';
     ds.anchorDraft = effective(selected()).anchor;
   }
-  function mutate(fn) {
+  function mutate(fn, label) {
+    // The timeline runs beside past/future, never instead of them: undo/redo behaviour is untouched.
     ds.past.push(copy(ds.operations)); if (ds.past.length > 100) ds.past.shift();
-    ds.future = []; fn(); ds.selectedOp = Math.min(ds.selectedOp, ds.operations.length - 1);
+    ds.future = []; fn();
+    ds.timeline = (ds.timeline || []).concat([{ time: Date.now(), label: label || '修改队列', snapshot: copy(ds.operations) }]).slice(-100); ds.selectedOp = Math.min(ds.selectedOp, ds.operations.length - 1);
     ds.error = ''; ds.dialog = false; persist(); render();
   }
   function addOperation(op) {
@@ -164,6 +166,27 @@
     if (batch.skipped.length) parts.push('跳过 ' + batch.skipped.length + ' 个：' + batch.skipped.map((s) => s.name).join(', '));
     state.notice = parts.join('；');
   }
+  function jumpTo(index) {
+    const t = (ds.timeline || [])[index];
+    if (!t) return;
+    ds.future.push(copy(ds.operations));
+    ds.operations = copy(t.snapshot);
+    ds.timeline = ds.timeline.slice(0, index + 1);
+    ds.selectedOp = Math.min(ds.selectedOp, ds.operations.length - 1);
+    ds.previewKey = ''; ds.dialog = false; persist(); render();
+  }
+  function renderTimeline() {
+    const box = node('div', { class: 'designer-timeline', 'data-testid': 'designer-timeline' });
+    const list = ds.timeline || [];
+    box.append(node('div', { class: 'side-title', text: '历史 · ' + list.length }));
+    if (!list.length) { box.append(node('p', { class: 'hint', text: '还没有改动。' })); return box; }
+    list.slice().reverse().forEach((entry, i) => {
+      const at = list.length - 1 - i;
+      const time = new Date(entry.time).toLocaleTimeString('zh-CN', { hour12: false });
+      box.append(btn(time + ' · ' + entry.label + ' · ' + entry.snapshot.length + ' 条', () => jumpTo(at), 'history-' + at, 'history-row'));
+    });
+    return box;
+  }
   function paletteButton(label, fn, id) { return btn(label, fn, id, 'btn'); }
   function renderPalette() {
     const box = node('div', { class: 'designer-palette' });
@@ -259,6 +282,7 @@
     generate.disabled = !ds.operations.length || ds.busy || ds.previewKey !== currentKey() || !ds.preview || Boolean(ds.error);
     main.append(node('div', { class: 'designer-toolbar' }, [undoBtn, redoBtn, btn('保存草稿', savePoint, 'designer-save'), generate, node('span', { class: dirty() ? 'dirty' : 'hint', 'data-testid': 'designer-dirty', text: dirty() ? '● 相对保存点有修改' : '保存点' })]));
     main.append(renderPalette());
+    main.append(renderTimeline());
     const tree = node('aside', { class: 'object-tree' }, [node('div', { class: 'object-head', text: 'Object Tree / 对象树' }), node('div', { class: 'tree-root', text: '▾ ' + state.data.profile.name + ' : Profile' })]);
     const plugins = state.data.plugins.filter(matches);
     plugins.forEach((p) => { const item = btn('', () => selectDesignerPlugin(p), 'tree-' + p.name, 'tree-item' + (p.name === ds.package ? ' active' : '')); item.append(document.createTextNode((ds.operations.some((op) => op.package === p.name) ? '◆ ' : '  ') + p.name), node('span', { class: 'tree-state', text: effective(p).disabled ? 'off' : 'on' })); tree.append(item); });
