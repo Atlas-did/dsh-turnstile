@@ -7,6 +7,7 @@ import { makePlan, applyPlan, describePlan } from "./txn.js";
 import { collectConsoleData } from "./console-data.js";
 import { readViewState, writeViewState } from "./view-state.js";
 import { toggleText } from "./toggle-text.js";
+import { DEFAULT_RULES as DEFAULT_HOOK_RULES, validateRules as validateHookRules } from "./hook-rules.js";
 import { designerTransaction } from "./designer-ops.js";
 import { beginOperation, settleOperation, recoverJournal } from "./journal.js";
 
@@ -297,7 +298,7 @@ export function apply(ctx, config) {
 
   // Model modules are ESM files the page loads as classic scripts: strip `export`, keep the window
   // attach. One helper for all of them, so a new module is one list entry instead of a copied block.
-  const MODULES = ["capabilities.js", "selection.js", "history-timeline.js", "field-schema.js", "hooks.js", "virtual-window.js"];
+  const MODULES = ["capabilities.js", "selection.js", "history-timeline.js", "field-schema.js", "hooks.js", "virtual-window.js", "hook-rules.js"];
   for (const file of MODULES) {
     ctx.effect(() => ctx.webServer.register({
       kind: "exact",
@@ -392,6 +393,20 @@ export function apply(ctx, config) {
       } catch (e) { sendJson(res, e.status || 400, { error: String((e && e.message) || e).slice(0, 180) }); }
     },
   }), "turnstile: POST /turnstile/designer");
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/hooks",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      // The profile owns the rules; the host only reads and validates them.
+      const file = join(STATE_DIR(), "hooks.json");
+      let raw = null;
+      try { raw = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null; } catch (e) { raw = null; }
+      const source = raw && Array.isArray(raw.rules) ? raw.rules : DEFAULT_HOOK_RULES;
+      const checked = validateHookRules(source);
+      sendJson(res, 200, { rules: checked.rules, rejected: checked.rejected, source: raw ? "state/hooks.json" : "defaults" });
+    },
+  }), "turnstile: GET /turnstile/hooks");
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
     path: "/turnstile/plugins",

@@ -2,6 +2,7 @@
 // Local full-window console. No framework and no external CDN assets.
 // npm run dev -- --host 127.0.0.1 --port 7100 --profile tests/console-fixture
 import { createServer } from 'node:http';
+import { pathToFileURL } from 'node:url';
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +21,26 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
   return createServer(async (req, res) => {
     const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
     const json = (code, value) => { res.statusCode = code; res.setHeader('content-type', 'application/json; charset=utf-8'); res.end(JSON.stringify(value)); };
-    if (pathname === '/turnstile/capabilities.js' || pathname === '/turnstile/history-timeline.js' || pathname === '/turnstile/selection.js' || pathname === '/turnstile/field-schema.js' || pathname === '/turnstile/hooks.js' || pathname === '/turnstile/virtual-window.js') {
+    if (pathname === '/turnstile/hooks') {
+      const json = (code, value) => { res.statusCode = code; res.setHeader('content-type', 'application/json; charset=utf-8'); res.end(JSON.stringify(value)); };
+      let rules = [];
+      let source = 'defaults';
+      try {
+        const file = join(root, 'plugins', 'turnstile-popup', 'lib', 'hook-rules.js');
+        const mod = await import(pathToFileURL(file).href);
+        rules = mod.DEFAULT_RULES.map((r) => ({ ...r }));
+        const stateFile = join(state || join(root, 'state'), 'hooks.json');
+        if (existsSync(stateFile)) {
+          const parsed = JSON.parse(readFileSync(stateFile, 'utf8'));
+          if (Array.isArray(parsed.rules)) {
+            const checked = mod.validateRules(parsed.rules);
+            return json(200, { rules: checked.rules, rejected: checked.rejected, source: 'state/hooks.json' });
+          }
+        }
+      } catch { rules = []; source = 'unavailable'; }
+      return json(200, { rules, rejected: [], source });
+    }
+    if (pathname === '/turnstile/capabilities.js' || pathname === '/turnstile/history-timeline.js' || pathname === '/turnstile/selection.js' || pathname === '/turnstile/field-schema.js' || pathname === '/turnstile/hooks.js' || pathname === '/turnstile/virtual-window.js' || pathname === '/turnstile/hook-rules.js') {
       const name = pathname.slice('/turnstile/'.length);
       const src = readFileSync(join(root, 'plugins', 'turnstile-popup', 'lib', name), 'utf8')
         .replace(/\bexport\s+(function|const|class)/g, '$1');

@@ -23,7 +23,7 @@ if (!existsSync(liveDir)) {
   process.exit(2);
 }
 
-const FILES = ['lib/index.js', 'lib/client.js', 'lib/console.html', 'lib/console-designer.js', 'lib/console-data.js', 'lib/designer-ops.js', 'lib/toggle-patch.js', 'lib/view-state.js', 'lib/sort-context.js', 'lib/inspector-model.js', 'lib/diff-state.js', 'lib/virtual-window.js', 'lib/txn.js', 'lib/journal.js', 'lib/toggle-text.js', 'lib/capabilities.js', 'lib/history-timeline.js', 'lib/selection.js', 'lib/field-schema.js', 'lib/hooks.js', 'lib/virtual-window.js'];
+const FILES = ['lib/index.js', 'lib/client.js', 'lib/console.html', 'lib/console-designer.js', 'lib/console-data.js', 'lib/designer-ops.js', 'lib/toggle-patch.js', 'lib/view-state.js', 'lib/sort-context.js', 'lib/inspector-model.js', 'lib/diff-state.js', 'lib/virtual-window.js', 'lib/txn.js', 'lib/journal.js', 'lib/toggle-text.js', 'lib/capabilities.js', 'lib/history-timeline.js', 'lib/selection.js', 'lib/field-schema.js', 'lib/hooks.js', 'lib/virtual-window.js', 'lib/hook-rules.js'];
 
 const drift = [];
 const copied = [];

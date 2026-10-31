@@ -37,6 +37,7 @@
     try { localStorage.setItem('turnstile.designer.draft.' + state.data.profile.name, signature()); } catch {}
   }
   function loadDraft() {
+    fetchHookRules();
     const id = state.data.profile.dir;
     if (ds.loadedFor === id) return;
     ds.loadedFor = id; ds.operations = []; ds.past = []; ds.future = []; ds.saved = '[]'; ds.preview = null; ds.previewKey = ''; ds.timeline = undefined;
@@ -204,6 +205,14 @@
   }
   // A real use of the hook layer: the queue-cap rule and duplicate detection live in a before hook,
   // so the palette and the batch path share one decision instead of each checking its own thing.
+  function fetchHookRules() {
+    try {
+      fetch('/turnstile/hooks', { headers: { accept: 'application/json' } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => { if (j && Array.isArray(j.rules)) { ds.hookRules = j.rules; ds.hookRuleSource = j.source || ''; } })
+        .catch(() => {});
+    } catch (e) {}
+  }
   function ensureHooks() {
     const HK = window.TurnstileHooks;
     if (!HK || ds.hooks) return ds.hooks;
@@ -211,11 +220,14 @@
     ds.hooks = HK.createHooks();
     HK.on(ds.hooks, 'beforeEnqueue', (cmd) => {
       if (!cmd) return true;
+      // The host owns the rules; the page only evaluates them against the pending command.
+      const R = window.TurnstileHookRules;
+      if (R && !ds.hookRules) ds.hookRules = R.DEFAULT_RULES.slice();
+      if (R && ds.hookRules && ds.hookRules.length) {
+        const verdict = R.evaluateRules(ds.hookRules, cmd, { queue: ds.operations });
+        return verdict.allowed ? true : verdict.reason;
+      }
       if (ds.operations.length >= 100) return '一次最多生成 100 条命令。';
-      const same = ds.operations.some((op) => op.type === cmd.type && op.package === cmd.package
-        && (cmd.type !== 'toggle' || Boolean(op.disable) === Boolean(cmd.disable))
-        && (cmd.type !== 'anchor' || (op.anchor || '') === (cmd.anchor || '')));
-      if (same) return '队列里已经有相同的命令：' + cmd.type + ' · ' + cmd.package;
       return true;
     });
     return ds.hooks;
