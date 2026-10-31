@@ -72,6 +72,17 @@ ok('atlas 生成 HTML', existsSync(html) && /UI 面/.test(readFileSync(html, 'ut
 const csvText = readFileSync(csv, 'utf8');
 ok('atlas 生成 CSV 且有表头', csvText.startsWith('surface,plugin,kind,detail'));
 ok('CSV 含两个插件', /plug-a/.test(csvText) && /plug-b/.test(csvText));
+// 运行时列：用真实形状的 slot-map（slot 名带点号、entry id 带插件前缀）
+const slotMap = join(dir, 'slot-map-p.json');
+writeFileSync(slotMap, JSON.stringify({ at: 'now', slots: [
+  { slot: 'settings.general.item', count: 2, entries: ['plug-a:item', 'someone-else:item'], declaredBy: 'an entry in "settings.section" (Gb)' },
+  { slot: 'shell.overlay', count: 1, entries: ['plug-b.overlay'], declaredBy: 'an entry in "root" (Gb)' },
+] }));
+const rt = JSON.parse(run('ui-atlas.mjs', [prof, '--json', '--slot-map', slotMap]).out);
+const row = rt.surfaces.find((s) => s.surface.includes('ui-settings') && s.entries.some((e) => e.plugin === 'plug-a'));
+ok('atlas 用真实 slot 形状算出 surface 运行时条目', row && row.runtime === 2, row ? String(row.runtime) : 'no row');
+ok('atlas 按插件前缀算出 pluginRuntime', row && row.entries.find((e) => e.plugin === 'plug-a').pluginRuntime === 1, JSON.stringify(row && row.entries.find((e) => e.plugin === 'plug-a')));
+
 const atlasJ = JSON.parse(run('ui-atlas.mjs', [prof, '--json']).out);
 const conv = atlasJ.surfaces.find((s) => s.surface.includes('ui-conversation'));
 ok('atlas 的面对应到插件', conv && conv.entries.some((e) => e.plugin === 'plug-b'));

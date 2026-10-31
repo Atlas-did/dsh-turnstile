@@ -64,12 +64,33 @@ window.__ModuleLoader__.load({
           if (!recs || typeof recs.forEach !== "function") return out;
           recs.forEach(function (node, slot) {
             var ids = [];
+            var pickEntryId = function (e) { var o = (e && e.options) || {}; return String(o.id || o.key || (e && (e.id || e.key || e.name)) || "?"); };
             try {
               var es = node && node.entries;
-              if (es && typeof es.forEach === "function") es.forEach(function (e) { ids.push(String((e && (e.id || e.key || e.name)) || "?")); });
-              else if (Array.isArray(es)) es.forEach(function (e) { ids.push(String((e && (e.id || e.key || e.name)) || "?")); });
+              if (es && typeof es.forEach === "function") es.forEach(function (e) { ids.push(pickEntryId(e)); });
+              else if (Array.isArray(es)) es.forEach(function (e) { ids.push(pickEntryId(e)); });
             } catch (e) {}
-            out.push({ slot: String(slot), declaredBy: String((node && node.declaredBy) || ""), count: ids.length, entries: ids.slice(0, 30) });
+            // 诊断字段：records 的真实形状（key 名 / entries 形状 / declaredBy 来源）。
+            // 只有 DSH_TURNSTILE_DEBUG 打开时才带，正常上报不受影响。
+            var diag = null;
+            try {
+              if (window.__TURNSTILE_DEBUG__) {
+                var keys = [];
+                try { keys = Object.keys(node || {}); } catch (e) {}
+                var es0 = node && node.entries;
+                diag = {
+                  nodeKeys: keys,
+                  entriesType: Object.prototype.toString.call(es0),
+                  entriesLen: (es0 && typeof es0.forEach === 'function') ? (function () { var n = 0; es0.forEach(function () { n += 1; }); return n; })() : (Array.isArray(es0) ? es0.length : null),
+                  entrySample: (function () {
+                    var s = null;
+                    try { if (es0 && typeof es0.forEach === 'function') es0.forEach(function (e) { if (!s) s = String(JSON.stringify(e && (e.id ? { id: e.id } : e))).slice(0, 160); }); } catch (e) {}
+                    return s;
+                  })(),
+                };
+              }
+            } catch (e) {}
+            out.push({ slot: String(slot), declaredBy: String((node && node.declaredBy) || ""), count: ids.length, entries: ids.slice(0, 30), diag: diag });
           });
         } catch (e) {}
         return out.sort(function (a, b) { return b.count - a.count || a.slot.localeCompare(b.slot); });

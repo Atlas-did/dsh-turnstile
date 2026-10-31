@@ -286,16 +286,29 @@ try {
     const jumped = await text('[data-testid="skeleton"]');
     ok('clicking a plugin row opens its skeleton', jumped.includes('inject 面'), jumped.slice(0, 60));
 
+    // 路由级覆盖：正常 / 穿越 / 未安装，三种形状的真实状态码
+    const routeStatus = await page.evaluate(async () => {
+      const out = {};
+      for (const [k, pkg] of [['ok', 'plug-alpha'], ['traversal', '../../../etc'], ['missing', 'no-such-plugin']]) {
+        const r = await fetch('/turnstile/inspect?pkg=' + encodeURIComponent(pkg));
+        out[k] = { status: r.status, body: await r.json() };
+      }
+      return out;
+    });
+    ok('inspect route: real plugin returns 200 with fields', routeStatus.ok.status === 200 && routeStatus.ok.body.version === '1.4.0' && routeStatus.ok.body.injects.includes('@deepseek-ai/dsh-client-ui-settings'), JSON.stringify(routeStatus.ok.body).slice(0, 80));
+    ok('inspect route: traversal is 400', routeStatus.traversal.status === 400 && /包名不合法/.test(routeStatus.traversal.body.error), routeStatus.traversal.status + ' ' + String(routeStatus.traversal.body.error).slice(0, 40));
+    ok('inspect route: missing plugin is 200 but installed=false', routeStatus.missing.status === 200 && routeStatus.missing.body.installed === false, routeStatus.missing.status + ' installed=' + routeStatus.missing.body.installed);
+
     // 插件骨架视图：输入包名 -> 出骨架（声明/面/patch 行/slot）
     await page.locator('[data-testid="nav-skeleton"]').click();
     await page.waitForTimeout(250);
-    await page.locator('[data-testid="skeleton-input"]').fill('fixture-plugin');
+    await page.locator('[data-testid="skeleton-input"]').fill('plug-alpha');
     await page.locator('[data-testid="skeleton-go"]').click();
     await page.waitForTimeout(700);
     const skel = await text('[data-testid="skeleton"]');
-    ok('skeleton view shows inject surfaces', skel.includes('ui-settings'));
-    ok('skeleton view shows patch rows', skel.includes('fixture-row'));
-    ok('skeleton view shows slots', skel.includes('shell.overlay'));
+    ok('skeleton view shows inject surfaces', skel.includes('ui-settings'), skel.slice(0, 60));
+    ok('skeleton view shows patch rows', skel.includes('alpha-row'));
+    ok('skeleton view says when the entry is undeclared', /入口/.test(skel) && (skel.includes('（无）') || skel.includes('lib/')), skel.slice(0, 100));
 
     // 启动器视图：输入即搜，结果带路径
     await page.locator('[data-testid="nav-launcher"]').click();

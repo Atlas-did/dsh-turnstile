@@ -57,6 +57,28 @@ const norm = (s) => String(s || '')
 // 客户端 slot 名常是「命名空间.路径」（settings.section），面的名字是 settings；
 // 所以 slot 侧取第一段，面侧取最后一段。
 const slotKey = (s) => String(s || '').split('.')[0].replace(/^ui-/, '').toLowerCase();
+// 单插件运行时条目：entry id 常以插件名开头（`dsh-better-sidebar:editor`）
+// 或 `@scope/name/...`（`@deepseek-ai/dsh-client-ui-sidebar-right/guide`）。
+// 取不到前缀的（`bash`、`user` 这类核心条目）不算给任何插件。
+const pluginRuntime = (plugin) => {
+  if (!runtime || !Array.isArray(runtime.slots)) return null;
+  let n = 0;
+  let seen = false;
+  for (const s of runtime.slots) {
+    for (const id of s.entries || []) {
+      seen = true;
+      const str = String(id || '');
+      // 三种写法都见过：`dsh-better-sidebar:editor`（冒号）
+      //                 `@scope/pkg/guide`（路径）
+      //                 `turnstile.plugin-list`（点号，取插件名第一段且够长才认）
+      const head = String(plugin).split('-')[0];
+      const dotted = head.length >= 6 && str.startsWith(head + '.');
+      if (str === plugin || str.startsWith(plugin + ':') || str.startsWith(plugin + '/') || dotted) n += 1;
+    }
+  }
+  return seen ? n : null;
+};
+
 const runtimeCount = (surface) => {
   if (!runtime || !Array.isArray(runtime.slots)) return null;
   const want = norm(surface);
@@ -65,15 +87,15 @@ const runtimeCount = (surface) => {
   return hits.reduce((n, h) => n + (h.count || 0), 0);
 };
 
-const rows = [...surfaces.entries()].map(([surface, list]) => ({ surface, count: new Set(list.map((l) => l.plugin)).size, entries: list, runtime: runtimeCount(surface) }))
+const rows = [...surfaces.entries()].map(([surface, list]) => ({ surface, count: new Set(list.map((l) => l.plugin)).size, entries: list, runtime: runtimeCount(surface) })).map((r) => ({ ...r, entries: r.entries.map((e) => ({ ...e, pluginRuntime: pluginRuntime(e.plugin) })) }))
   .sort((a, b) => b.count - a.count || a.surface.localeCompare(b.surface));
 
 if (argv.includes('--json')) { console.log(JSON.stringify({ profile: profileDir, bundles: bundles.length, surfaces: rows }, null, 1)); process.exit(0); }
 
 const csvOut = val('--csv');
 if (csvOut) {
-  const lines = ['surface,plugin,kind,detail,runtimeCount'];
-  for (const r of rows) for (const e of r.entries) lines.push([r.surface, e.plugin, e.kind, e.detail, r.runtime == null ? '' : r.runtime].map((x) => '"' + String(x).replace(/"/g, '""') + '"').join(','));
+  const lines = ['surface,plugin,kind,detail,runtimeCount,pluginRuntime'];
+  for (const r of rows) for (const e of r.entries) lines.push([r.surface, e.plugin, e.kind, e.detail, r.runtime == null ? '' : r.runtime, e.pluginRuntime == null ? '' : e.pluginRuntime].map((x) => '"' + String(x).replace(/"/g, '""') + '"').join(','));
   writeFileSync(csvOut, lines.join('\n') + '\n');
   console.log('CSV 已写 ' + csvOut + '（' + (lines.length - 1) + ' 行）');
 }

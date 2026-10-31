@@ -28,7 +28,9 @@ function logTail(n = 2000) {
   try { const t = readFileSync(LOG, 'utf8'); return t.slice(-n); } catch { return ''; }
 }
 function url() {
-  const m = /http:\/\/127\.0\.0\.1:(\d+)\/\?token=([A-Za-z0-9_-]+)/.exec(logTail(200000));
+  // 日志是追加写的：必须取**最后一条**，第一条是上一次启动的旧 token（root 会 401）
+  const all = [...logTail(200000).matchAll(/http:\/\/127\.0\.0\.1:(\d+)\/\?token=([A-Za-z0-9_-]+)/g)];
+  const m = all[all.length - 1];
   return m ? { port: Number(m[1]), token: m[2], url: m[0] } : null;
 }
 async function alive() {
@@ -82,7 +84,11 @@ if (cmd === 'start') {
   mkdirSync(join(MINI, 'logs'), { recursive: true });
   const bin = join(MINI, 'runtime', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js');
   if (!existsSync(bin)) { console.error('找不到 dsh 运行时：' + bin); process.exit(2); }
-  const child = spawn(process.execPath, [bin, 'mini', '--no-open', '--port', String(PORT)], { cwd: MINI, env, detached: true, stdio: 'ignore', windowsHide: true });
+  // stdout/stderr 必须落到日志：不然进程自己生成的新 token 谁也看不到，
+  // 而 `/` 会一直 401（插件路由却还能用，掩盖了问题）。
+  const { openSync } = await import('node:fs');
+  const logFd = openSync(LOG, 'a');
+  const child = spawn(process.execPath, [bin, 'mini', '--no-open', '--port', String(PORT)], { cwd: MINI, env, detached: true, stdio: ['ignore', logFd, logFd], windowsHide: true });
   child.unref();
   console.log('已启动（pid ' + child.pid + '），等它就绪…');
   for (let i = 0; i < 40; i += 1) {

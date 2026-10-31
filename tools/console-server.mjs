@@ -38,14 +38,16 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
       return;
     }
     if (pathname === '/turnstile/inspect') {
+      // 用真的 inspectPlugin 跑 fixture profile —— 之前硬编码 {"version":"1.2.3"},
+      // 等于这条路由的解析/错误映射零覆盖（外部审查也点了这条）。
       const pkg = new URL(req.url, 'http://x').searchParams.get('pkg') || '';
-      res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({
-        pkg, version: '1.2.3', installed: true, inBundles: true, disabled: false,
-        injects: ['@deepseek-ai/dsh-client-ui-settings'], patchRows: ['fixture-row'], entry: 'lib/client.js',
-        slotKeys: ['shell.overlay'], classNames: ['fixture-btn'], head: ['// fixture client'],
-      }));
-      return;
+      const [{ inspectPlugin }, { json }] = await Promise.all([
+        import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'plugin-inspect.js')).href),
+        Promise.resolve({ json: (code, value) => { res.statusCode = code; res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(value)); } }),
+      ]);
+      const r = inspectPlugin(dir, pkg, { lines: 12 });
+      const status = r.ok ? 200 : r.code === 3 ? 200 : r.code === 2 ? 400 : 500;
+      return json(status, r.data || { error: r.reason });
     }
     if (pathname === '/turnstile/search') {
       const q = (new URL(req.url, 'http://x').searchParams.get('q') || '');
