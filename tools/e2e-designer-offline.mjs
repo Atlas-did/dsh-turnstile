@@ -152,6 +152,17 @@ try {
     const row = document.querySelector('[data-testid^="history-"]');
     return Boolean(row) && /\d{2}:\d{2}:\d{2}/.test(row.textContent) && /条/.test(row.textContent);
   }));
+  // Field schema: an invalid anchor is refused by the declaration, and the error names the field.
+  const anchorInput = page.locator('[data-testid="property-anchor"]').first();
+  await anchorInput.fill('center');
+  await anchorInput.dispatchEvent('input');
+  await page.waitForTimeout(300);
+  const errText = await page.locator('[data-testid="field-error-anchor"]').first().textContent();
+  ok('schema validation flags the field', /位置必须是/.test(errText || ''), errText);
+  await anchorInput.fill('top-left');
+  await anchorInput.dispatchEvent('input');
+  await page.waitForTimeout(300);
+  ok('a valid value clears the field error', ((await page.locator('[data-testid="field-error-anchor"]').first().textContent()) || '') === '');
   ok('no uncaught designer browser errors', errors.length === 0, errors.join(' | ').slice(0, 200));
 } catch (error) {
   ok('designer e2e completed without throwing', false, String(error?.stack || error).slice(0, 500));

@@ -189,6 +189,20 @@
     });
     return box;
   }
+  // Declared once, rendered and validated from the same declaration (lib/field-schema.js).
+  function configFields() {
+    const FS = window.TurnstileFields;
+    if (!FS) return null;
+    return [
+      FS.field({ key: 'disabled', label: '停用', type: 'boolean', group: 'Config / 可编辑属性' }),
+      FS.field({ key: 'anchor', label: 'anchor', group: 'Config / 可编辑属性', defaultValue: '',
+        validate: (v) => (!v || ['top-left', 'top-right', 'bottom-left', 'bottom-right', ''].indexOf(v) !== -1 ? true : '位置必须是 top-left / top-right / bottom-left / bottom-right 或留空') }),
+    ];
+  }
+  function configValues(p) {
+    const eff = p ? effective(p) : { disabled: false, anchor: '' };
+    return { disabled: Boolean(eff.disabled), anchor: ds.anchorDraft || eff.anchor || '' };
+  }
   function paletteButton(label, fn, id) { return btn(label, fn, id, 'btn'); }
   function renderPalette() {
     const box = node('div', { class: 'designer-palette' });
@@ -312,8 +326,23 @@
     const config = node('div', {});
     const check = node('input', { type: 'checkbox', 'data-testid': 'property-disabled', onchange: (e) => addOperation({ type: 'toggle', disable: e.target.checked }) }); check.checked = eff.disabled;
     config.append(node('label', { class: 'property-check' }, [check, document.createTextNode('disabled / 停用')]));
-    const input = node('input', { class: 'property-input', 'data-testid': 'property-anchor', value: ds.anchorDraft, placeholder: 'anchor token', oninput: (e) => { ds.anchorDraft = e.target.value; } });
-    config.append(node('div', { class: 'prop' }, [node('dt', { text: 'anchor' }), node('dd', {}, [input])]), node('div', { class: 'action-stack' }, [btn('＋ 加入位置命令', () => addAnchor(ds.anchorDraft), 'property-add-anchor'), btn('＋ 清除位置', () => addAnchor(''), 'property-clear-anchor')]));
+    const errBox = node('p', { class: 'hint', 'data-testid': 'field-error-anchor', text: '' });
+    const refreshAnchorError = () => {
+      const decl = configFields();
+      const list = decl ? window.TurnstileFields.validateValues(decl, { disabled: false, anchor: ds.anchorDraft }) : [];
+      const hit = list.find((e) => e.key === 'anchor');
+      errBox.textContent = hit ? hit.message : '';
+      if (hit) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
+    };
+    const input = node('input', { class: 'property-input', 'data-testid': 'property-anchor', value: ds.anchorDraft, placeholder: 'anchor token', oninput: (e) => { ds.anchorDraft = e.target.value; refreshAnchorError(); } });
+    const declared = configFields();
+    const errs = declared ? window.TurnstileFields.validateValues(declared, configValues(p)) : [];
+    const anchorErr = errs.find((e) => e.key === 'anchor');
+    if (anchorErr) input.setAttribute('aria-invalid', 'true');
+    config.append(node('div', { class: 'prop' }, [node('dt', { text: 'anchor' }), node('dd', {}, [input])]));
+    if (anchorErr) errBox.textContent = anchorErr.message;
+    config.append(errBox);
+    config.append(node('div', { class: 'action-stack' }, [btn('＋ 加入位置命令', () => addAnchor(ds.anchorDraft), 'property-add-anchor'), btn('＋ 清除位置', () => addAnchor(''), 'property-clear-anchor')]));
     box.append(groupedInspector('Config / 可编辑属性', 'config', config));
     box.append(groupedInspector('Source / 来源', 'source', node('dl', {}, [node('div', { class: 'prop' }, [node('dt', { text: 'manifest' }), node('dd', { text: p.manifest || '无' })])])));
   }
