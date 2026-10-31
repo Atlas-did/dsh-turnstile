@@ -9,6 +9,7 @@
 // 归属规则与 ui-atlas 一致：entry id 以插件名开头（冒号 / 斜杠 / 点号三种写法）。
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { groupByPlugin, belongsTo, diffSlotMaps, CORE } from './lib/slot-attr.mjs';
 
 const argv = process.argv.slice(2);
 const val = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
@@ -28,31 +29,27 @@ if (!file || !existsSync(file)) {
 }
 
 const data = JSON.parse(readFileSync(file, 'utf8'));
+
+// --against：和另一份快照比「哪个 slot 多了谁/少了谁」（装插件前后用这个）
+const against = val('--against');
+if (against) {
+  if (!existsSync(against)) { console.error('找不到对比文件：' + against); process.exit(3); }
+  const oldMap = JSON.parse(readFileSync(against, 'utf8'));
+  const changes = diffSlotMaps(oldMap, data);
+  if (wantJson) { console.log(JSON.stringify({ before: against, after: file, changed: changes.length, slots: changes }, null, 1)); process.exit(0); }
+  console.log('slot 变化 · ' + against + '  →  ' + file);
+  if (!changes.length) console.log('  没有任何 slot 的条目变化');
+  for (const c of changes) {
+    console.log('  ' + c.slot + '  (' + c.before + ' → ' + c.after + ')');
+    for (const id of c.added) console.log('    + ' + id);
+    for (const id of c.removed) console.log('    - ' + id);
+  }
+  process.exit(0);
+}
 const slots = Array.isArray(data.slots) ? data.slots : [];
 
-function belongs(entryId, plugin) {
-  const s = String(entryId || '');
-  const head = String(plugin).split('-')[0];
-  return s === plugin || s.startsWith(plugin + ':') || s.startsWith(plugin + '/') || (head.length >= 6 && s.startsWith(head + '.'));
-}
-
-// 反推：每个 entry 属于谁？先按已知前缀法归到插件，归不上的记 (核心/未知)
-const byPlugin = new Map();
-for (const s of slots) {
-  for (const id of s.entries || []) {
-    const str = String(id || '');
-    // 取前缀作为候选插件名：@scope/name 或 name:rest 或 name.rest
-    let plugin = '(核心/未归属)';
-    const scoped = /^(@[\w.-]+\/[\w.-]+)/.exec(str);
-    if (scoped) plugin = scoped[1];
-    else if (str.includes(':')) plugin = str.split(':')[0];
-    else if (str.includes('.') && str.split('.')[0].length >= 6) plugin = str.split('.')[0];
-    if (!byPlugin.has(plugin)) byPlugin.set(plugin, new Map());
-    const m = byPlugin.get(plugin);
-    if (!m.has(s.slot)) m.set(s.slot, []);
-    m.get(s.slot).push(str);
-  }
-}
+// 归属规则来自 tools/lib/slot-attr.mjs（与 ui-atlas 共用一份，防漂移）
+const byPlugin = groupByPlugin(slots);
 
 const rows = [...byPlugin.entries()].map(([plugin, slotsMap]) => ({
   plugin,
@@ -60,8 +57,7 @@ const rows = [...byPlugin.entries()].map(([plugin, slotsMap]) => ({
   slots: [...slotsMap.entries()].map(([slot, ids]) => ({ slot, count: ids.length, entries: ids })).sort((a, b) => b.count - a.count),
 })).sort((a, b) => b.total - a.total);
 
-const filtered = only ? rows.filter((r) => belongs2(r.plugin, only)) : rows;
-function belongs2(a, b) { return a === b || a.startsWith(b) || b.startsWith(a); }
+const filtered = only ? rows.filter((r) => r.plugin === only || belongsTo(r.plugin, only) || r.plugin.startsWith(only)) : rows;
 
 if (wantJson) {
   console.log(JSON.stringify({ file, at: data.at || '', plugins: filtered }, null, 1));

@@ -9,6 +9,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { patchFiles } from './lib/patch-files.mjs';
+import { belongsTo } from './lib/slot-attr.mjs';
 
 const argv = process.argv.slice(2);
 const profileDir = argv.find((a) => !a.startsWith('--'));
@@ -68,12 +69,8 @@ const pluginRuntime = (plugin) => {
     for (const id of s.entries || []) {
       seen = true;
       const str = String(id || '');
-      // 三种写法都见过：`dsh-better-sidebar:editor`（冒号）
-      //                 `@scope/pkg/guide`（路径）
-      //                 `turnstile.plugin-list`（点号，取插件名第一段且够长才认）
-      const head = String(plugin).split('-')[0];
-      const dotted = head.length >= 6 && str.startsWith(head + '.');
-      if (str === plugin || str.startsWith(plugin + ':') || str.startsWith(plugin + '/') || dotted) n += 1;
+      // 归属规则与 slot-map-report 共用 tools/lib/slot-attr.mjs（防两份实现漂移）
+      if (belongsTo(str, plugin)) n += 1;
     }
   }
   return seen ? n : null;
