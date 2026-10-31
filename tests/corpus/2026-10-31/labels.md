@@ -49,3 +49,20 @@ pnpm add @agents-anywhere/dsh-bridge-next@2.0.2
 
 `diagnose` 的第一条验收就是：**读本目录**（不是 `~/.agents-anywhere`），输出与上表逐行一致；
 任何一条对不上，或者输出了「全部健康」，即视为未通过。
+## 五、用例 C（健康对照）已就位
+
+从冻结语料里切出 08:14–08:15 这一分钟：**1,014 条记录，0 条 ERROR**，全部 `dsh-bridge` debug/info。
+
+```
+tests/corpus/2026-10-31/logs/aa/healthy-window-0814.jsonl   1014 records   ERROR 0
+```
+
+它的用途：任何诊断结论拿这份当输入，**必须判健康**。判成故障 = 假阳性，直接算未通过。
+这是第 1 轮「75% 假阳性」唯一能防住的东西，之前缺的就是它。
+
+切片命令（可复跑，已留在本节）：
+
+```bash
+node tools/log-format.mjs tests/corpus/2026-10-31/logs/aa/healthy-window-0814.jsonl
+# levels: debug=920 info=94    没有 error
+```

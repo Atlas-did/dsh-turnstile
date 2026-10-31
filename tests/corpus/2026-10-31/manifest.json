@@ -1,10 +1,12 @@
 {
- "frozenAt": "2026-10-31T08:47:28.522Z",
- "source": {
-  "aa": "C:/Users/finef/.agents-anywhere/logs",
-  "plugin": "C:/Users/finef/.agents-anywhere/dsh-bridge-next/logs"
- },
+ "frozenAt": "2026-10-31T08:48:45.479Z",
+ "note": "read-only evidence for diagnose acceptance; do not edit",
  "files": [
+  {
+   "path": "logs/aa/healthy-window-0814.jsonl",
+   "bytes": 375343,
+   "sha256": "95759cb6e1f7110b"
+  },
   {
    "path": "logs/aa/runtime-00000000000000000001.jsonl",
    "bytes": 395157,
