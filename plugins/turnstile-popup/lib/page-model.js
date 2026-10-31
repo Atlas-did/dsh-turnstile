@@ -54,6 +54,24 @@ export const COMPONENTS = Object.freeze({
       gap: { type: 'number', label: '间距', default: 10, min: 0, max: 40 },
     },
   },
+  // 数据来源：留空=手写数据；填 plugins/health/occupancy=运行时从宿主端点取。
+  dataTable: {
+    label: '数据表（绑定）',
+    capabilities: { draggable: true, droppable: false, acceptsChildren: false },
+    defaults: { source: 'plugins' },
+    propsSchema: {
+      source: { type: 'enum', label: '数据源', default: 'plugins', options: ['plugins', 'health', 'occupancy'] },
+    },
+  },
+  dataChart: {
+    label: '数据图（绑定）',
+    capabilities: { draggable: true, droppable: false, acceptsChildren: false },
+    defaults: { source: 'occupancy', kind: 'bar' },
+    propsSchema: {
+      source: { type: 'enum', label: '数据源', default: 'occupancy', options: ['occupancy', 'health', 'plugins'] },
+      kind: { type: 'enum', label: '类型', default: 'bar', options: ['bar', 'line'] },
+    },
+  },
   table: {
     label: '表格',
     capabilities: { draggable: true, droppable: false, acceptsChildren: false },

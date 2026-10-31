@@ -34,6 +34,7 @@ button:disabled{opacity:.45;cursor:default}
 </div>
 <div class="body">
   <div class="palette"><h4>组件（拖到画布）</h4><div id="palette" data-testid="palette"></div>
+    <h4 style="margin-top:14px">模板</h4><div id="templates" data-testid="templates"></div>
     <h4 style="margin-top:14px">快照</h4><div class="snaps" id="snaps" data-testid="snaps"></div></div>
   <div class="canvas"><div id="canvas" data-testid="canvas"></div></div>
   <div class="inspector"><h4>属性</h4><div id="inspector" data-testid="inspector"><p style="color:#7d8fa1">选中一个节点</p></div></div>
@@ -173,6 +174,37 @@ function renderInspector() {
   box.replaceChildren(head, box2, styleHead, styleBox);
 }
 
+const TEMPLATES = {
+  health: { label: '体检报告页', build: (M2) => {
+    const s = M2.createStack(M2.newPage());
+    let st = M2.run(s, { type: 'add', parentId: 'stack-root', component: 'heading', props: { text: '环境体检', level: 1 } });
+    st = M2.run(st, { type: 'add', parentId: 'stack-root', component: 'dataTable', props: { source: 'health' } });
+    st = M2.run(st, { type: 'add', parentId: 'stack-root', component: 'dataChart', props: { source: 'health', kind: 'bar' } });
+    return st;
+  } },
+  occupancy: { label: 'UI 占用页', build: (M2) => {
+    const s = M2.createStack(M2.newPage());
+    let st = M2.run(s, { type: 'add', parentId: 'stack-root', component: 'heading', props: { text: '界面占用', level: 1 } });
+    st = M2.run(st, { type: 'add', parentId: 'stack-root', component: 'dataChart', props: { source: 'occupancy', kind: 'bar' } });
+    st = M2.run(st, { type: 'add', parentId: 'stack-root', component: 'dataTable', props: { source: 'occupancy' } });
+    return st;
+  } },
+};
+
+function renderTemplates() {
+  const box = document.getElementById('templates');
+  if (!box) return;
+  box.replaceChildren();
+  for (const [key, t] of Object.entries(TEMPLATES)) {
+    const b = document.createElement('button');
+    b.style.display = 'block'; b.style.width = '100%'; b.style.marginBottom = '4px';
+    b.dataset.testid = 'template-' + key;
+    b.textContent = t.label;
+    b.addEventListener('click', () => { stack = t.build(M); selectedId = stack.current.root.id; status('已套用模板 ' + t.label); render(); });
+    box.append(b);
+  }
+}
+
 function renderSnaps() {
   const box = document.getElementById('snaps');
   box.replaceChildren();
@@ -224,6 +256,6 @@ document.getElementById('undo').addEventListener('click', () => { stack = M.undo
 document.getElementById('redo').addEventListener('click', () => { stack = M.redo(stack); status('已重做'); render(); });
 document.getElementById('save').addEventListener('click', save);
 
-renderPalette(); render();
+renderPalette(); renderTemplates(); render();
 status('拖一个组件到画布开始');
 </script></body></html>

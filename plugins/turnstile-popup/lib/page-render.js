@@ -63,6 +63,16 @@
     else if (node.type === 'text') { const n = el('div'); n.className = 'text'; n.style.color = '#b9c7d4'; n.textContent = p.text; box.append(n); }
     else if (node.type === 'panel') { const n = el('div'); n.style.padding = (p.padding || 0) + 'px'; const t = el('div'); t.textContent = p.title || ''; t.style.fontWeight = '600'; t.style.marginBottom = '6px'; n.append(t, children(node)); box.append(n); }
     else if (node.type === 'stat') { const n = el('div'); n.className = 'stat ' + (p.tone || 'neutral'); n.style.background = '#16212b'; n.style.border = '1px solid #2b3a49'; n.style.borderRadius = '8px'; n.style.padding = '10px 12px'; const v = el('b'); v.textContent = p.value; v.style.fontSize = '20px'; v.style.display = 'block'; v.style.color = p.tone === 'good' ? '#4ec97c' : p.tone === 'warn' ? '#e8b53d' : p.tone === 'bad' ? '#e86161' : '#e6edf5'; const l = el('small'); l.textContent = p.label; l.style.color = '#8fa3b5'; n.append(v, l); box.append(n); }
+    else if (node.type === 'dataTable' || node.type === 'dataChart') {
+      const holder = el('div');
+      holder.dataset.bound = node.type;
+      holder.dataset.source = p.source || '';
+      holder.dataset.kind = p.kind || 'bar';
+      holder.textContent = '读取 ' + (p.source || '') + ' …';
+      holder.style.color = '#8fa3b5'; holder.style.fontSize = '12px';
+      box.append(holder);
+      hydrate(holder);
+    }
     else if (node.type === 'table') { box.append(tableNode(p)); }
     else if (node.type === 'chart') { box.append(chartNode(p)); }
     else if (node.type === 'image') {
@@ -91,6 +101,37 @@
       box.replaceChildren(children(node));
     }
     return box;
+  }
+  // B1 数据绑定：组件只声明「我要哪份数据」，渲染时去宿主端点取。
+  function hydrate(holder) {
+    const source = holder.dataset.source;
+    const token = new URLSearchParams(location.search).get('token') || '';
+    const url = '/turnstile/' + source + '?token=' + encodeURIComponent(token);
+    fetch(url).then((r) => r.json()).then((data) => {
+      holder.textContent = '';
+      holder.style.color = '';
+      if (holder.dataset.bound === 'dataTable') holder.append(tableNode(tableFrom(source, data)));
+      else holder.append(chartNode({ kind: holder.dataset.kind, title: source, series: seriesFrom(source, data) }));
+    }).catch((e) => { holder.textContent = '读取失败：' + e.message; holder.style.color = '#e3b341'; });
+  }
+  function tableFrom(source, data) {
+    if (source === 'plugins') {
+      const rows = (data.rows || []).map((r) => r.name + ', ' + (r.disabled ? '停用' : '启用') + ', ' + ((r.ui || []).length) + ' 个界面');
+      return { columns: '插件, 状态, UI 面', rows: rows.join('\n') };
+    }
+    if (source === 'health') {
+      const rows = (data.items || []).map((i) => i.id + ', ' + i.level + ', ' + String(i.message || '').replace(/,/g, ' '));
+      return { columns: '检查, 结论, 说明', rows: rows.join('\n') };
+    }
+    const rows = ((data.surfaces || [])).map((s) => s.surface + ', ' + s.count);
+    return { columns: '界面, 插件数', rows: rows.join('\n') };
+  }
+  function seriesFrom(source, data) {
+    if (source === 'occupancy') return (data.surfaces || []).map((s) => s.surface + ':' + s.count).join('\n');
+    if (source === 'plugins') return (data.rows || []).slice(0, 8).map((r) => r.name + ':' + ((r.ui || []).length)).join('\n');
+    const counts = {};
+    for (const i of data.items || []) counts[i.level] = (counts[i.level] || 0) + 1;
+    return Object.entries(counts).map(([k, v]) => k + ':' + v).join('\n');
   }
   function children(node) {
     const wrap = el('div');

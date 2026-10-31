@@ -101,6 +101,12 @@ await page.waitForTimeout(200);
 await page.locator('[data-testid="style-align"]').selectOption('center');
 await page.waitForTimeout(300);
 ok('style panel applies alignment', (await page.locator('[data-testid="view-heading"]').first().evaluate((n) => getComputedStyle(n).textAlign)) === 'center');
+// 模板：一键套用「体检报告页」
+await page.locator('[data-testid="template-health"]').click();
+await page.waitForTimeout(400);
+ok('template loads a bound page', (await page.locator('[data-testid="canvas"]').innerText()).includes('环境体检'));
+ok('bound table asks the host for data', (await page.locator('[data-source="health"]').count()) >= 1);
+
 // 撤销 / 重做 / 快照
 const beforeUndo = await page.locator('#canvas .node').count();
 await page.locator('[data-testid="undo"]').click();
