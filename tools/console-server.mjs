@@ -20,7 +20,7 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
   return createServer(async (req, res) => {
     const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
     const json = (code, value) => { res.statusCode = code; res.setHeader('content-type', 'application/json; charset=utf-8'); res.end(JSON.stringify(value)); };
-    if (pathname === '/turnstile/capabilities.js' || pathname === '/turnstile/history-timeline.js' || pathname === '/turnstile/selection.js' || pathname === '/turnstile/field-schema.js' || pathname === '/turnstile/hooks.js') {
+    if (pathname === '/turnstile/capabilities.js' || pathname === '/turnstile/history-timeline.js' || pathname === '/turnstile/selection.js' || pathname === '/turnstile/field-schema.js' || pathname === '/turnstile/hooks.js' || pathname === '/turnstile/virtual-window.js') {
       const name = pathname.slice('/turnstile/'.length);
       const src = readFileSync(join(root, 'plugins', 'turnstile-popup', 'lib', name), 'utf8')
         .replace(/\bexport\s+(function|const|class)/g, '$1');

@@ -297,7 +297,7 @@ export function apply(ctx, config) {
 
   // Model modules are ESM files the page loads as classic scripts: strip `export`, keep the window
   // attach. One helper for all of them, so a new module is one list entry instead of a copied block.
-  const MODULES = ["capabilities.js", "selection.js", "history-timeline.js", "field-schema.js", "hooks.js"];
+  const MODULES = ["capabilities.js", "selection.js", "history-timeline.js", "field-schema.js", "hooks.js", "virtual-window.js"];
   for (const file of MODULES) {
     ctx.effect(() => ctx.webServer.register({
       kind: "exact",
