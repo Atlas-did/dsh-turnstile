@@ -33,7 +33,12 @@
     "test:cases": "node tools/test-cases-and-verify.mjs",
     "sandbox:new": "node tools/new-sandbox.mjs",
     "sandbox:verify": "node tools/sandbox-verify.mjs",
-    "lab:journal": "node tools/lab-journal.mjs"
+    "lab:journal": "node tools/lab-journal.mjs",
+    "uia": "node tools/uia.mjs",
+    "win:probe": "node tools/windows-probe.mjs",
+    "win:gate": "node tools/windows-gate.mjs",
+    "win:enum": "node tools/win-enumerate.mjs",
+    "test:windows-gate": "node plugins/turnstile-popup/test/windows-gate.test.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",
