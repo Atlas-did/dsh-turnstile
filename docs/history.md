@@ -60,6 +60,7 @@
 | [173-reaudit-ci-and-validation.md](173-reaudit-ci-and-validation.md) | 复审 P1-6 / P1-5 / P2-1 / P2-2 处置（2026-11-01） |
 | [174-acceptance-transaction-and-hash-version.md](174-acceptance-transaction-and-hash-version.md) | 复审 P1-3 处置 + 版本号改成内容哈希（2026-11-01） |
 | [175-health-and-transactions.md](175-health-and-transactions.md) | 主仓库复核后的收口（2026-11-01 第 2 轮） |
+| [176-body-limits-and-protocol.md](176-body-limits-and-protocol.md) | 剩余四项的收口（2026-11-01 第 3 轮） |
 | [22-gate-report.md](22-gate-report.md) | 闸门报告（自动生成） |
 | [26-provider-map.md](26-provider-map.md) | 26 · 多接口（provider）地图与切换 |
 | [31-plugin-manager.md](31-plugin-manager.md) | 31 · mini 的插件管理界面：现状与两条路 |

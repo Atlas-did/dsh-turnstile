@@ -28,7 +28,7 @@ ok('当前版本可写', w2.ok === true, String(w2.version));
 
 // 内容哈希版本：写完**不同内容**后，旧版本必须失效（这才是真正的覆盖保护）
 const page2 = { schema: 'mini/page@1', root: { id: 'r2', type: 'stack', children: [] } };
-writePage(file, page2);
+writePage(file, page2, { baseVersion: w2.version });
 const staleOlder = writePage(file, page, { baseVersion: w2.version });
 ok('内容被改后旧版本不能再写', staleOlder.ok === false && staleOlder.stale === true);
 

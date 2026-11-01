@@ -35,8 +35,8 @@ const good = await post({ page: pageB, baseVersion: v1 });
 ok('当前版本保存成功', good.status === 200, String(good.status));
 ok('内容变了版本也变', good.body.version !== v1, v1 + ' → ' + good.body.version);
 
-const noVersion = await post({ page: pageA });
-ok('没带 baseVersion 的旧客户端仍可写（兼容）', noVersion.status === 200, String(noVersion.status));
+const noVersion = await post({ page: pageB });
+ok('覆盖已有页面必须带 baseVersion（否则 428）', noVersion.status === 428 && noVersion.body.needsVersion === true, String(noVersion.status));
 
 server.close();
 rmSync(tmp, { recursive: true, force: true });

@@ -25,8 +25,12 @@ export function readPage(file) {
  * 写入页面。baseVersion 给定时必须与当前版本一致，否则返回 stale（不写）。
  * 返回 { ok, version } | { ok:false, stale:true, version }
  */
-export function writePage(file, page, { baseVersion } = {}) {
+export function writePage(file, page, { baseVersion, allowMissingVersion = false } = {}) {
   const current = pageVersion(file);
+  // 覆盖已有文件必须带版本：省略就拒绝（428），否则并发保护形同虚设（复审 P1）
+  if (existsSync(file) && baseVersion == null && !allowMissingVersion) {
+    return { ok: false, needsVersion: true, version: current };
+  }
   // 版本是字符串哈希，必须按字符串比较（不能 Number()，否则 NaN 永不相等）
   if (baseVersion != null && String(baseVersion) !== String(current)) {
     return { ok: false, stale: true, version: current };

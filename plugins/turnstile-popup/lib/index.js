@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { makePlan, applyPlan, describePlan } from "./txn.js";
 import { validatePageTree } from "./page-validate.js";
 import { readPage, writePage } from "./page-store.js";
+import { readJsonBody, readJsonText, BODY_TOO_LARGE } from "./body.js";
 import { collectConsoleData } from "./console-data.js";
 import { readViewState, writeViewState } from "./view-state.js";
 import { toggleText } from "./toggle-text.js";
@@ -318,10 +319,14 @@ export function apply(ctx, config) {
       }
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
       if (!requestRejection(req, res)) return;
-      let body = "";
-      for await (const chunk of req) body += chunk;
-      let parsed = null;
-      try { parsed = JSON.parse(body || "{}"); } catch { return sendJson(res, 400, { error: "json" }); }
+      let parsedRaw;
+      try { parsedRaw = await readJsonBody(req, { maxBytes: 1e6 }); }
+      catch (e) {
+        if (e && e.code === BODY_TOO_LARGE) return sendJson(res, 413, { error: "请求体过大（上限 " + e.limit + " 字节）" });
+        return sendJson(res, 400, { error: "body 不是 JSON：" + String(e.message).slice(0, 120) });
+      }
+      const parsed = parsedRaw;
+      if (!parsed || typeof parsed !== "object") return sendJson(res, 400, { error: "json" });
       try { sendJson(res, 200, { state: writeViewState(STATE_DIR(), parsed) }); }
       catch (e) { sendJson(res, 500, { error: String((e && e.message) || e).slice(0, 160) }); }
     },
@@ -441,7 +446,8 @@ export function apply(ctx, config) {
       let started = false;
       try {
         let body = "";
-        for await (const chunk of req) body += chunk;
+        try { body = await readJsonText(req, 1e6); }
+        catch (e) { if (e && e.code === BODY_TOO_LARGE) return sendJson(res, 413, { error: "请求体过大（上限 " + e.limit + " 字节）" }); return sendJson(res, 400, { error: "body 读不到：" + String(e.message).slice(0, 80) }); }
         const args = JSON.parse(body || "{}");
         dryRun = args.dryRun !== false;
         const summary = Array.isArray(args.operations) ? args.operations.slice(0, 100).map((op) => ({ type: String(op?.type || ""), package: String(op?.package || ""), disable: typeof op?.disable === "boolean" ? op.disable : undefined, anchor: typeof op?.anchor === "string" ? op.anchor : undefined })) : [];
@@ -659,9 +665,12 @@ export function apply(ctx, config) {
     path: "/turnstile/run",
     handler: async (req, res) => {
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
-      let body = "";
-      await new Promise((resolve) => { req.on("data", (c) => { body += c; if (body.length > 1e6) req.destroy(); }); req.on("end", resolve); });
-      let parsed; try { parsed = JSON.parse(body); } catch { return sendJson(res, 400, { error: "body 不是 JSON" }); }
+      let parsed;
+      try { parsed = await readJsonBody(req, { maxBytes: 1e6 }); }
+      catch (e) {
+        if (e && e.code === BODY_TOO_LARGE) return sendJson(res, 413, { error: "请求体过大（上限 " + e.limit + " 字节）" });
+        return sendJson(res, 400, { error: "body 不是 JSON：" + String(e.message).slice(0, 120) });
+      }
       if (parsed && parsed.args && !parsed.args.profile) parsed.args.profile = dir;
       try {
         const libDir = dirname(fileURLToPath(import.meta.url));
@@ -682,9 +691,12 @@ export function apply(ctx, config) {
         try { return sendJson(res, 200, JSON.parse(readFileSync(f, "utf8"))); } catch (e) { return sendJson(res, 500, { error: String(e.message).slice(0, 120) }); }
       }
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
-      let body = "";
-      await new Promise((resolve) => { req.on("data", (c) => { body += c; if (body.length > 1e6) req.destroy(); }); req.on("end", resolve); });
-      let parsed; try { parsed = JSON.parse(body); } catch { return sendJson(res, 400, { error: "body 不是 JSON" }); }
+      let parsed;
+      try { parsed = await readJsonBody(req, { maxBytes: 1e6 }); }
+      catch (e) {
+        if (e && e.code === BODY_TOO_LARGE) return sendJson(res, 413, { error: "请求体过大（上限 " + e.limit + " 字节）" });
+        return sendJson(res, 400, { error: "body 不是 JSON：" + String(e.message).slice(0, 120) });
+      }
       if (!parsed || !Array.isArray(parsed.slots)) return sendJson(res, 400, { error: "缺少 slots 数组" });
       try {
         const f = join(stateBase(), "slot-map-" + profile + ".json");
@@ -804,10 +816,12 @@ export function apply(ctx, config) {
       }
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
       // 写前先校验：没有 schema 标记或根节点不是对象，一律拒绝（B8 的纪律）。
-      let body = "";
-      await new Promise((resolve) => { req.on("data", (c) => { body += c; if (body.length > 2e6) req.destroy(); }); req.on("end", resolve); });
       let parsed;
-      try { parsed = JSON.parse(body); } catch { return sendJson(res, 400, { error: "body 不是 JSON" }); }
+      try { parsed = await readJsonBody(req, { maxBytes: 2e6 }); }
+      catch (e) {
+        if (e && e.code === BODY_TOO_LARGE) return sendJson(res, 413, { error: "页面过大（上限 " + e.limit + " 字节）" });
+        return sendJson(res, 400, { error: "body 不是 JSON：" + String(e.message).slice(0, 120) });
+      }
       // 严格校验页面树（与 console-server 同一份实现）
       const tree = validatePageTree(parsed.page);
       if (!tree.ok) return sendJson(res, 400, { error: "页面不合法：" + tree.errors[0], errors: tree.errors });
@@ -817,6 +831,7 @@ export function apply(ctx, config) {
       try {
         // 与独立控制台共用同一份版本比较 + 备份 + 原子写（审查 P1-1）
         const wrote = writePage(file, parsed.page, { baseVersion: parsed.baseVersion });
+        if (!wrote.ok && wrote.needsVersion) return sendJson(res, 428, { error: "覆盖已有页面必须带 baseVersion", version: wrote.version, needsVersion: true });
         if (!wrote.ok) return sendJson(res, 409, { error: "页面已被其他地方修改（当前版本 " + wrote.version + "）", version: wrote.version, stale: true });
         return sendJson(res, 200, { ok: true, file, version: wrote.version });
       } catch (e) { return sendJson(res, 500, { error: String(e.message).slice(0, 160) }); }
@@ -832,10 +847,8 @@ export function apply(ctx, config) {
       if (!requestRejection(req, res)) return;
       try {
         let body = "";
-        for await (const chunk of req) {
-          body += chunk;
-          if (body.length > 2e6) return sendJson(res, 413, { error: "页面过大" });
-        }
+        try { body = await readJsonText(req, 2e6); }
+        catch (e) { if (e && e.code === BODY_TOO_LARGE) return sendJson(res, 413, { error: "页面过大（上限 " + e.limit + " 字节）" }); return sendJson(res, 400, { error: "body 读不到：" + String(e.message).slice(0, 80) }); }
         const parsed = JSON.parse(body || "{}");
         const renderer = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "page-render.js"), "utf8");
         const result = exportPlugin(parsed.page, join(stateBase(), "exports", String(parsed.name || "")), { name: parsed.name, renderer });
@@ -937,10 +950,13 @@ export function apply(ctx, config) {
     path: "/turnstile/fuse",
     handler: async (req, res) => {
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
-      let body = "";
-      for await (const chunk of req) body += chunk;
-      let args = {};
-      try { args = JSON.parse(body || "{}"); } catch { return sendJson(res, 400, { error: "json" }); }
+      let parsedRaw;
+      try { parsedRaw = await readJsonBody(req, { maxBytes: 1e6 }); }
+      catch (e) {
+        if (e && e.code === BODY_TOO_LARGE) return sendJson(res, 413, { error: "请求体过大（上限 " + e.limit + " 字节）" });
+        return sendJson(res, 400, { error: "body 不是 JSON：" + String(e.message).slice(0, 120) });
+      }
+      const args = parsedRaw || {};
       if (!args.surface) return sendJson(res, 400, { error: "surface" });
       // Applying a fusion writes another plugin's config, so it stays a CLI action with a backup.
       // This endpoint only returns the command: the package spawns no subprocess.
@@ -988,10 +1004,13 @@ export function apply(ctx, config) {
     handler: async (req, res) => {
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
       if (!requestRejection(req, res)) return;
-      let body = "";
-      for await (const chunk of req) body += chunk;
-      let args = {};
-      try { args = JSON.parse(body || "{}"); } catch { return sendJson(res, 400, { error: "json" }); }
+      let parsedRaw;
+      try { parsedRaw = await readJsonBody(req, { maxBytes: 1e6 }); }
+      catch (e) {
+        if (e && e.code === BODY_TOO_LARGE) return sendJson(res, 413, { error: "请求体过大（上限 " + e.limit + " 字节）" });
+        return sendJson(res, 400, { error: "body 不是 JSON：" + String(e.message).slice(0, 120) });
+      }
+      const args = parsedRaw || {};
       // The value space belongs to the plugin: accept any short token, and allow clearing.
       const clear = args.anchor === "" || args.anchor === null || args.anchor === undefined;
       const ok = clear || (typeof args.anchor === "string" && args.anchor.length <= 40 && /^[A-Za-z0-9_.:-]+$/.test(args.anchor));
@@ -1035,10 +1054,13 @@ export function apply(ctx, config) {
     handler: async (req, res) => {
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
       if (!requestRejection(req, res)) return;
-      let body = "";
-      for await (const chunk of req) body += chunk;
-      let args = {};
-      try { args = JSON.parse(body || "{}"); } catch { return sendJson(res, 400, { error: "json" }); }
+      let parsedRaw;
+      try { parsedRaw = await readJsonBody(req, { maxBytes: 1e6 }); }
+      catch (e) {
+        if (e && e.code === BODY_TOO_LARGE) return sendJson(res, 413, { error: "请求体过大（上限 " + e.limit + " 字节）" });
+        return sendJson(res, 400, { error: "body 不是 JSON：" + String(e.message).slice(0, 120) });
+      }
+      const args = parsedRaw || {};
       const row = readRows(dir).find((r) => r.name === args.package);
       if (!row || !row.row) return sendJson(res, 404, { error: "no-row", package: args.package });
       const patchPath = join(dir, "cordis.patch.yml");

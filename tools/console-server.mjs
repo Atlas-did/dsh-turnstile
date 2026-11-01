@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { copyFileSync, existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { readPage, writePage, pageVersion } from '../plugins/turnstile-popup/lib/page-store.js';
-import { readJsonBody } from './lib/json-body.mjs';
+import { readJsonBody, readJsonText } from './lib/json-body.mjs';
 import { homedir } from 'node:os';
 import { validatePageTree } from '../plugins/turnstile-popup/lib/page-validate.js';
 import { dirname, join, resolve } from 'node:path';
@@ -157,9 +157,12 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
         try { return json(200, JSON.parse(readFileSync(file, 'utf8'))); } catch (e) { return json(500, { error: 'bad json' }); }
       }
       if (req.method !== 'POST') return json(405, { error: 'method' });
-      let body = '';
-      await new Promise((r2) => { req.on('data', (c) => { body += c; if (body.length > 1e6) req.destroy(); }); req.on('end', r2); });
-      let parsed; try { parsed = JSON.parse(body); } catch (e) { return json(400, { error: 'body 不是 JSON' }); }
+      let parsed;
+      try { parsed = await readJsonBody(req, { maxBytes: 1e6 }); }
+      catch (e) {
+        if (e && e.code === 'BODY_TOO_LARGE') return json(413, { error: '请求体过大（上限 ' + e.limit + ' 字节）' });
+        return json(400, { error: 'body 不是 JSON：' + String(e.message).slice(0, 120) });
+      }
       if (!parsed || !Array.isArray(parsed.slots)) return json(400, { error: '缺少 slots 数组' });
       writeFileSync(file, JSON.stringify({ at: new Date().toISOString(), slots: parsed.slots }));
       return json(200, { ok: true, file, slots: parsed.slots.length });
@@ -272,7 +275,8 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       let started = false;
       try {
         let body = '';
-        for await (const chunk of req) body += chunk;
+        try { body = await readJsonText(req, 1e6); }
+        catch (e) { if (e && e.code === 'BODY_TOO_LARGE') return json(413, { error: '请求体过大（上限 ' + e.limit + ' 字节）' }); return json(400, { error: 'body 读不到：' + String(e.message).slice(0, 80) }); }
         const args = JSON.parse(body || '{}');
         dryRun = args.dryRun !== false;
         const summary = Array.isArray(args.operations) ? args.operations.slice(0, 100).map((op) => ({ type: String(op?.type || ''), package: String(op?.package || ''), disable: typeof op?.disable === 'boolean' ? op.disable : undefined, anchor: typeof op?.anchor === 'string' ? op.anchor : undefined })) : [];
@@ -291,7 +295,8 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       if (req.method !== 'POST') return json(405, { error: 'method' });
       try {
         let body = '';
-        for await (const chunk of req) body += chunk;
+        try { body = await readJsonText(req, 1e6); }
+        catch (e) { if (e && e.code === 'BODY_TOO_LARGE') return json(413, { error: '请求体过大（上限 ' + e.limit + ' 字节）' }); return json(400, { error: 'body 读不到：' + String(e.message).slice(0, 80) }); }
         const args = JSON.parse(body || '{}');
         const plugin = collectConsoleData(dir, { stateDir: state }).plugins.find((p) => p.name === args.package);
         if (!plugin?.row) return json(404, { error: 'no-row' });
@@ -339,16 +344,15 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       if (req.method !== 'POST') return json(405, { error: 'method' });
       try {
         let body = '';
-        for await (const chunk of req) {
-          body += chunk;
-          if (body.length > 2e6) return json(413, { error: '页面过大' });
-        }
+        try { body = await readJsonText(req, 2e6); }
+        catch (e) { if (e && e.code === 'BODY_TOO_LARGE') return json(413, { error: '页面过大（上限 ' + e.limit + ' 字节）' }); return json(400, { error: 'body 读不到：' + String(e.message).slice(0, 80) }); }
         const parsed = JSON.parse(body || '{}');
         // 严格校验页面树：坏页面不能进渲染器，也不能落盘
         const tree = validatePageTree(parsed.page);
         if (!tree.ok) return json(400, { error: '页面不合法：' + tree.errors[0], errors: tree.errors });
         if (parsed.page?.schema !== 'mini/page@1' || !parsed.page.root || typeof parsed.page.root !== 'object') return json(400, { error: '页面缺少 mini/page@1 schema 或有效 root' });
         const wrote = writePage(pageFile, parsed.page, { baseVersion: parsed.baseVersion });
+        if (!wrote.ok && wrote.needsVersion) return json(428, { error: '覆盖已有页面必须带 baseVersion', version: wrote.version, needsVersion: true });
         if (!wrote.ok) return json(409, { error: '页面已被其他地方修改（当前版本 ' + wrote.version + '）', version: wrote.version, stale: true });
         return json(200, { ok: true, file: pageFile, version: wrote.version });
       } catch (e) { return json(400, { error: String(e?.message || e).slice(0, 160) }); }
@@ -357,10 +361,8 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       if (req.method !== 'POST') return json(405, { error: 'method' });
       try {
         let body = '';
-        for await (const chunk of req) {
-          body += chunk;
-          if (body.length > 2e6) return json(413, { error: '页面过大' });
-        }
+        try { body = await readJsonText(req, 2e6); }
+        catch (e) { if (e && e.code === 'BODY_TOO_LARGE') return json(413, { error: '页面过大（上限 ' + e.limit + ' 字节）' }); return json(400, { error: 'body 读不到：' + String(e.message).slice(0, 80) }); }
         const parsed = JSON.parse(body || '{}');
         const renderer = readFileSync(join(pluginLib, 'page-render.js'), 'utf8');
         const result = exportPlugin(parsed.page, join(state || join(dir, '.turnstile'), 'exports', String(parsed.name || '')), { name: parsed.name, renderer });

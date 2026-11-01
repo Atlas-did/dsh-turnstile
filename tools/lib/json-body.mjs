@@ -33,3 +33,16 @@ export async function readJsonOr413(req, res, helpers, opts) {
     return { ok: false, status: 400 };
   }
 }
+
+/** 只要原始文本，同样有上限。 */
+export async function readJsonText(req, maxBytes = 1000000) {
+  let body = '';
+  let tooBig = false;
+  for await (const chunk of req) {
+    if (tooBig) continue;
+    body += chunk;
+    if (body.length > maxBytes) { tooBig = true; body = ''; }
+  }
+  if (tooBig) throw new BodyTooLarge(maxBytes);
+  return body;
+}
