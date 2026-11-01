@@ -256,11 +256,12 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       res.end(src + '\nwindow.TurnstileSort = { SORT_KEYS: SORT_KEYS, valueOf: valueOf, compareRows: compareRows, orderedRows: orderedRows };\n');
       return;
     }
-    if (pathname === '/turnstile/console-designer.js' || pathname === '/turnstile/console-annotations.js') {
+    if (['/turnstile/console-designer.js','/turnstile/console-annotation-picker.js','/turnstile/console-annotation-pick.js','/turnstile/console-annotations.js'].includes(pathname)) {
       if (req.method !== 'GET') return json(405, { error: 'method' });
       res.setHeader('content-type', 'text/javascript; charset=utf-8');
       res.setHeader('cache-control', 'no-store');
-      res.end(readFileSync(pathname.endsWith('console-annotations.js') ? join(pluginLib, 'console-annotations.js') : designerFile, 'utf8'));
+      const src = readFileSync(join(pluginLib, pathname.replace('/turnstile/', '')), 'utf8').replace(/^export\s+(?=(function|const|let|class))/gm, '');
+      res.end(src);
       return;
     }
     if (pathname === '/turnstile/audit') {

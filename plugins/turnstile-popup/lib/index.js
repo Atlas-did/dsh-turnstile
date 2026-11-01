@@ -405,7 +405,7 @@ export function apply(ctx, config) {
     },
   }), "turnstile: GET /turnstile/sort-context.js");
 
-  for (const file of ["console-designer.js", "console-annotations.js"]) {
+  for (const file of ["console-designer.js", "console-annotation-picker.js", "console-annotation-pick.js", "console-annotations.js"]) {
     ctx.effect(() => ctx.webServer.register({
       kind: "exact",
       path: "/turnstile/" + file,
@@ -413,7 +413,8 @@ export function apply(ctx, config) {
         if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
         const here = dirname(fileURLToPath(import.meta.url));
         res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
-        res.end(readFileSync(join(here, file), "utf8"));
+        // 页面按经典脚本加载：剥掉 export，保留 window 挂载
+        res.end(readFileSync(join(here, file), "utf8").replace(/^export\s+(?=(function|const|let|class))/gm, ""));
       },
     }), "turnstile: GET /turnstile/" + file);
   }

@@ -64,6 +64,7 @@
 | [177-compat-and-visual.md](177-compat-and-visual.md) | 兼容矩阵与视觉证据（2026-11-01 第 4 轮） |
 | [178-annotations-live.md](178-annotations-live.md) | 侧边栏批注：真机验证（2026-11-01） |
 | [179-annotations-live-full.md](179-annotations-live-full.md) | 批注功能真机全流程（2026-11-01 第 2 轮） |
+| [180-annotation-first-batch.md](180-annotation-first-batch.md) | 批注层最小改造：第一批四项（2026-11-02） |
 | [22-gate-report.md](22-gate-report.md) | 闸门报告（自动生成） |
 | [26-provider-map.md](26-provider-map.md) | 26 · 多接口（provider）地图与切换 |
 | [31-plugin-manager.md](31-plugin-manager.md) | 31 · mini 的插件管理界面：现状与两条路 |

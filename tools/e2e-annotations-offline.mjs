@@ -89,6 +89,43 @@ try {
     await page.locator('[data-testid="annotation-text"]').fill('这段说明可以补充快捷键。');
     await page.locator('[data-testid="annotation-save"]').click();
     ok('quoted note renders its source excerpt', (await page.locator('[data-testid="annotation-list"]').innerText()).includes('点击表头排序'));
+
+    // ── 点选元素 / 草稿保护 / 编号标记（批注最小方案 A–C） ──
+    await page.setViewportSize({ width: 1440, height: 960 });
+    const drawerOpen = async () => page.locator('[data-testid="annotations-drawer"]').isVisible();
+    const openDrawer = async () => { if (!(await drawerOpen())) { await page.locator('[data-testid="annotations-toggle"]').click(); await page.waitForTimeout(250); } };
+    await openDrawer();
+    await page.locator('[data-testid="annotation-new"]').click();
+    await page.locator('[data-testid="annotation-text"]').fill('草稿不应该丢。');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(250);
+    await openDrawer();
+    const restored = await page.locator('[data-testid="annotation-text"]').inputValue().catch(() => '');
+    ok('draft survives closing the sidebar', restored === '草稿不应该丢。', restored);
+
+    await page.locator('[data-testid="annotation-pick"]').click();
+    await page.waitForTimeout(250);
+    ok('picking collapses the sidebar', !(await page.locator('[data-testid="annotations-drawer"]').isVisible()));
+    const targetBox = await page.locator('#connection, .statusbar').first().boundingBox();
+    if (targetBox) await page.mouse.click(targetBox.x + 6, targetBox.y + targetBox.height / 2);
+    await page.waitForTimeout(350);
+    ok('picking reopens the sidebar with the draft', await page.locator('[data-testid="annotations-drawer"]').isVisible());
+    const ctxText = await page.locator('[data-testid="annotation-context"]').innerText().catch(() => '');
+    ok('picked element context is shown', Boolean(ctxText.trim()), ctxText.slice(0, 40));
+    await page.locator('[data-testid="annotation-text"]').fill('这个状态栏元素需要确认。');
+    await page.locator('[data-testid="annotation-save"]').click();
+    await page.waitForTimeout(400);
+    const caps = await page.locator('[data-testid^="annotation-capture-"]').count();
+    ok('capture status is recorded (unavailable here)', caps >= 1, String(caps));
+    const badges = await page.locator('[data-testid^="annotation-badge-"]').count();
+    ok('numbered badge appears next to the picked element', badges >= 1, String(badges));
+    if (badges) {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(250);
+      await page.locator('[data-testid^="annotation-badge-"]').first().click();
+      await page.waitForTimeout(300);
+      ok('badge opens the sidebar again', await page.locator('[data-testid="annotations-drawer"]').isVisible());
+    }
     await page.screenshot({ path: join(output, 'console-annotations.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 760 });
     const bounds = await page.locator('[data-testid="annotations-drawer"]').boundingBox();

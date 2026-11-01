@@ -342,6 +342,8 @@ document.addEventListener('keydown',e=>{if(e.key==='F5'){e.preventDefault();load
 document.addEventListener('click',e=>{if(state.context&&!e.target.closest('.context-menu')){state.context=null;renderOverlays();}});
 restoreView().then(load).catch(()=>load());
 </script>
+<script src="/turnstile/console-annotation-picker.js"></script>
+<script src="/turnstile/console-annotation-pick.js"></script>
 <script src="/turnstile/console-annotations.js"></script>
 <script src="/turnstile/console-designer.js"></script>
 </body>

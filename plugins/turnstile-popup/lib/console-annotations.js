@@ -14,7 +14,7 @@
 `;
   document.head.append(style);
 
-  const astate = state.annotations = { open: false, notes: [], filter: 'open', draft: null, deleteId: null, profile: '', message: '' };
+  const astate = state.annotations = { open: false, notes: [], filter: 'open', draft: null, deleteId: null, profile: '', message: '', picking: false, highlight: '' };
   const toggle = btn('✎ 批注', () => setAnnotationsOpen(!astate.open), 'annotations-toggle', 'btn annotation-toggle');
   toggle.title = '打开批注侧栏 (Ctrl+Shift+A)';
   toggle.setAttribute('aria-expanded', 'false');
@@ -44,10 +44,28 @@
     try { localStorage.setItem(storageKey(), JSON.stringify(astate.notes)); astate.message = ''; }
     catch { astate.message = '浏览器无法保存批注。请先导出 Markdown，避免刷新后丢失。'; }
   }
+  function draftKey() { return 'turnstile.console.draft.' + (state.data?.profile?.name || 'default'); }
+  function saveDraftToStorage() {
+    const draft = astate.draft;
+    const area = document.querySelector('[data-testid="annotation-text"]');
+    if (draft && area) draft.text = area.value;
+    try {
+      if (draft && (draft.text || draft.quote)) localStorage.setItem(draftKey(), JSON.stringify(draft));
+      else localStorage.removeItem(draftKey());
+    } catch { astate.message = '草稿无法保存到浏览器；请先导出，避免丢失。'; }
+  }
+  function loadDraftFromStorage() {
+    try { const raw = localStorage.getItem(draftKey()); return raw ? model.createDraft(JSON.parse(raw)) : null; } catch { return null; }
+  }
+  function discardDraft() {
+    if (astate.draft && (astate.draft.text || astate.draft.quote) && !astate.confirmDiscard) { astate.confirmDiscard = true; renderAnnotations(); return; }
+    astate.draft = null; astate.confirmDiscard = false; try { localStorage.removeItem(draftKey()); } catch {} renderAnnotations();
+  }
+
   function setAnnotationsOpen(open) {
     astate.open = Boolean(open);
-    if (astate.open) loadAnnotations();
-    if (!astate.open) { astate.draft = null; astate.deleteId = null; selectionButton.hidden = true; }
+    if (astate.open) { loadAnnotations(); if (!astate.draft) { const saved = loadDraftFromStorage(); if (saved && (saved.text || saved.quote)) { astate.draft = saved; astate.message = '有未保存的草稿，继续编辑或明确放弃。'; } } }
+    if (!astate.open) { astate.deleteId = null; selectionButton.hidden = true; astate.highlight = ''; saveDraftToStorage(); }
     renderAnnotations();
   }
   function currentTarget() {
@@ -62,7 +80,8 @@
   function startAnnotation(quote) {
     loadAnnotations();
     astate.open = true;
-    astate.draft = { kind: 'question', quote: String(quote || '').slice(0, 1000), target: currentTarget() };
+    const page = { url: location.href.split('?')[0], title: document.title, viewport: { width: window.innerWidth, height: window.innerHeight } };
+    astate.draft = model.createDraft({ kind: 'question', quote: String(quote || '').slice(0, 1000), target: currentTarget(), page });
     astate.deleteId = null;
     renderAnnotations();
     setTimeout(() => document.querySelector('[data-testid="annotation-text"]')?.focus(), 0);
@@ -73,9 +92,12 @@
     if (!draft || !area) return;
     try {
       const now = new Date().toISOString();
-      const note = model.createAnnotation({ id: crypto.randomUUID(), kind: draft.kind, text: area.value, quote: draft.quote, target: draft.target, now });
+      const body = area.value || draft.text || '';
+      const note = model.createAnnotation({ id: crypto.randomUUID(), kind: draft.kind, text: body, quote: draft.quote, target: draft.target, page: draft.page, capture: draft.capture, now });
       astate.notes.unshift(note);
       astate.draft = null;
+      astate.confirmDiscard = false;
+      try { localStorage.removeItem(draftKey()); } catch {}
       astate.filter = 'open';
       saveAnnotations();
       renderAnnotations();
@@ -99,6 +121,9 @@
   }
   function locateAnnotation(note) {
     const t = note.target;
+    const el = t && (t.selector || t.domPath) ? resolveElement(note) : null;
+    if (el) { setAnnotationsOpen(false); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.animate ? el.animate([{ outline: '2px solid #82c7ff' }, { outline: '2px solid transparent' }], { duration: 900 }) : null; return; }
+    if (t && (t.selector || t.domPath) && !el) { astate.message = '原目标已变化：页面上找不到这条批注绑定的元素。'; renderAnnotations(); return; }
     setAnnotationsOpen(false);
     if (t.archId && state.data.architecture.nodes.some((n) => n.id === t.archId)) { locate(t.archId); return; }
     state.view = t.view || 'overview';
@@ -132,25 +157,65 @@
     const draft = astate.draft;
     const kind = node('select', { class: 'select', 'data-testid': 'annotation-kind', onchange: (e) => { draft.kind = e.target.value; } }, [['question', '疑问'], ['issue', '问题'], ['decision', '决定'], ['note', '备注']].map(([v, t]) => node('option', { value: v, text: t, selected: draft.kind === v ? 'selected' : null })));
     const form = node('section', { class: 'annotation-form', 'data-testid': 'annotation-form' });
-    form.append(node('div', { class: 'annotation-context', text: draft.target.title + ' · ' + draft.target.view }));
+    const ctxText = draft.target.selector || draft.target.tag ? (draft.target.selector || draft.target.tag) + (draft.target.text ? ' · ' + draft.target.text : '') : draft.target.title + ' · ' + draft.target.view;
+    form.append(node('div', { class: 'annotation-context', 'data-testid': 'annotation-context', text: ctxText }));
     if (draft.quote) form.append(node('blockquote', { class: 'annotation-quote', 'data-testid': 'annotation-quote', text: draft.quote }));
     form.append(node('label', { text: '类型', for: 'annotation-kind' }), kind);
     form.append(node('label', { text: '批注内容', for: 'annotation-text' }));
     const area = node('textarea', { id: 'annotation-text', 'data-testid': 'annotation-text', maxlength: '4000', placeholder: '例如：这里的“检查通过”是否包含运行态？需要补什么证据？' });
+    area.value = draft.text || '';
+    area.addEventListener('input', () => { draft.text = area.value; });
     area.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveDraft(); } });
     form.append(area, node('div', { class: 'annotation-actions' }, [btn('保存批注', saveDraft, 'annotation-save'), btn('取消', () => { astate.draft = null; renderAnnotations(); }, 'annotation-cancel')]));
     return form;
   }
   function annotationCard(note) {
     const labels = { question: '疑问', issue: '问题', decision: '决定', note: '备注' };
-    const card = node('article', { class: 'annotation-card' + (note.status === 'resolved' ? ' resolved' : ''), 'data-testid': 'annotation-' + note.id });
+    const card = node('article', { class: 'annotation-card' + (note.status === 'resolved' ? ' resolved' : '') + (astate.highlight === note.id ? ' highlight' : ''), 'data-testid': 'annotation-' + note.id, 'data-card-id': note.id });
     card.append(node('div', { class: 'annotation-meta' }, [chip(labels[note.kind], note.kind === 'issue' ? 'bad' : note.kind === 'question' ? 'warn' : 'blue'), chip(note.status === 'resolved' ? '已解决' : '待处理', note.status === 'resolved' ? 'good' : ''), node('time', { text: new Date(note.createdAt).toLocaleDateString() })]));
     card.append(node('div', { class: 'annotation-target', text: note.target.title + ' · ' + note.target.view }));
     if (note.quote) card.append(node('blockquote', { class: 'annotation-quote', text: note.quote }));
     card.append(node('p', { class: 'annotation-text', text: note.text }));
+    if (note.capture && note.capture.status !== 'none') {
+      const label = { pending: '截图进行中', captured: '已截图', failed: '截图失败：' + (note.capture.error || '未知原因'), unavailable: '当前环境不支持截图' }[note.capture.status] || note.capture.status;
+      card.append(node('p', { class: 'annotation-target', 'data-testid': 'annotation-capture-' + note.id, text: label }));
+      if (note.capture.status === 'failed') card.append(btn('重试截图', () => retryCapture(note.id), 'annotation-retry-' + note.id, 'btn'));
+    }
     const removing = astate.deleteId === note.id;
     card.append(node('div', { class: 'annotation-actions' }, [btn('定位', () => locateAnnotation(note), 'annotation-locate-' + note.id), btn(note.status === 'resolved' ? '重新打开' : '标为已解决', () => updateNote(note.id, { status: note.status === 'resolved' ? 'open' : 'resolved' }), 'annotation-resolve-' + note.id), btn(removing ? '确认删除' : '删除', () => removeNote(note.id), 'annotation-delete-' + note.id, 'btn' + (removing ? ' danger' : ''))]));
     return card;
+  }
+
+  // ── 编号标记：与卡片双向定位 ──
+  let badgeFrame = 0;
+  function badgeHost() {
+    let host = document.querySelector('[data-testid="annotation-badges"]');
+    if (!host) { host = document.createElement('div'); host.setAttribute('data-testid', 'annotation-badges'); host.setAttribute('data-annotation-ui', '1'); document.body.append(host); }
+    return host;
+  }
+  function renderBadges() {
+    const host = badgeHost();
+    host.replaceChildren();
+    const numbers = model.annotationNumbers(astate.notes);
+    for (const note of astate.notes) {
+      const el = resolveElement(note);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4) continue;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'annotation-badge' + (note.status === 'resolved' ? ' resolved' : '');
+      b.setAttribute('data-annotation-ui', '1');
+      b.setAttribute('data-testid', 'annotation-badge-' + note.id);
+      b.textContent = String(numbers.get(note.id) || '');
+      b.style.cssText = 'position:fixed;z-index:66;left:' + Math.max(2, r.right - 9) + 'px;top:' + Math.max(2, r.top - 9) + 'px;min-width:17px;height:17px;border-radius:9px;border:1px solid #82c7ff;background:#0d1a24;color:#82c7ff;font:10px var(--mono);cursor:pointer;padding:0 4px';
+      b.onclick = (e) => { e.preventDefault(); setAnnotationsOpen(true); astate.highlight = note.id; astate.filter = 'all'; renderAnnotations(); setTimeout(() => document.querySelector('[data-card-id="' + note.id + '"]')?.scrollIntoView({ block: 'center' }), 30); };
+      host.append(b);
+    }
+  }
+  function scheduleBadges() {
+    if (badgeFrame) return;
+    badgeFrame = requestAnimationFrame(() => { badgeFrame = 0; renderBadges(); });
   }
   function renderAnnotations() {
     backdrop.hidden = !astate.open;
@@ -163,13 +228,39 @@
     const body = node('div', { class: 'annotation-body' });
     body.append(node('p', { class: 'annotation-intro', text: '记录疑问、问题或决定。批注只保存在此浏览器的当前 profile 下，不改插件文件；导出 Markdown 后可交给智能体继续处理。' }));
     if (astate.message) body.append(node('div', { class: 'annotation-error', 'data-testid': 'annotation-message', text: astate.message }));
-    body.append(node('div', { class: 'annotation-tools' }, [btn('＋ 新建批注', () => startAnnotation(''), 'annotation-new'), node('select', { class: 'select', 'data-testid': 'annotation-filter', 'aria-label': '筛选批注', onchange: (e) => { astate.filter = e.target.value; renderAnnotations(); } }, [['open', '待处理 ' + counts.open], ['resolved', '已解决 ' + counts.resolved], ['all', '全部 ' + counts.total]].map(([v, t]) => node('option', { value: v, text: t, selected: astate.filter === v ? 'selected' : null })))]));
+    body.append(node('div', { class: 'annotation-tools' }, [btn('＋ 新建批注', () => startAnnotation(''), 'annotation-new'), btn('⌖ 点选元素', () => startPicking(), 'annotation-pick'), node('select', { class: 'select', 'data-testid': 'annotation-filter', 'aria-label': '筛选批注', onchange: (e) => { astate.filter = e.target.value; renderAnnotations(); } }, [['open', '待处理 ' + counts.open], ['resolved', '已解决 ' + counts.resolved], ['all', '全部 ' + counts.total]].map(([v, t]) => node('option', { value: v, text: t, selected: astate.filter === v ? 'selected' : null })))]));
     if (astate.draft) body.append(annotationForm());
     const notes = astate.notes.filter((n) => astate.filter === 'all' || n.status === astate.filter);
     body.append(node('div', { class: 'annotation-list', 'data-testid': 'annotation-list' }, notes.length ? notes.map(annotationCard) : [node('div', { class: 'annotation-empty', 'data-testid': 'annotation-empty', text: astate.filter === 'open' && counts.total ? '没有待处理批注。可切换到“全部”查看已解决记录。' : '还没有批注。选中页面文字，或点击“新建批注”记录当前对象。' })]));
     drawer.replaceChildren(head, body);
+    scheduleBadges();
   }
 
+
+  // ── 点选元素：进入后收起侧栏，保留草稿；Esc 只退出点选 ──
+  function startPicking() {
+    const pick = window.TurnstileAnnotationPick;
+    if (!pick) { astate.message = '点选组件未加载'; renderAnnotations(); return; }
+    if (astate.draft) { const area = document.querySelector('[data-testid="annotation-text"]'); if (area) astate.draft.text = area.value; }
+    setAnnotationsOpen(false);
+    pick.start({
+      onPick: (target) => {
+        const page = { url: location.href.split('?')[0], title: document.title, viewport: { width: innerWidth, height: innerHeight } };
+        astate.draft = model.createDraft({ kind: 'question', text: '', quote: '', target: Object.assign(currentTarget(), target), page, capture: { status: 'unavailable' } });
+        setAnnotationsOpen(true);
+      },
+      onCancel: () => setAnnotationsOpen(true),
+    });
+  }
+  function retryCapture() { astate.message = '当前环境没有截图适配器；正文已保存，可直接导出。'; renderAnnotations(); }
+  function resolveElement(note) {
+    const t = note.target || {};
+    for (const sel of [t.selector, t.domPath]) {
+      if (!sel) continue;
+      try { const el = document.querySelector(sel); if (el) return el; } catch {}
+    }
+    return null;
+  }
   document.addEventListener('mouseup', (e) => {
     setTimeout(() => {
       if (astate.open || e.target.closest('button,input,textarea,select,a,.annotation-drawer')) { selectionButton.hidden = true; return; }
@@ -183,8 +274,11 @@
       selectionButton.hidden = false;
     }, 0);
   });
-  $('main').addEventListener('scroll', () => { selectionButton.hidden = true; }, { passive: true });
+  $('main').addEventListener('scroll', () => { selectionButton.hidden = true; scheduleBadges(); }, { passive: true });
+  window.addEventListener('resize', scheduleBadges);
   document.addEventListener('keydown', (e) => {
+    const inDraft = e.target && e.target.getAttribute && e.target.getAttribute('data-testid') === 'annotation-text';
+    if (inDraft && (e.ctrlKey || e.metaKey) && e.key === 'Enter' && !e.isComposing) { e.preventDefault(); saveDraft(); return; }
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') { e.preventDefault(); setAnnotationsOpen(!astate.open); }
     else if (e.key === 'Escape' && astate.open) { e.preventDefault(); setAnnotationsOpen(false); }
   });
