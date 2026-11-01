@@ -114,6 +114,7 @@ if (COMMANDS[argv[0]] && COMMANDS[argv[0]].mutating) {
     if (positional[at] != null) args[k] = positional[at];
     const fi = argv.indexOf('--' + k);
     if (fi >= 0 && argv[fi + 1] != null) args[k] = argv[fi + 1];
+    if (args[k] == null) delete args[k];
   });
   const dryRun = argv.includes('--dry-run');
   const applyIdx = argv.indexOf('--apply');
@@ -186,6 +187,7 @@ if (COMMANDS[argv[0]] && argv.includes('--json')) {
     if (positional[at] != null) args[k] = positional[at];
     const fi = argv.indexOf('--' + k);
     if (fi >= 0 && argv[fi + 1] != null) args[k] = argv[fi + 1];
+    if (args[k] == null) delete args[k];
   });
   const r = runCommand(argv[0], args);
   const out = shapeReport({
@@ -231,6 +233,7 @@ if (COMMANDS[argv[0]] && argv.includes('--json')) {
     if (positional[at] != null) args[k] = positional[at];
     const fi = argv.indexOf('--' + k);
     if (fi >= 0 && argv[fi + 1] != null) args[k] = argv[fi + 1];
+    if (args[k] == null) delete args[k];
   });
   const dryRun = argv.includes('--dry-run');
   const r = runCommand(argv[0], args);

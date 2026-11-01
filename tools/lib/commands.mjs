@@ -19,6 +19,8 @@ export const COMMANDS = {
   'snapshot-diff': { script: 'profile-snapshot.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'], fixed: ['--diff'] },
   'inspect': { script: 'inspect-plugin.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile', 'pkg'] },
   'diagnose': { script: 'diagnose.mjs', mutating: false, json: true, timeout: 90000, fixed: ['--live'] },
+  // 创作闭环第 1 步：生成一个「能被宿主真的加载」的最小插件
+  'new-plugin': { script: 'new-plugin.mjs', mutating: true, drySafe: true, json: true, timeout: 60000, positional: ['name'], flagMap: { dir: '--dir', template: '--template' } },
   'preinstall': { script: 'preinstall.mjs', mutating: false, json: true, timeout: 90000, positional: ['profile', 'pkg'] },
   // 三查也进注册表（以前完全不在表里，面板/智能体只能自己拼命令）
   'check-risk': { script: 'risk.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'] },
@@ -55,7 +57,8 @@ export function argvFor(command, args) {
   const out = [];
   for (const k of spec.positional || []) out.push(String(args[k]));
   for (const f of spec.fixed || []) out.push(f);
-  for (const [k, flag] of Object.entries(spec.flagMap || {})) out.push(flag, String(args[k]));
+  // 只传真的给了值的 flag：否则会产出 --template undefined
+  for (const [k, flag] of Object.entries(spec.flagMap || {})) if (args[k] != null && args[k] !== '') out.push(flag, String(args[k]));
   for (const flag of spec.flags || []) if (args[flag.replace(/^--/, '')] != null) out.push(flag, String(args[flag.replace(/^--/, '')]));
   if (spec.json) out.push('--json');
   return out;
