@@ -2,6 +2,12 @@
 
 const LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
 
+/** 试装是否留下了需要回滚的改动；失败 JSON 不能抹掉已经发生的部分写入。 */
+export function hasTrialChanges({ originalPkg, currentPkg, preexistingDir = false, dirExists = false } = {}) {
+  if (typeof currentPkg !== 'string') return true;
+  return currentPkg !== originalPkg || (!preexistingDir && dirExists);
+}
+
 /** 复判报告 → 是否算「真实宿主验收通过」。任何一层非 pass 都不算。 */
 export function judgeVerify(report) {
   if (!report || typeof report !== 'object') return { ok: false, reason: '没有复判报告' };

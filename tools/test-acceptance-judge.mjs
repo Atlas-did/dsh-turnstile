@@ -1,5 +1,5 @@
 // P0-2 行为夹具：验收判定不能只看 L2。
-import { judgeVerify, judgeAcceptance } from './lib/acceptance.mjs';
+import { judgeVerify, judgeAcceptance, hasTrialChanges } from './lib/acceptance.mjs';
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
 const L = (statuses) => Object.entries(statuses).map(([level, status]) => ({ level, status, evidence: [status === 'pass' ? 'ok' : 'route 404'] }));
@@ -28,6 +28,11 @@ ok('整体验收：全通过且必需步骤齐全才算过', judgeAcceptance(ful
 ok('整体验收：空步骤数组不算通过（复审 P2-1）', !judgeAcceptance([]).ok, judgeAcceptance([]).reason);
 ok('整体验收：缺必需步骤不算通过', !judgeAcceptance([{ id: 'create', ok: true }]).ok, judgeAcceptance([{ id: 'create', ok: true }]).reason);
 ok('整体验收：任一步失败即失败', !judgeAcceptance(full.map((s) => (s.id === 'uninstall' ? { ...s, ok: false } : s))).ok);
+
+ok('试装配置有变化就需要回滚', hasTrialChanges({ originalPkg: '{}', currentPkg: '{"changed":true}', dirExists: false }));
+ok('试装只创建目录也需要回滚', hasTrialChanges({ originalPkg: '{}', currentPkg: '{}', preexistingDir: false, dirExists: true }));
+ok('试装无变化不制造回滚动作', !hasTrialChanges({ originalPkg: '{}', currentPkg: '{}', preexistingDir: false, dirExists: false }));
+ok('试装后配置不可读时保守回滚', hasTrialChanges({ originalPkg: '{}', currentPkg: null, preexistingDir: true, dirExists: true }));
 
 console.log(fail ? 'ACCEPTANCE_JUDGE_FAILED ' + fail : 'ACCEPTANCE_JUDGE_OK');
 process.exitCode = fail ? 1 : 0;

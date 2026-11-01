@@ -20,7 +20,7 @@ const outDir = join(parent, name);
 const profileDir = join(mini, 'home', 'profiles', 'mini');
 const dshBin = join(mini, 'runtime', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js');
 
-import { judgeVerify, judgeAcceptance } from './lib/acceptance.mjs';
+import { judgeVerify, judgeAcceptance, hasTrialChanges } from './lib/acceptance.mjs';
 
 const state = { claim: "unknown", levels: null, after: null, ok: false, installedByUs: false, phase: "init", rollback: null };
 const steps = [];
@@ -96,7 +96,9 @@ const claim = state.claim;
 state.levels = trialJson ? trialJson.levels : null;
 const levels = state.levels;
 step('install+verify', Boolean(trialJson && trialJson.ok), claim, { levels });
-if (trialJson && trialJson.ok) state.installedByUs = true;
+let pkgAfterTrial = null;
+try { pkgAfterTrial = readFileSync(pkgPath0, 'utf8'); } catch {}
+state.installedByUs = hasTrialChanges({ originalPkg, currentPkg: pkgAfterTrial, preexistingDir: preexisting.dir, dirExists: existsSync(nm0) });
 
 // 2.5) after：试装过程已重启过宿主，这里采集「新启动 + 路由内容」证据
 const afterObs = runNode('host-observe.mjs', ['after', profileDir, name, '--mini', mini, '--input', obsFile, '--out', evFile, '--route', '/' + name], 180000);
@@ -129,8 +131,9 @@ if (pkg.dependencies) delete pkg.dependencies[name];
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 const nm = join(profileDir, 'node_modules', name);
 if (existsSync(nm)) rmSync(nm, { recursive: true, force: true });
-state.installedByUs = false; // 已卸载，finally 不必再回滚
-step('uninstall', !existsSync(nm) && pkg.dsh.profile.bundles.length === beforeBundles - 1,
+const uninstalled = !existsSync(nm) && !pkg.dsh.profile.bundles.includes(name) && !pkg.dependencies?.[name];
+if (uninstalled) state.installedByUs = false;
+step('uninstall', uninstalled && pkg.dsh.profile.bundles.length === beforeBundles - 1,
   'bundles ' + beforeBundles + '→' + pkg.dsh.profile.bundles.length + '，node_modules/' + name + (existsSync(nm) ? ' 仍在' : ' 已删'));
 
 // 4) 重启后确认它真的不在了（路由 404 + dump-config 无它）
@@ -182,9 +185,9 @@ if (has('--json')) console.log(JSON.stringify(evidence, null, 2));
 else {
   for (const s of steps) console.log('  ' + (s.ok ? '✓' : '✗') + ' ' + s.id.padEnd(18) + (s.ok ? 'pass' : 'FAIL') + '  ' + String(s.detail).slice(0, 70));
   console.log('');
-  console.log((ok ? '验收通过' : '验收未通过') + ' · 证据：' + outFile);
+  console.log((state.ok ? '验收通过' : '验收未通过') + ' · 证据：' + outFile);
 }
-return { ok, outFile };
+return { ok: state.ok, outFile };
 }
 
 // 正常结束

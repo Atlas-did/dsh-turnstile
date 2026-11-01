@@ -27,6 +27,7 @@ const evFile = join(tmp, 'evidence.json');
 const r1 = await run(['acc-broken', '--dir', join(tmp, 'work'), '--mini', mini, '--out', evFile]);
 ok('早期异常退出码非 0', r1.code !== 0, String(r1.code));
 ok('早期异常仍然写出证据文件', existsSync(evFile));
+ok('早期异常打印证据路径且不发生二次异常', r1.out.includes('证据：') && !r1.out.includes('证据也写不出来'), r1.out.trim().split('\n').pop() || '');
 if (existsSync(evFile)) {
   const ev = JSON.parse(readFileSync(evFile, 'utf8'));
   ok('证据标了 failedEarly', ev.failedEarly === true, JSON.stringify(ev).slice(0, 60));

@@ -25,6 +25,8 @@ ok('413 带结构化错误信息', Boolean(body && /过大/.test(String(body.err
 
 const bad = await fetch(base + '/turnstile/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{not json' });
 ok('非 JSON 返回 400（不是 socket 错误）', bad.status === 400, String(bad.status));
+const viewBig = await fetch(base + '/turnstile/view-state', { method: 'POST', headers: { 'content-type': 'application/json' }, body: big });
+ok('view-state 也使用统一请求上限', viewBig.status === 413 && /过大/.test(String((await viewBig.json()).error)), String(viewBig.status));
 
 server.close();
 rmSync(tmp, { recursive: true, force: true });

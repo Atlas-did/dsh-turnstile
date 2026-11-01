@@ -220,7 +220,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       } catch { rules = []; source = 'unavailable'; }
       return json(200, { rules, rejected: [], source });
     }
-    if (pathname === '/turnstile/capabilities.js' || pathname === '/turnstile/history-timeline.js' || pathname === '/turnstile/selection.js' || pathname === '/turnstile/field-schema.js' || pathname === '/turnstile/hooks.js' || pathname === '/turnstile/virtual-window.js' || pathname === '/turnstile/hook-rules.js') {
+    if (pathname === '/turnstile/capabilities.js' || pathname === '/turnstile/history-timeline.js' || pathname === '/turnstile/selection.js' || pathname === '/turnstile/field-schema.js' || pathname === '/turnstile/hooks.js' || pathname === '/turnstile/virtual-window.js' || pathname === '/turnstile/hook-rules.js' || pathname === '/turnstile/annotations.js') {
       const name = pathname.slice('/turnstile/'.length);
       const src = readFileSync(join(root, 'plugins', 'turnstile-popup', 'lib', name), 'utf8')
         .replace(/\bexport\s+(function|const|class)/g, '$1');
@@ -256,11 +256,11 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       res.end(src + '\nwindow.TurnstileSort = { SORT_KEYS: SORT_KEYS, valueOf: valueOf, compareRows: compareRows, orderedRows: orderedRows };\n');
       return;
     }
-    if (pathname === '/turnstile/console-designer.js') {
+    if (pathname === '/turnstile/console-designer.js' || pathname === '/turnstile/console-annotations.js') {
       if (req.method !== 'GET') return json(405, { error: 'method' });
       res.setHeader('content-type', 'text/javascript; charset=utf-8');
       res.setHeader('cache-control', 'no-store');
-      res.end(readFileSync(designerFile, 'utf8'));
+      res.end(readFileSync(pathname.endsWith('console-annotations.js') ? join(pluginLib, 'console-annotations.js') : designerFile, 'utf8'));
       return;
     }
     if (pathname === '/turnstile/audit') {
@@ -386,10 +386,12 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
         res.end(JSON.stringify({ state: r.state, source: r.source }));
         return;
       }
-      let body = '';
-      for await (const chunk of req) body += chunk;
-      let parsed = null;
-      try { parsed = JSON.parse(body || '{}'); } catch { res.statusCode = 400; res.end('{"error":"json"}'); return; }
+      let parsed;
+      try { parsed = await readJsonBody(req, { maxBytes: 1e6 }); }
+      catch (e) {
+        if (e && e.code === 'BODY_TOO_LARGE') return json(413, { error: '请求体过大（上限 ' + e.limit + ' 字节）' });
+        return json(400, { error: 'body 不是 JSON：' + String(e.message).slice(0, 120) });
+      }
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify({ state: writeViewState(viewDir, parsed) }));
       return;

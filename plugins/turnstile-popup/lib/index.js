@@ -346,7 +346,7 @@ export function apply(ctx, config) {
 
   // Model modules are ESM files the page loads as classic scripts: strip `export`, keep the window
   // attach. One helper for all of them, so a new module is one list entry instead of a copied block.
-  const MODULES = ["capabilities.js", "selection.js", "history-timeline.js", "field-schema.js", "hooks.js", "virtual-window.js", "hook-rules.js", "health.js"];
+  const MODULES = ["capabilities.js", "selection.js", "history-timeline.js", "field-schema.js", "hooks.js", "virtual-window.js", "hook-rules.js", "health.js", "annotations.js"];
   for (const file of MODULES) {
     ctx.effect(() => ctx.webServer.register({
       kind: "exact",
@@ -405,16 +405,18 @@ export function apply(ctx, config) {
     },
   }), "turnstile: GET /turnstile/sort-context.js");
 
-  ctx.effect(() => ctx.webServer.register({
-    kind: "exact",
-    path: "/turnstile/console-designer.js",
-    handler: async (req, res) => {
-      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
-      const here = dirname(fileURLToPath(import.meta.url));
-      res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
-      res.end(readFileSync(join(here, "console-designer.js"), "utf8"));
-    },
-  }), "turnstile: GET /turnstile/console-designer.js");
+  for (const file of ["console-designer.js", "console-annotations.js"]) {
+    ctx.effect(() => ctx.webServer.register({
+      kind: "exact",
+      path: "/turnstile/" + file,
+      handler: async (req, res) => {
+        if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+        const here = dirname(fileURLToPath(import.meta.url));
+        res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
+        res.end(readFileSync(join(here, file), "utf8"));
+      },
+    }), "turnstile: GET /turnstile/" + file);
+  }
 
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
