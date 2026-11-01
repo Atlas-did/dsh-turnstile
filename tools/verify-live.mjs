@@ -123,7 +123,13 @@ async function get(path) {
 const live = Boolean(base && token);
 let routeResults = [];
 if (!live) {
-  layers.push(level('L3', STATUS.unknown, ['没有 --base/--token：未连活宿主，路由未验证', hostEv && hostEv.ok ? '（host-evidence 里有路由 ' + ((hostEv.raw.route && hostEv.raw.route.path) || '') + ' → ' + ((hostEv.raw.route && hostEv.raw.route.status) || '') + '，可作替代证据）' : '']));
+  // 没有活宿主连接时，真实宿主证据里的路由结果可以替代（它同样是真 HTTP 得到的）
+  const evRoute = hostEv && hostEv.ok ? (hostEv.raw.route || null) : null;
+  if (evRoute && evRoute.path && evRoute.status >= 200 && evRoute.status < 400) {
+    layers.push(level('L3', STATUS.pass, ['host-evidence：' + evRoute.path + ' → ' + evRoute.status + '（sha256 ' + String(evRoute.bodySha256 || '').slice(0, 8) + '…，' + (evRoute.bodyBytes || 0) + ' 字节）']));
+  } else {
+    layers.push(level('L3', STATUS.unknown, ['没有 --base/--token：未连活宿主，路由未验证', evRoute ? '（证据里的路由 ' + evRoute.path + ' → ' + evRoute.status + '，不算通过）' : '']));
+  }
 } else if (!routes.length) {
   layers.push(level('L3', STATUS.skip, ['没有可测路由（源码里没找到 path:）']));
 } else {

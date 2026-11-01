@@ -34,12 +34,33 @@ if (!existsSync(outDir)) {
   step('create', made.code === 0, made.code === 0 ? outDir : (made.out.trim().split('\n').pop() || ''));
 } else step('create', true, '复用已有目录 ' + outDir);
 
+// 1.5) 真实宿主证据 before（宿主观察，不重启）
+const obsFile = join(parent, '.' + name + '-observation.json');
+const evFile = join(parent, '.' + name + '-host-evidence.json');
+const before = runNode('host-observe.mjs', ['before', profileDir, name, '--mini', mini, '--out', obsFile], 120000);
+step('host-observe-before', before.code === 0, before.code === 0 ? obsFile : (before.out.trim().split('\n').pop() || ''));
+
 // 2) 装 + 六级（--keep 保留，下一步才卸）
 const trial = runNode('sandbox-trial.mjs', [profileDir, outDir, '--json', '--keep', '--mini', mini]);
 const trialJson = jsonOf(trial.out);
 const claim = trialJson ? trialJson.claim : 'unknown';
 const levels = trialJson ? trialJson.levels : null;
 step('install+verify', Boolean(trialJson && trialJson.ok), claim, { levels });
+
+// 2.5) after：试装过程已重启过宿主，这里采集「新启动 + 路由内容」证据
+const afterObs = runNode('host-observe.mjs', ['after', profileDir, name, '--mini', mini, '--input', obsFile, '--out', evFile, '--route', '/' + name], 180000);
+step('host-observe-after', afterObs.code === 0, afterObs.code === 0 ? evFile : (afterObs.out.trim().split('\n').pop() || ''));
+
+// 2.7) 用真实宿主证据再判一次 L2/L3（claim 应升级或至少证据来源变成 host）
+let hostClaim = null;
+if (afterObs.code === 0) {
+  const rv = runNode('verify-live.mjs', [profileDir, '--pkg', name, '--host-evidence', evFile, '--json'], 300000);
+  const rj = jsonOf(rv.out);
+  hostClaim = rj && rj.claim;
+  const l2 = rj && (rj.levels || []).find((l) => l.level === 'L2');
+  step('verify-with-host-evidence', Boolean(rj && l2 && l2.status === 'pass'), (hostClaim || 'unknown') + ' / L2=' + (l2 ? l2.status + '：' + String((l2.evidence || [])[0] || '').slice(0, 40) : 'n/a'));
+}
+
 
 // 3) 卸载：从 bundles/deps 移除 + 删目录（真实回滚，不是只回滚配置）
 const pkgPath = join(profileDir, 'package.json');

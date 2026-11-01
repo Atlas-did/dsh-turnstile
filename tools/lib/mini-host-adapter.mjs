@@ -46,8 +46,10 @@ export function createMiniHostAdapter({ mini, findProcess } = {}) {
       const current = latestUrl();
       const processId = Number(await processFor());
       if (!Number.isInteger(processId) || processId <= 0) throw new Error('宿主进程 PID 无效');
-      const response = await fetch(`http://127.0.0.1:${current.port}/?token=${encodeURIComponent(current.token)}`, { signal: AbortSignal.timeout(8000) });
-      if (response.status !== 200) throw new Error('带当前 token 的宿主根路由未返回 200：' + response.status);
+      // redirect:'manual'：页面会 303 跳到不带 token 的地址，自动跟随会变成 401（误判 token 无效）
+      const response = await fetch(`http://127.0.0.1:${current.port}/?token=${encodeURIComponent(current.token)}`, { redirect: 'manual', signal: AbortSignal.timeout(8000) });
+      // 真机根路由会 303 跳转（例如首次进入 setup），401 才是 token 不对；所以只拒绝 4xx/5xx
+      if (response.status >= 400) throw new Error('带当前 token 的宿主根路由未返回成功状态：' + response.status);
       await response.arrayBuffer();
       return { ...current, processId, bootId: sha256(processId + '|' + current.token) };
     },

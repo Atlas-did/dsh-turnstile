@@ -12,6 +12,10 @@ const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' +
 
 ok('verify-live 接受真实宿主证据作为 L2 的判据', /--host-evidence/.test(vl) && /hostEv && hostEv\.ok/.test(vl));
 ok('宿主证据无效时退回 dump 而不是直接判死', /host-evidence 无效/.test(vl));
+ok('没有活宿主时用证据里的路由判 L3', /evRoute && evRoute\.path && evRoute\.status >= 200/.test(vl));
+const acc = readFileSync(join(here, '..', 'tools', 'acceptance-mini.mjs'), 'utf8');
+ok('验收器自动做 before/after 采集', /host-observe\.mjs', \['before'/.test(acc) && /host-observe\.mjs', \['after'/.test(acc));
+ok('验收器会用宿主证据复判一次', /--host-evidence/.test(acc) && /verify-with-host-evidence/.test(acc));
 ok('trial-status 输出 claim 字段', /claim,/.test(ts));
 ok('trial-status 的 claim 只用阶梯词', ['static-only', 'verified-with-regression', 'failed', 'unknown'].every((w) => ts.includes("'" + w + "'")));
 ok('两边没有第二套成功词（loaded/pass/ok 之外的）', !/claim\s*=\s*'pass'/.test(ts) && !/claim\s*=\s*'loaded'/.test(ts));
