@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { checkCompatibility } from './version.mjs';
 import { loadYaml } from './config.mjs';
 import { safeWritePatch } from './lib/patch-write.mjs';
+import { toggleText } from '../plugins/turnstile-popup/lib/toggle-text.js';
 
 const argv = process.argv.slice(2);
 const flag = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : null; };
@@ -152,34 +153,8 @@ async function menuMode() {
 
 /** pure: return the patch text with row `rowId` disabled (off=true) or enabled (off=false) */
 function toggleInPatch(text, rowId, off) {
-  if (off) {
-    const block = '- id: ' + rowId + '\n  disabled: true';
-    // Idempotent: a row already disabled must not gain a second block (that was a real bug:
-    // two clicks of "disable" produced two `- id: talk` entries and the file kept growing).
-    const lines0 = text.split(/\r?\n/);
-    const at = lines0.findIndex((l) => new RegExp('^-\\s*id:\\s*' + rowId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$').test(l));
-    if (at !== -1) {
-      let end = lines0.length;
-      for (let i = at + 1; i < lines0.length; i++) { if (/^-\s/.test(lines0[i])) { end = i; break; } }
-      const next = lines0.slice(0, at).concat(block.split('\n'), lines0.slice(end));
-      return next.join('\n');
-    }
-    const emptyRe = /^\[\]\s*$/m;
-    return emptyRe.test(text) ? text.replace(emptyRe, block) : text.replace(/\s*$/, '') + '\n' + block + '\n';
-  }
-  const lines = text.split(/\r?\n/);
-  const out = [];
-  let dropping = false;
-  for (const line of lines) {
-    const m = line.match(/^-\s*id:\s*([\w.@/-]+)\s*$/);
-    if (m) dropping = m[1] === rowId;
-    else if (/^\S/.test(line)) dropping = false;
-    if (dropping) continue;
-    out.push(line);
-  }
-  let next = out.join('\n');
-  if (!/^- /m.test(next)) next = next.replace(/\s*$/, '\n') + '[]\n';
-  return next;
+  // menu 路径与主写路径共用 toggle-text.js
+  return toggleText(text, rowId, off);
 }
 
 if (argv.includes('--menu')) { await menuMode(); }
@@ -211,46 +186,23 @@ if (!row) { console.error('not in this profile: ' + target); process.exit(3); }
 if (!row.ids.length) { console.error('refusing: no row id found for ' + target); process.exit(4); }
 const id = row.ids[0];
 
-let next = patchText;
-if (doDisable) {
-  if (row.disabled) {
-    if (argv.includes('--json')) { console.log(JSON.stringify({ ok: true, noop: true, action: 'disable', target, row: id, file: patchPath, plan: [target + ' 已经是停用状态，无需改动'], note: '已经是停用状态' }, null, 2)); process.exit(0); }
-    console.log(target + ' 已经停用 (' + row.disabledIds.join(',') + ')');
-    process.exit(0);
-  }
-  // A profile patch that is an empty flow array (`[]`) cannot also hold block items;
-  // replacing the sentinel keeps the file valid YAML.
-  const emptyRe = /^\[\]\s*$/m;
-  const rowBlock = '- id: ' + id + '\n  disabled: true';
-  next = emptyRe.test(patchText)
-    ? patchText.replace(emptyRe, rowBlock)
-    : patchText.replace(/\s*$/, '') + '\n' + rowBlock + '\n';
-} else {
-  const lines = patchText.split(/\r?\n/);
-  const out = [];
-  let dropping = false;
-  for (const line of lines) {
-    const m = line.match(/^-\s*id:\s*([\w.@/-]+)\s*$/);
-    if (m) dropping = (m[1] === id);
-    else if (/^\S/.test(line)) dropping = false;
-    if (dropping && /^\s*disabled:\s*true\s*$/.test(line)) continue;
-    if (dropping && m) { /* keep the - id line? drop the whole block */ }
-    if (!dropping) out.push(line);
-  }
-  next = out.join('\n');
-  // keep the file a valid, self-describing empty patch
-  if (!/^- /m.test(next)) next = next.replace(/\s*$/, '\n') + '[]\n';
+// 唯一实现在 toggle-text.js：块内增删 disabled，保留用户 config；空块才移除。
+const next = toggleText(patchText, id, Boolean(doDisable));
+if (doDisable && row.disabled) {
+  if (argv.includes('--json')) { console.log(JSON.stringify({ ok: true, noop: true, action: 'disable', target, row: id, file: patchPath })); }
+  else console.log(target + ' 已经停用 (' + row.disabledIds.join(',') + ')');
+  process.exit(0);
 }
 
 const asJson = argv.includes('--json');
 if (!confirmed) {
   if (asJson) {
     console.log(JSON.stringify({ ok: true, dryRun: true, action: doDisable ? 'disable' : 'enable', target, row: id, file: patchPath,
-      plan: [doDisable ? '追加 - id: ' + id + ' / disabled: true' : '删除 - id: ' + id + ' / disabled: true'] }, null, 2));
+      plan: [doDisable ? '块内插入 disabled: true（保留其它键）' : '删除块内 disabled: true（保留其它键，空块才移除）'] }, null, 2));
     process.exit(0);
   }
   console.log('DRY RUN — 会写 ' + patchPath);
-  console.log('  ' + (doDisable ? '追加 - id: ' + id + ' / disabled: true' : '删除 - id: ' + id + ' / disabled: true'));
+  console.log('  ' + (doDisable ? '块内插入 disabled: true（保留其它键）' : '删除块内 disabled: true（保留其它键，空块才移除）'));
   console.log('  加 --yes 才执行');
   process.exit(0);
 }

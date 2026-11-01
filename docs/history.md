@@ -71,6 +71,7 @@
 | [184-doctor-issue-parity.md](184-doctor-issue-parity.md) | CLI 与 UI 同源：doctor 输出同一份 issue（2026-11-02） |
 | [185-finding-issues.md](185-finding-issues.md) | doctor findings 也归一化成 issue（2026-11-02） |
 | [186-provision-batch-schema.md](186-provision-batch-schema.md) | Provision 批次：两层适配卡最小 schema（2026-11-02） |
+| [187-toggle-unify.md](187-toggle-unify.md) | 数据保护批次第一步：toggle 收敛为一份（2026-11-02） |
 | [22-gate-report.md](22-gate-report.md) | 闸门报告（自动生成） |
 | [26-provider-map.md](26-provider-map.md) | 26 · 多接口（provider）地图与切换 |
 | [31-plugin-manager.md](31-plugin-manager.md) | 31 · mini 的插件管理界面：现状与两条路 |
