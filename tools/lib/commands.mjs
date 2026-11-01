@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 const toolsDir = dirname(fileURLToPath(import.meta.url)).replace(/[\\/]lib$/, '');
 
 export const COMMANDS = {
-  'doctor': { script: 'doctor.mjs', mutating: false, json: false, timeout: 60000 },
+  // doctor 接受 profile 路径（B9 起支持位置参数传目录），所以传 profile
+  'doctor': { script: 'doctor.mjs', mutating: false, json: false, timeout: 60000, positional: ['profile'] },
   'gate': { script: 'preflight.mjs', mutating: false, json: true, timeout: 180000, positional: ['profile'] },
   'surfaces': { script: 'ui-surfaces.mjs', mutating: false, json: false, timeout: 60000, positional: ['profile'] },
   'slot-report': { script: 'slot-map-report.mjs', mutating: false, json: true, timeout: 60000, flags: ['--map'] },
@@ -22,7 +23,8 @@ export const COMMANDS = {
   // 写操作：必须先 dryRun，拿到 applyToken 才能 apply
   'snapshot-take': { script: 'profile-snapshot.mjs', mutating: true, json: false, timeout: 60000, positional: ['profile'], fixed: ['--take'] },
   'manage-enable': { script: 'manage.mjs', mutating: true, json: false, timeout: 60000, positional: ['profile'], flagMap: { package: '--enable' } },
-  'manage-disable': { script: 'manage.mjs', mutating: true, json: false, timeout: 60000, positional: ['profile'], flagMap: { package: '--disable' } },
+  // 高危：禁用插件会让界面少一块，apply 时必须逐字确认目标包名（设计 §4.4-3）
+  'manage-disable': { script: 'manage.mjs', mutating: true, danger: true, json: false, timeout: 60000, positional: ['profile'], flagMap: { package: '--disable' } },
 };
 
 /** 极简参数校验：缺必填位置参数就报错（不做类型推断，避免假安全）。 */

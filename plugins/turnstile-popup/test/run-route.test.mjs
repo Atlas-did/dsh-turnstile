@@ -37,7 +37,18 @@ const dry2 = await handleRun({ command: 'manage-disable', args: { profile, packa
 const swapped = await handleRun({ command: 'manage-disable', args: { profile, package: 'plug-beta' }, applyToken: dry2.body.applyToken });
 ok('token 与参数绑定（换参数被拒）', swapped.status === 403 && /不匹配/.test(swapped.body.summary), swapped.body.summary.slice(0, 20));
 
-// 7) 连点去重
+// 7) 高危命令要逐字 confirm（设计 §4.4-3）
+_resetForTests();
+const dDry = await handleRun({ command: 'manage-disable', args: { profile, package: 'plug-beta' }, dryRun: true });
+const dNo = await handleRun({ command: 'manage-disable', args: { profile, package: 'plug-beta' }, applyToken: dDry.body.applyToken });
+ok('高危操作缺 confirm → 403', dNo.status === 403 && /confirm/.test(dNo.body.summary), dNo.body.summary.slice(0, 24));
+const dWrong = await handleRun({ command: 'manage-disable', args: { profile, package: 'plug-beta' }, applyToken: dDry.body.applyToken, confirm: 'plug-alpha' });
+ok('confirm 写错目标 → 403', dWrong.status === 403, String(dWrong.status));
+const dGood = await handleRun({ command: 'manage-disable', args: { profile, package: 'plug-beta' }, applyToken: dDry.body.applyToken, confirm: 'plug-beta' });
+ok('confirm 正确 → 执行', dGood.status === 200 && dGood.body.ok === true, String(dGood.status));
+
+// 8) 连点去重
+_resetForTests();
 _resetForTests();
 await handleRun({ command: 'snapshot-take', args: { profile }, dryRun: true });
 const again = await handleRun({ command: 'snapshot-take', args: { profile }, dryRun: true });

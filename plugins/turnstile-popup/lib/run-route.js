@@ -69,6 +69,13 @@ export async function handleRun(body, { toolsRoot } = {}) {
       if (rec.hash !== hash) {
         return { status: 403, body: { ok: false, verdict: 'unknown', summary: 'applyToken 与本次参数不匹配（参数被改过？）' } };
       }
+      // 高危命令：apply 时必须逐字确认目标（防「手滑点到确认」）
+      if (spec.danger) {
+        const target = String((args && (args.package || args.profile)) || '');
+        if (String((body && body.confirm) || '') !== target) {
+          return { status: 403, body: { ok: false, verdict: 'unknown', summary: '高危操作需要 confirm 与目标逐字一致（收到 "' + String((body && body.confirm) || '') + '"，期望 "' + target + '"）', next: ['先 dry-run 看计划，再带 confirm 重放'] } };
+        }
+      }
       rec.used = true;
     } else {
       const last = recent.get(hash) || 0;
@@ -78,7 +85,16 @@ export async function handleRun(body, { toolsRoot } = {}) {
   }
 
   const result = runCommand(command, args, { toolsRoot });
-  const out = { ...result };
+  // 统一契约整形（03 设计 §2）：next[] / rollback / findings 规范化都在这一个地方
+  let shape = null;
+  try {
+    const reportPath = await import(pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'tools', 'lib', 'report.mjs')).href);
+    shape = reportPath.shapeReport({
+      command, exitCode: result.exitCode, parsed: result.data, stderr: (result.evidence || [])[0] || '',
+      mutating: spec.mutating, dryRun, durationMs: result.durationMs,
+    });
+  } catch (e) { shape = null; }
+  const out = { ...result, ...(shape || {}) };
   if (spec.mutating && dryRun && result.exitCode === 0) {
     const token = randomUUID();
     tokens.set(token, { hash, expires: now + TTL, used: false });

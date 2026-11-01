@@ -132,6 +132,7 @@ window.__ModuleLoader__.load({
         var qs = React.useState(""), query = qs[0], setQuery = qs[1];
         var ns = React.useState(null), notice = ns[0], setNotice = ns[1];
         var rr = React.useState(null), runResult = rr[0], setRunResult = rr[1];
+        var hlv = React.useState(null), healthVerdict = hlv[0], setHealthVerdict = hlv[1];
         var rb = React.useState(""), runBusy = rb[0], setRunBusy = rb[1];
         var im = React.useState(false), inspectMode = im[0], setInspectMode = im[1];
         var ir = React.useState(null), inspectResult = ir[0], setInspectResult = ir[1];
@@ -231,6 +232,18 @@ window.__ModuleLoader__.load({
             .catch(function (e) { setNotice({ kind: "error", text: "位置更新失败：" + errorText(e) }); })
             .then(function () { setBusy(""); });
         }
+        // 档位一的状态灯：60s 轮询一次 doctor（只读，安全）；收起时也能看到颜色。
+        React.useEffect(function () {
+          var alive = true;
+          function tick() {
+            api("run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ command: "doctor", args: {} }) })
+              .then(function (r) { if (alive) setHealthVerdict(r && r.verdict ? r.verdict : "unknown"); })
+              .catch(function () { if (alive) setHealthVerdict("unknown"); });
+          }
+          tick();
+          var id = setInterval(tick, 60000);
+          return function () { alive = false; clearInterval(id); };
+        }, []);
         // 统一入口：面板按钮全部打 /turnstile/run（02 设计 §4）。
         // 读操作直跑；写操作先 dryRun 拿 applyToken，面板上出「确认执行」。
         function runCommandViaRun(name, args, dryRun) {
@@ -346,7 +359,10 @@ window.__ModuleLoader__.load({
           return cur;
         }
 
-        if (!open) return h("button", { type: "button", "data-testid": "reopen", onClick: function () { setOpen(true); }, style: Object.assign({}, S.button, { position: "fixed", right: "16px", top: "64px", zIndex: 2147483000, boxShadow: "0 8px 28px rgba(0,0,0,.35)" }) }, "插件闸门 · " + rows.length);
+        if (!open) return h("button", { type: "button", "data-testid": "reopen", onClick: function () { setOpen(true); }, style: Object.assign({}, S.button, { position: "fixed", right: "16px", top: "64px", zIndex: 2147483000, boxShadow: "0 8px 28px rgba(0,0,0,.35)", display: "flex", alignItems: "center", gap: "6px" }) },
+          // 档位一：状态下灯（绿/黄/红/灰），颜色来自统一契约的 verdict
+          h("span", { "data-testid": "status-light", "data-verdict": healthVerdict || "unknown", style: { width: "8px", height: "8px", borderRadius: "50%", background: runLight(healthVerdict === "ok" ? { verdict: "ok" } : healthVerdict === "warn" ? { verdict: "warn" } : healthVerdict === "fail" ? { verdict: "fail" } : null) } }),
+          "插件闸门 · " + rows.length);
 
         var off = rows.filter(function (r) { return r.disabled; }).length;
         var skipped = rows.filter(function (r) { return r.engineSkipped; }).length;

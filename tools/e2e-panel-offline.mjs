@@ -279,6 +279,10 @@ try {
 
     await mouseClick(page.locator('[data-testid="close"]'));
     ok("close collapses to a reopen button", (await page.locator('[data-testid="reopen"]').count()) === 1);
+    // 档位一：收起态也要有状态灯，颜色来自统一契约的 verdict（离线无 /run → unknown）
+    const light = page.locator('[data-testid="status-light"]').first();
+    ok("collapsed card shows a status light", (await light.count()) === 1);
+    ok("status light exposes its verdict", ["ok", "warn", "fail", "unknown"].includes(await light.getAttribute("data-verdict")), await light.getAttribute("data-verdict"));
     await page.locator('[data-testid="reopen"]').scrollIntoViewIfNeeded();
     const reopenBox = await page.locator('[data-testid="reopen"]').boundingBox();
     await page.mouse.click(reopenBox.x + reopenBox.width / 2, reopenBox.y + reopenBox.height / 2);
