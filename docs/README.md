@@ -65,3 +65,10 @@
 - [外部评审](104-external-review.md)：当时的评审结论，后续状态以当前代码和测试为准。
 - [最终报告](108-final-report.md)：历史节点报告，不代表当前所有能力均已在真实环境验收。
 - [诚实缺口评审](109-honest-gap-review.md)：已知限制与证据纪律。
+
+| [真机验收](159-l5-baseline.md) | 装→六级→卸→回滚，一次跑完并落证据 |
+| [宿主证据自动采集](157-host-evidence-auto.md) | before/after + bootId + 路由内容 |
+| [页面版本与并发写](160-page-version.md) | 两个标签页不会互相覆盖 |
+| [页面树校验](161-page-tree-validation.md) | 坏页面进不来 |
+| [多选编辑](162-multi-select-edit.md) | 多选删除/复制粘贴，一次一步 |
+| [设计令牌](164-design-tokens.md) | 两个界面共用一套颜色/间距 |
