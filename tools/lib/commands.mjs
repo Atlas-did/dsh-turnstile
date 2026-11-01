@@ -19,6 +19,8 @@ export const COMMANDS = {
   'snapshot-diff': { script: 'profile-snapshot.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'], fixed: ['--diff'] },
   'inspect': { script: 'inspect-plugin.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile', 'pkg'] },
   'diagnose': { script: 'diagnose.mjs', mutating: false, json: true, timeout: 90000, fixed: ['--live'] },
+  // 创作闭环：新建/导出 → 试装 → 六级验证（任一段失败就停）
+  'create': { script: 'create-loop.mjs', mutating: true, drySafe: true, json: true, timeout: 900000, positional: ['name'], flagMap: { dir: '--dir', template: '--template', mini: '--mini' } },
   // 重启 mini 并取新 token（写操作：会中断正在跑的会话）
   'lab-reload': { script: 'lab-reload.mjs', mutating: true, drySafe: true, json: true, timeout: 240000 },
   // 把搭建器产物导出成插件（写文件）
