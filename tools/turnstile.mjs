@@ -145,7 +145,7 @@ if (COMMANDS[argv[0]] && COMMANDS[argv[0]].mutating) {
     const v = verify(token, argv[0], args);
     if (!v.ok) { console.error('拒绝：' + v.reason); process.exit(2); }
     const r = runCommand(argv[0], args, { extraFlags: spec.applyFlag ? [spec.applyFlag] : [] });
-    const out = shapeReport({ command: argv[0], exitCode: r.exitCode, parsed: r.data, stderr: (r.evidence || [])[0] || '', mutating: true, dryRun: false, durationMs: r.durationMs });
+    const out = shapeReport({ command: argv[0], exitCode: r.exitCode, parsed: r.data, stderr: (r.evidence || [])[0] || '', mutating: true, dryRun: false, durationMs: r.durationMs, profile: args.profile });
     console.log(JSON.stringify(out, null, 2));
     process.exit(r.exitCode);
   }
@@ -168,6 +168,11 @@ function runCommandDry(name, args) {
   } catch (e) { return null; }
 }
 
+// 命令名双轨统一：`check risk` 与 `check-risk` 等价（注册表用的是后者）
+if (argv[0] === 'check' && argv[1] && COMMANDS['check-' + argv[1]]) {
+  argv.splice(0, 2, 'check-' + argv[1]);
+}
+
 // 步骤 0（放在分派之前）：注册表里的命令 + --json → 走统一契约给 agent 读。
 if (COMMANDS[argv[0]] && argv.includes('--json')) {
   const spec = COMMANDS[argv[0]];
@@ -186,7 +191,7 @@ if (COMMANDS[argv[0]] && argv.includes('--json')) {
   const out = shapeReport({
     command: argv[0], exitCode: r.exitCode, parsed: r.data,
     stderr: (r.evidence || [])[0] || '', mutating: Boolean(spec.mutating),
-    dryRun: argv.includes('--dry-run'), durationMs: r.durationMs,
+    dryRun: argv.includes('--dry-run'), durationMs: r.durationMs, profile: args.profile,
   });
   console.log(JSON.stringify(out, null, 2));
   process.exit(r.exitCode);

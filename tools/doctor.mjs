@@ -10,7 +10,25 @@ import { ROOT as root, DSH_BIN, DSH_HOME, loadYaml } from './config.mjs';
 import { scanUi } from './lib/ui-scan.mjs';
 import { checkCompatibility, runtimeVersion } from './version.mjs';
 import { patchFiles } from './lib/patch-files.mjs';
-const { yaml, schema } = loadYaml();
+// 缺依赖时不能顶层崩（外部审查：那会让「环境问题」冒充 verdict:fail + 一行文件路径）
+let yaml, schema;
+try {
+  ({ yaml, schema } = loadYaml());
+} catch (e) {
+  const missing = e && e.code === 'MISSING_DEPENDENCY';
+  const msg = '缺少依赖 ' + ((e && e.dependency) || 'js-yaml') + '：在仓库根跑 `npm install`（离线可 `npm install --offline`）。这是环境问题，不是插件有问题。';
+  if (process.argv.includes('--json')) {
+    console.log(JSON.stringify({
+      profile: process.argv.slice(2).find((a) => !a.startsWith('--')) || '',
+      verdict: 'unknown', skipped: true, skipReason: missing ? 'missing-dependency' : 'load-error',
+      summary: msg, findings: [],
+      next: [{ label: '装依赖后重试', command: 'npm install', mutating: false, reason: '缺依赖' }],
+    }, null, 2));
+    process.exit(3);
+  }
+  console.error(msg);
+  process.exit(3);
+}
 const jsType = new yaml.Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: (d) => String(d) });
 
 const argv = process.argv.slice(2);
