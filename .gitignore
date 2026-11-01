@@ -31,3 +31,7 @@ tests/**/.turnstile/turnstile-view.json
 # the 2026-10-31 evidence corpus is frozen test data, not runtime logs
 !tests/corpus/**/logs/
 !tests/corpus/**/logs/**
+
+# 运行产物：预览状态 / 启动器索引 / 流水账不应进仓库
+tests/**/.turnstile/turnstile-journal.json
+tests/**/.turnstile/launcher-index.json

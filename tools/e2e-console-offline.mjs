@@ -9,7 +9,7 @@ try { ({ chromium } = await import('playwright-core')); } catch {
 }
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { copyTreeSafe } from './safe-copy.mjs';
 import { createConsoleServer } from './console-server.mjs';
 import { viewStatePath } from '../plugins/turnstile-popup/lib/view-state.js';
@@ -32,7 +32,14 @@ const ok = (name, pass, detail = '') => {
 
 try {
   // e2e 用可复现的 fixture 数据（明确选入，不是默认）；真实数据路径由 fixture:false 覆盖
-  const stateDir = join(profileDir, '.turnstile');
+  // 运行产物不能写进夹具（否则 journal/view 会变成未跟踪文件污染仓库）
+  const stateDir = join(tmp, '.turnstile-state');
+  mkdirSync(stateDir, { recursive: true });
+  // 但夹具里那几份「输入」（报告/占用/历史）要复制过来，否则页面没数据
+  for (const f of ['gate-history.json', 'occupancy-console-fixture.json', 'report-console-fixture.json']) {
+    const src = join(root, 'tests', 'console-fixture', '.turnstile', f);
+    if (existsSync(src)) copyFileSync(src, join(stateDir, f));
+  }
   // 启动器搜索现在是真索引：给 e2e 造一个小索引，否则「搜不到」是对的、但测不了渲染
   mkdirSync(stateDir, { recursive: true });
   writeFileSync(join(stateDir, 'launcher-index.json'), JSON.stringify({
@@ -227,7 +234,7 @@ try {
     ok('narrow layout keeps the main workspace usable', narrow.width >= 350 && narrow.x >= 0);
     await page.setViewportSize({ width: 1440, height: 960 });
     // View state: a corrupt file must fall back (never blank the page), and a sort click must persist.
-    writeFileSync(viewStatePath(join(profileDir, '.turnstile')), '{ broken json');
+    writeFileSync(viewStatePath(stateDir), '{ broken json');
     await page.reload({ waitUntil: 'load' });
     await page.waitForSelector('[data-testid="nav-overview"]');
     ok('corrupt view state falls back instead of breaking the page', (await page.locator('[data-testid="nav-overview"]').count()) === 1);
@@ -235,7 +242,7 @@ try {
     let saved = null;
     for (let i = 0; i < 15 && !saved; i++) {
       await page.waitForTimeout(200);
-      try { saved = JSON.parse(readFileSync(viewStatePath(join(profileDir, '.turnstile')), 'utf8')); } catch { saved = null; }
+      try { saved = JSON.parse(readFileSync(viewStatePath(stateDir), 'utf8')); } catch { saved = null; }
     }
     ok('view change is persisted', Boolean(saved) && saved.view === 'plugins', saved ? saved.view : 'not written');
 
@@ -360,6 +367,15 @@ try {
     ok('the failure state is exposed for styling', (await page.locator('body').getAttribute('data-health')) === 'failed');
     await page.unroute('**/api/console*');
     await page.unroute('**/turnstile/console-data*');
+    // 纯文本断言：之前只验「页面能打开」，undefined 混在导航里也没人发现
+    const navText = await page.locator('#nav').innerText();
+    ok('导航区没有 undefined', !/undefined/i.test(navText), navText.replace(/\n/g, ' ').slice(0, 80));
+    for (const view of ['launcher', 'skeleton']) {
+      await page.locator('[data-testid="nav-' + view + '"]').click();
+      await page.waitForTimeout(250);
+      const body = await page.locator('main').innerText();
+      ok('视图 ' + view + ' 没有 undefined', !/undefined/i.test(body), body.replace(/\n/g, ' ').slice(0, 60));
+    }
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {

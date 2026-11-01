@@ -42,7 +42,7 @@ body[data-health="failed"] .statusbar{color:#ffb3b8}
 'use strict';
 const $=(id)=>document.getElementById(id);
 const state={data:null,view:'overview',query:'',selected:null,inspectorTab:'properties',archId:'profile',pluginStatus:'all',busy:false,focus:false,hideInspector:false,delta:null,sort:{key:'name',dir:1},context:null,patchPreview:null,notice:'',skeleton:null};
-const views=[['steward','环境管家','◎'],['overview','总览','⌂'],['designer','配置设计器','▧'],['checks','门禁检查','✓'],['plugins','插件','▤'],['surfaces','UI 占用','▦'],['architecture','深层架构','⌘'],['history','历史','◷'],['launcher','启动器','⌕'],['skeleton','插件骨架','◫']];
+const views=[['steward','环境管家','◎'],['overview','总览','⌂'],['designer','配置设计器','▧'],['checks','门禁检查','✓'],['plugins','插件','▤'],['surfaces','UI 占用','▦'],['architecture','深层架构','⌘'],['history','历史','◷'],['launcher','启动器','⌕'],['skeleton','插件检查','◫']];
 function node(tag,props={},children=[]){const n=document.createElement(tag);for(const [k,v] of Object.entries(props)){if(k==='class')n.className=v;else if(k==='text')n.textContent=v;else if(k.startsWith('on'))n.addEventListener(k.slice(2),v);else if(v!==null&&v!==undefined)n.setAttribute(k,v);}for(const c of children){if(c===null||c===undefined)continue;n.append(c.nodeType?c:document.createTextNode(String(c)));}return n;}
 function btn(text,onClick,testid,cls='btn'){return node('button',{type:'button',class:cls,text,'data-testid':testid,onclick:onClick});}
 function chip(text,kind=''){return node('span',{class:'chip '+kind,text});}
@@ -65,7 +65,7 @@ function pickPlugin(p,ev){const S=window.TurnstileSelection;if(!S)return;const o
 function select(item){state.selected=item;state.inspectorTab='properties';state.context=null;renderTop();renderInspector();document.querySelectorAll('tr.selected').forEach(x=>x.classList.remove('selected'));}
 function locate(id){if(!id)return;state.archId=id;state.view='architecture';const n=state.data.architecture.nodes.find(x=>x.id===id);state.selected=n?selectionForNode(n):null;state.query='';$('global-search').value='';render();}
 function renderTop(){const b=$('refresh');b.disabled=state.busy;b.textContent=state.busy?'读取中…':'↻ 刷新';document.body.classList.toggle('focus',state.focus);document.body.classList.toggle('hide-inspector',state.hideInspector);const p=state.selected?.kind==='plugin'?state.selected.plugin:null;const t=$('toggle-plugin');t.disabled=!p||p.missing||!p.row||state.busy;t.textContent=p?(p.disabled?'启用插件':'停用插件'):'停用插件';t.title=p?'生成 cordis.patch.yml 预览，确认后才写入 (Del)':'先选中一个插件';}
-function renderNav(){const d=state.data;const counts={steward:'',overview:'',designer:'',checks:d?.report?.checks?.length??'—',plugins:d?.plugins.length??'—',surfaces:d?.surfaces.length??'—',architecture:d?.architecture.nodes.length??'—',history:d?.history.length??'—'};$('nav').replaceChildren(...views.map(([id,label,icon])=>{const b=btn('',()=>setView(id),'nav-'+id,'nav-btn'+(state.view===id?' active':''));b.append(node('span',{text:icon}),node('span',{text:label}),node('span',{class:'count',text:String(counts[id])}));return b;}));}
+function renderNav(){const d=state.data;const counts={steward:'',overview:'',designer:'',launcher:'',skeleton:'',checks:d?.report?.checks?.length??'—',plugins:d?.plugins?.length??'—',surfaces:d?.surfaces?.length??'—',architecture:d?.architecture?.nodes?.length??'—',history:d?.history?.length??'—'};$('nav').replaceChildren(...views.map(([id,label,icon])=>{const b=btn('',()=>setView(id),'nav-'+id,'nav-btn'+(state.view===id?' active':''));b.append(node('span',{text:icon}),node('span',{text:label}),node('span',{class:'count',text:String(counts[id]??'')}));return b;}));}
 function pageHead(title,desc){return node('div',{class:'page-head'},[node('div',{},[node('h1',{text:title}),node('p',{text:desc})])]);}
 function panel(title,body){return node('section',{class:'panel'},[node('div',{class:'panel-head'},[node('h2',{text:title})]),body]);}
 function table(headers,rows){const t=node('table',{class:'data-table'});t.append(node('thead',{},[node('tr',{},headers.map(h=>node('th',{},[typeof h==='object'?btn(h.label+(state.sort.key===h.key?(state.sort.dir===1?' ↑':' ↓'):''),()=>{state.sort={key:h.key,dir:state.sort.key===h.key?-state.sort.dir:1};persistView();render();},'sort-'+h.key,'th-sort'):h]))) ]));const tb=node('tbody');rows.forEach(r=>tb.append(r));t.append(tb);return t;}
@@ -239,7 +239,7 @@ async function loadSkeleton(name){
 function skeleton(){
   const main=$('main');
   main.replaceChildren();
-  main.append(pageHead('插件骨架','看声明、inject 面、patch 行、slot、类名——不用再翻 node_modules。'));
+  main.append(pageHead('插件检查','查一个已装插件的声明、inject 面、patch 行、slot、类名——这是「检查器」，不是搭建器；新建插件走配置设计器。'));
   const box=node('section',{class:'panel'});
   const input=node('input',{placeholder:'插件名，例如 dsh-mimir','data-testid':'skeleton-input'});
   input.value=(state.skeleton&&state.skeleton.name)||'';
