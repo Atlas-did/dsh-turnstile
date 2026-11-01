@@ -287,9 +287,16 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       res.end(readFileSync(join(pluginLib, 'builder.html'), 'utf8'));
       return;
     }
-    if (pathname === '/turnstile/page-model.js' || pathname === '/turnstile/page-render.js') {
+    if (pathname === '/turnstile/page-model.js' || pathname === '/turnstile/page-render.js' || pathname === '/turnstile/page-validate.js' || pathname === '/turnstile/tokens.css') {
       const name = pathname.slice('/turnstile/'.length);
-      const src = readFileSync(join(pluginLib, name), 'utf8').replace(/^export\s+(?=(function|const|let|class))/gm, '');
+      const raw = readFileSync(join(pluginLib, name), 'utf8');
+      if (name.endsWith('.css')) {
+        res.setHeader('content-type', 'text/css; charset=utf-8');
+        res.setHeader('cache-control', 'no-store');
+        res.end(raw);
+        return;
+      }
+      const src = raw.replace(/^export\s+(?=(function|const|let|class))/gm, '');
       res.setHeader('content-type', 'text/javascript; charset=utf-8');
       res.setHeader('cache-control', 'no-store');
       res.end(src);

@@ -1,0 +1,28 @@
+/* turnstile 设计令牌（控制台与搭建器共用一份，避免两套视觉语言） */
+:root{
+  color-scheme: dark;
+  /* 表面 */
+  --bg:#0b1117; --nav:#10171f; --panel:#141e27; --raised:#1b2833; --line:#2a3946;
+  /* 文本 */
+  --text:#e9eff4; --muted:#96a5b2;
+  /* 语义 */
+  --accent:#82c7ff; --ok:#65d6a2; --danger:#ff8b83; --warn:#e8bc67;
+  /* 状态别名（同一含义只用一个名字） */
+  --status-ok:var(--ok); --status-warn:var(--warn); --status-fail:var(--danger); --status-unknown:var(--muted);
+  /* 间距 4 的倍数 */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  /* 字号 */
+  --fs-xs:11px; --fs-sm:12px; --fs-md:13px; --fs-lg:16px; --fs-xl:20px;
+  /* 圆角与阴影 */
+  --r-sm:6px; --r-md:9px; --r-lg:14px;
+  --shadow:0 18px 60px rgba(0,0,0,.48);
+  /* 等宽 */
+  --mono:ui-monospace,SFMono-Regular,Consolas,monospace;
+}
+/* 可访问性：键盘焦点必须可见（两种界面共用） */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* 窄屏：面板改为可开合的抽屉，而不是直接藏没 */
+@media (max-width:900px){
+  .tier-drawer-open .side{display:block;position:fixed;inset:0 auto 0 0;width:min(86vw,320px);z-index:60;overflow:auto}
+  .tier-sheet-open .inspector{display:block;position:fixed;inset:auto 0 0 0;max-height:60vh;z-index:60;overflow:auto}
+}

@@ -672,6 +672,19 @@ export function apply(ctx, config) {
     },
   }), "turnstile: GET /turnstile/page-model.js");
 
+  // 设计令牌：控制台与搭建器共用一份（窄屏抽屉规则也在里面）
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/tokens.css",
+    handler: async (req, res) => {
+      try {
+        const file = join(dirname(fileURLToPath(import.meta.url)), "tokens.css");
+        res.writeHead(200, { "content-type": "text/css; charset=utf-8", "cache-control": "no-store" });
+        res.end(readFileSync(file, "utf8"));
+      } catch (e) { sendJson(res, 500, { error: "tokens.css 读不出：" + String(e.message).slice(0, 160) }); }
+    },
+  }), "turnstile: GET /turnstile/tokens.css");
+
   // 统一入口：面板按钮全部打这一条（02 设计 §4）。写操作有 dryRun + applyToken 兜底。
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
