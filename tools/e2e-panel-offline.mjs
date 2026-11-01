@@ -317,6 +317,18 @@ try {
       ok('panel has ' + id, (await page.locator('[data-testid="' + id + '"]').count()) === 1);
     }
 
+    // 档位二：点灯开抽屉，抽屉有六个按钮；「完整」再进档位三
+    await mouseClick(page.locator('[data-testid="close"]'));
+    await page.waitForSelector('[data-testid="status-light"]');
+    await page.locator('[data-testid="status-light"]').click();
+    await page.waitForSelector('[data-testid="drawer"]');
+    ok("clicking the light opens the drawer", (await page.locator('[data-testid="drawer"]').count()) === 1);
+    const drawerBtns = await page.locator('[data-testid^="drawer-"]').count();
+    ok("drawer exposes its action buttons", drawerBtns >= 6, String(drawerBtns));
+    await page.locator('[data-testid="drawer-full"]').click();
+    await page.waitForSelector('[data-testid="panel"]');
+    ok("drawer can escalate to the full panel", (await page.locator('[data-testid="panel"]').count()) === 1);
+
     ok("no uncaught browser errors", pageErrors.length === 0, pageErrors.join(" | ").slice(0, 100));
   }
 } catch (error) {

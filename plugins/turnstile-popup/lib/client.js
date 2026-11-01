@@ -133,6 +133,8 @@ window.__ModuleLoader__.load({
         var ns = React.useState(null), notice = ns[0], setNotice = ns[1];
         var rr = React.useState(null), runResult = rr[0], setRunResult = rr[1];
         var hlv = React.useState(null), healthVerdict = hlv[0], setHealthVerdict = hlv[1];
+        // 档位：mini（灯）→ drawer（抽屉）→ full（完整面板）
+        var tr = React.useState("mini"), tier = tr[0], setTier = tr[1];
         var rb = React.useState(""), runBusy = rb[0], setRunBusy = rb[1];
         var im = React.useState(false), inspectMode = im[0], setInspectMode = im[1];
         var ir = React.useState(null), inspectResult = ir[0], setInspectResult = ir[1];
@@ -359,9 +361,37 @@ window.__ModuleLoader__.load({
           return cur;
         }
 
+        // 档位二：抽屉（360×420）。六个常用按钮 + 最近 3 条 finding 摘要。
+        function drawer() {
+          var items = (runResult && runResult.result && runResult.result.findings) || [];
+          return h("div", { "data-testid": "drawer", style: { position: "fixed", right: "16px", top: "64px", width: "360px", maxHeight: "420px", overflowY: "auto", zIndex: 2147483000, background: C.bg, color: C.text, border: "1px solid " + C.line, borderRadius: "12px", padding: "12px", boxShadow: "0 18px 60px rgba(0,0,0,.48)" } },
+            h("div", { style: { display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" } },
+              h("span", { "data-testid": "drawer-light", style: { width: "8px", height: "8px", borderRadius: "50%", background: healthVerdict === "ok" ? "#3fb950" : healthVerdict === "warn" ? "#d29922" : healthVerdict === "fail" ? "#f85149" : "#8b949e" } }),
+              h("strong", { style: { fontSize: "12.5px", flex: 1 } }, "插件闸门 · " + rows.length),
+              h("button", { type: "button", "data-testid": "drawer-close", onClick: function () { setTier("mini"); }, style: S.button }, "收起")
+            ),
+            // 六个常用按钮（设计 §3 抽屉级）
+            h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" } },
+              [["doctor", "体检"], ["surfaces", "三查"], ["diagnose", "诊断"], ["slot-report", "槽位"], ["snapshot-take", "快照"], ["doctor", "完整"]].map(function (b, i) {
+                var isFull = b[1] === "完整";
+                return h("button", { key: b[0] + i, type: "button", "data-testid": "drawer-" + (isFull ? "full" : b[0]), disabled: !isFull && !!runBusy,
+                  onClick: function () { if (isFull) { setTier("full"); setOpen(true); } else if (b[0] === "snapshot-take") { runCommandViaRun("snapshot-take", {}, true); } else { runCommandViaRun(b[0]); } },
+                  style: Object.assign({}, S.button, { minHeight: "32px" }) }, runBusy === b[0] ? "…" : b[1]);
+              })
+            ),
+            runResult ? h("div", { "data-testid": "drawer-result", style: { marginTop: "8px", fontSize: "11.5px", color: C.muted } },
+              (runResult.error || (runResult.result && (runResult.result.summary || runResult.result.verdict)) || "") + "") : null,
+            items.length ? h("div", { style: { marginTop: "8px" } },
+              h("div", { style: { fontSize: "11px", color: C.muted, marginBottom: "4px" } }, "最近 " + Math.min(3, items.length) + " 条问题"),
+              items.slice(0, 3).map(function (f, i) { return h("div", { key: i, "data-testid": "drawer-finding-" + i, style: { fontSize: "11.5px", padding: "4px 0", borderTop: "1px solid " + C.line } }, "· " + (f.title || f.id)); })
+            ) : null
+          );
+        }
+        if (tier === "drawer") return drawer();
         if (!open) return h("button", { type: "button", "data-testid": "reopen", onClick: function () { setOpen(true); }, style: Object.assign({}, S.button, { position: "fixed", right: "16px", top: "64px", zIndex: 2147483000, boxShadow: "0 8px 28px rgba(0,0,0,.35)", display: "flex", alignItems: "center", gap: "6px" }) },
           // 档位一：状态下灯（绿/黄/红/灰），颜色来自统一契约的 verdict
-          h("span", { "data-testid": "status-light", "data-verdict": healthVerdict || "unknown", style: { width: "8px", height: "8px", borderRadius: "50%", background: runLight(healthVerdict === "ok" ? { verdict: "ok" } : healthVerdict === "warn" ? { verdict: "warn" } : healthVerdict === "fail" ? { verdict: "fail" } : null) } }),
+          // 点灯进抽屉（档位二），点文字进完整面板（档位三）
+          h("span", { "data-testid": "status-light", "data-verdict": healthVerdict || "unknown", role: "button", tabIndex: 0, title: "点这里打开抽屉", onClick: function (e) { e.stopPropagation(); setTier("drawer"); }, style: { width: "8px", height: "8px", borderRadius: "50%", background: runLight(healthVerdict === "ok" ? { verdict: "ok" } : healthVerdict === "warn" ? { verdict: "warn" } : healthVerdict === "fail" ? { verdict: "fail" } : null) } }),
           "插件闸门 · " + rows.length);
 
         var off = rows.filter(function (r) { return r.disabled; }).length;
