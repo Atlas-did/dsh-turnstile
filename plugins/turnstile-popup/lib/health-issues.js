@@ -100,3 +100,22 @@ export function issueKey(issue) {
   const it = issue && typeof issue === 'object' ? issue : {};
   return [it.id || 'unknown', it.domain || '', it.subject && it.subject.kind, it.subject && it.subject.id].filter(Boolean).join('|');
 }
+
+/** doctor 的四类 findings（停用/路由重名/UI 抢占/引擎跳过）→ 同一套 issue。ID 以 doctor. 开头。 */
+export function issuesFromFindings(findings, options = {}) {
+  const rows = Array.isArray(findings) ? findings : [];
+  const observedAt = clean(options.observedAt || new Date().toISOString(), 40);
+  const domainOf = { engines: 'plugins', providers: 'providers', 'ui-surface': 'ui', manage: 'plugins' };
+  return rows.slice(0, 200).filter((f) => f && typeof f === 'object').map((f) => ({
+    schema: ISSUE_SCHEMA,
+    id: 'doctor.' + clean(f.id || 'unknown', 120),
+    domain: domainOf[f.checker] || 'env',
+    subject: { kind: clean(f.checker || 'finding', 40), id: clean(f.id || '', 180) },
+    severity: f.severity === 'error' ? 'error' : f.severity === 'warn' ? 'warning' : 'unknown',
+    summary: clean(f.title, 200),
+    impact: clean(f.title, 200),
+    evidence: [{ source: 'doctor:' + clean(f.checker || '?', 40), observedAt, status: clean(f.severity || '', 20), locator: clean((f.evidence || [])[0] || '', 200) }],
+    repair: { supported: false, command: f.falsifier ? null : null },
+    resolution: 'open',
+  }));
+}

@@ -13,13 +13,16 @@ try {
   doctor = JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1));
 } catch (e) { const s = String((e.stdout || '') + (e.stderr || '')); doctor = JSON.parse(s.slice(s.indexOf('{'), s.lastIndexOf('}') + 1)); }
 const data = doctor.data || doctor;
-const doctorIds = (data.issues || []).map((i) => i.id).sort();
+// 只比健康 issue：doctor 另有 findings issue（doctor.* 开头），UI 不产生它们
+const doctorIds = (data.healthIssueIds || (data.issues || []).filter((i) => !String(i.id).startsWith('doctor.')).map((i) => i.id)).sort();
 const ui = collectConsoleData(profileDir, { stateDir: join(here, '..', 'state') });
 const uiIds = (ui.issues || []).map((i) => i.id).sort();
 ok('doctor 输出 issues', Array.isArray(data.issues), String(doctorIds.length));
 ok('doctor 与 console-data 的 issue ID 完全一致', JSON.stringify(doctorIds) === JSON.stringify(uiIds), doctorIds.join(',') + ' vs ' + uiIds.join(','));
 ok('两边都带三组', Boolean(data.issueGroups && ui.issueGroups));
 const sev = (list) => list.map((i) => i.id + '=' + i.severity).sort().join(',');
-ok('严重度也一致', sev(data.issues || []) === sev(ui.issues || []), sev(data.issues || []));
+const healthOnly = (data.issues || []).filter((i) => !String(i.id).startsWith('doctor.'));
+ok('健康 issue 严重度也一致', sev(healthOnly) === sev(ui.issues || []), sev(healthOnly));
+ok('doctor findings 也进入同一套 issue', (data.findingIssueIds || []).every((id) => String(id).startsWith('doctor.')), String((data.findingIssueIds || []).length));
 console.log(fail ? 'ISSUE_PARITY_FAILED ' + fail : 'ISSUE_PARITY_OK');
 process.exitCode = fail ? 1 : 0;

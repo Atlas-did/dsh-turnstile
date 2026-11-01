@@ -69,6 +69,7 @@
 | [182-steward-issue-groups.md](182-steward-issue-groups.md) | 方案 02-B/C：管家三组 + 四段式详情（2026-11-02） |
 | [183-issue-recheck.md](183-issue-recheck.md) | 方案 02-D：复检闭环 + 同步覆盖改成传递闭包（2026-11-02） |
 | [184-doctor-issue-parity.md](184-doctor-issue-parity.md) | CLI 与 UI 同源：doctor 输出同一份 issue（2026-11-02） |
+| [185-finding-issues.md](185-finding-issues.md) | doctor findings 也归一化成 issue（2026-11-02） |
 | [22-gate-report.md](22-gate-report.md) | 闸门报告（自动生成） |
 | [26-provider-map.md](26-provider-map.md) | 26 · 多接口（provider）地图与切换 |
 | [31-plugin-manager.md](31-plugin-manager.md) | 31 · mini 的插件管理界面：现状与两条路 |
