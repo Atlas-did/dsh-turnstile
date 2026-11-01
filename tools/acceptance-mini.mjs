@@ -30,6 +30,37 @@ function runNode(script, args, timeout = 900000) {
   catch (e) { return { code: e.status == null ? 1 : e.status, out: String((e.stdout || '') + (e.stderr || '')) }; }
 }
 function jsonOf(out) { try { return JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1)); } catch { return null; } }
+// 0) 预检与事务边界（复审 P1-3）：记录原始状态，只回滚本次创建的东西
+const pkgPath0 = join(profileDir, 'package.json');
+const originalPkg = readFileSync(pkgPath0, 'utf8');
+const nm0 = join(profileDir, 'node_modules', name);
+const preexisting = {
+  bundle: (JSON.parse(originalPkg).dsh?.profile?.bundles || []).includes(name),
+  dep: Boolean(JSON.parse(originalPkg).dependencies?.[name]),
+  dir: existsSync(nm0),
+};
+const alreadyThere = preexisting.bundle || preexisting.dep || preexisting.dir;
+if (alreadyThere && !has('--overwrite')) {
+  console.error('目标已存在（bundle=' + preexisting.bundle + ' dep=' + preexisting.dep + ' dir=' + preexisting.dir + '）。');
+  console.error('为避免把已有安装当成「本次试装」删掉，默认拒绝；确需覆盖请加 --overwrite。');
+  process.exit(3);
+}
+let installedByUs = false;
+// 任何未捕获异常都要：回滚本次改动 → 落证据 → 退出码 1（复审 P1-3）
+process.on('uncaughtException', (e) => {
+  step('unexpected-error', false, String(e && e.message || e).slice(0, 120));
+  if (installedByUs) { rollbackOwnChanges(); step('rollback-on-failure', true, '已恢复 package.json 并删除本次安装'); }
+  try { const r = flushEvidence({ failedEarly: true }); console.error('验收中断，证据：' + r.outFile); } catch {}
+  process.exit(1);
+});
+process.on('unhandledRejection', (e) => { throw e; });
+
+function rollbackOwnChanges() {
+  // 只恢复我们造成的改变：package.json 复原 + 删掉我们装的目录
+  try { writeFileSync(pkgPath0, originalPkg); } catch {}
+  try { if (!preexisting.dir && existsSync(nm0)) rmSync(nm0, { recursive: true, force: true }); } catch {}
+}
+
 // 1) 生成插件（可重复：已存在就复用）
 if (!existsSync(outDir)) {
   const made = runNode('new-plugin.mjs', [name, '--dir', parent], 120000);
@@ -58,6 +89,7 @@ const trialJson = jsonOf(trial.out);
 const claim = trialJson ? trialJson.claim : 'unknown';
 const levels = trialJson ? trialJson.levels : null;
 step('install+verify', Boolean(trialJson && trialJson.ok), claim, { levels });
+if (trialJson && trialJson.ok) installedByUs = true;
 
 // 2.5) after：试装过程已重启过宿主，这里采集「新启动 + 路由内容」证据
 const afterObs = runNode('host-observe.mjs', ['after', profileDir, name, '--mini', mini, '--input', obsFile, '--out', evFile, '--route', '/' + name], 180000);
@@ -90,6 +122,7 @@ if (pkg.dependencies) delete pkg.dependencies[name];
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 const nm = join(profileDir, 'node_modules', name);
 if (existsSync(nm)) rmSync(nm, { recursive: true, force: true });
+installedByUs = false; // 已卸载，finally 不必再回滚
 step('uninstall', !existsSync(nm) && pkg.dsh.profile.bundles.length === beforeBundles - 1,
   'bundles ' + beforeBundles + '→' + pkg.dsh.profile.bundles.length + '，node_modules/' + name + (existsSync(nm) ? ' 仍在' : ' 已删'));
 
@@ -116,6 +149,7 @@ step('rollback-verified', after.route === 404 && after.inDump === false, '路由
 const overall = judgeAcceptance(steps);
 const ok = overall.ok;
 if (!ok) console.log('验收未通过：' + overall.reason);
+function flushEvidence(extra) {
 const evidence = {
   kind: 'mini-acceptance@1',
   at: new Date().toISOString(),
@@ -125,6 +159,7 @@ const evidence = {
   steps,
   ok,
   note: '这是真实 mini 的证据；不等同桌面端验收。',
+  ...(extra || {}),
 };
 const outFile = val('--out') || join(process.env.DSH_TURNSTILE_STATE || join(mini, 'state'), 'acceptance', 'mini-' + name + '.json');
 mkdirSync(dirname(outFile), { recursive: true });
@@ -137,4 +172,9 @@ else {
   console.log('');
   console.log((ok ? '验收通过' : '验收未通过') + ' · 证据：' + outFile);
 }
-process.exitCode = ok ? 0 : 1;
+return { ok, outFile };
+}
+
+// 正常结束
+const flushed = flushEvidence();
+process.exitCode = flushed.ok ? 0 : 1;

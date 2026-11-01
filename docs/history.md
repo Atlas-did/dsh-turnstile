@@ -58,6 +58,7 @@
 | [171-audit-p1-fixes.md](171-audit-p1-fixes.md) | 审查 P1-1 / P1-2 处置（2026-11-01） |
 | [172-reaudit-fixes.md](172-reaudit-fixes.md) | 复审三个新问题的处置（2026-11-01） |
 | [173-reaudit-ci-and-validation.md](173-reaudit-ci-and-validation.md) | 复审 P1-6 / P1-5 / P2-1 / P2-2 处置（2026-11-01） |
+| [174-acceptance-transaction-and-hash-version.md](174-acceptance-transaction-and-hash-version.md) | 复审 P1-3 处置 + 版本号改成内容哈希（2026-11-01） |
 | [22-gate-report.md](22-gate-report.md) | 闸门报告（自动生成） |
 | [26-provider-map.md](26-provider-map.md) | 26 · 多接口（provider）地图与切换 |
 | [31-plugin-manager.md](31-plugin-manager.md) | 31 · mini 的插件管理界面：现状与两条路 |

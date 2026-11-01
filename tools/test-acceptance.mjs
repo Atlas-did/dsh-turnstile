@@ -15,7 +15,9 @@ ok('回滚后要求 dump-config 里没有它', /after\.inDump === false/.test(sr
 ok('证据落盘为机器可读 JSON', /kind: 'mini-acceptance@1'/.test(src) && /writeFileSync\(outFile/.test(src));
 ok('证据里写明不等同桌面端', /不等同桌面端/.test(src));
 ok('没有 --mini 直接报错退出', /需要 --mini/.test(src));
-ok('任一段失败则退出码非 0', /process\.exitCode = ok \? 0 : 1/.test(src));
+ok('任一段失败则退出码非 0', /process\.exitCode = flushed\.ok \? 0 : 1/.test(src) || /exitCode = ok \? 0 : 1/.test(src));
+ok('有失效即回滚的事务边界', /rollbackOwnChanges/.test(src) && /uncaughtException/.test(src));
+ok('目标已存在时默认拒绝', /--overwrite/.test(src) && /目标已存在/.test(src));
 
 console.log(fail ? 'ACCEPTANCE_TEST_FAILED ' + fail : 'ACCEPTANCE_TEST_OK');
 process.exitCode = fail ? 1 : 0;
