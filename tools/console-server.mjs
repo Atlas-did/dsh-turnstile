@@ -4,6 +4,7 @@
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { copyFileSync, existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
+import { readPage, writePage, pageVersion } from '../plugins/turnstile-popup/lib/page-store.js';
 import { homedir } from 'node:os';
 import { validatePageTree } from '../plugins/turnstile-popup/lib/page-validate.js';
 import { dirname, join, resolve } from 'node:path';
@@ -27,6 +28,16 @@ const designerFile = join(pluginLib, 'console-designer.js');
 export function createConsoleServer({ profileDir, stateDir, fixture = false } = {}) {
   const dir = resolve(profileDir || join(root, 'tests', 'console-fixture'));
   // 页面版本：文件 mtime+size 的哈希，够用来发现「别处改过」，不需要额外存储
+  // 真实模式读 profile 里实际装了多少插件（不写死包名）
+  const readInstalledPlugins = (profileDir) => {
+    try {
+      const pj = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'));
+      const bundles = pj.dsh?.profile?.bundles || [];
+      const deps = Object.keys(pj.dependencies || {});
+      return { count: bundles.length, deps: deps.length };
+    } catch { return { count: 0, deps: 0 }; }
+  };
+
   const pageVersion = (file) => {
     try {
       const st = statSync(file);
@@ -152,11 +163,25 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
     if (pathname === '/turnstile/health') {
       const mod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health.js')).href);
       const items = [];
-      const credFile = join(root, 'tests', 'console-fixture', '.credentials.yaml');
-      items.push(mod.credentialsItem({ exists: existsSync(credFile), keys: [] }));
-      items.push(mod.bridgeItem({ exists: false }));
-      items.push(mod.pluginItem({ name: 'dsh-free-search', installed: true, disabled: false }));
-      items.push(mod.authItem({ total: null }));
+      if (fixture) {
+        // 只有 fixture 分支才允许写死演示数据
+        const credFile = join(root, 'tests', 'console-fixture', '.credentials.yaml');
+        items.push(mod.credentialsItem({ exists: existsSync(credFile), keys: [] }));
+        items.push(mod.bridgeItem({ exists: false }));
+        items.push(mod.pluginItem({ name: 'dsh-free-search', installed: true, disabled: false }));
+        items.push(mod.authItem({ total: null }));
+      } else {
+        // 真实模式：只用能读到的真实文件，读不到就 unknown（不再写死包名与 profile）
+        const credFile = join(dir, '.credentials.yaml');
+        const credExists = existsSync(credFile);
+        items.push(mod.credentialsItem({ exists: credExists, keys: [], unknown: !credExists }));
+        const bridgeFile = join(dir, '.dsh-link.json');
+        items.push(mod.bridgeItem({ exists: existsSync(bridgeFile), unknown: !existsSync(bridgeFile) }));
+        // 用真实的 bundles 统计（bundlesItem 只报统计与缺包，不编造具体插件名）
+        const inst = readInstalledPlugins(dir);
+        items.push(mod.bundlesItem({ total: inst.count, hostProvided: [], missing: [] }));
+        items.push(mod.authItem({ total: null }));
+      }
       res.setHeader('content-type', 'application/json; charset=utf-8');
       // 真实口径：pits 由 lib/pits.js 算；这里之前是写死的两条。fixture 分支才返回假数据。
       // 真实口径：pits 由 tools/pits.mjs 的 runPitChecks 算；只有 fixture 分支返回固定体。
@@ -169,7 +194,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
           pits = pitsMod.runPitChecks(dir);
         } catch (e) { pits = [{ id: 'pit:unavailable', level: 'warn', message: 'pits 检查跑不动：' + String(e.message).slice(0, 80), next: 'node tools/pits.mjs <profile>' }]; }
       }
-      res.end(JSON.stringify({ items, pits, summary: mod.summarize(items), profile: 'console-fixture', at: new Date().toISOString() }));
+      res.end(JSON.stringify({ items, pits, summary: mod.summarize(items), profile: fixture ? 'console-fixture' : dir, fixture, at: new Date().toISOString() }));
       return;
     }
     if (pathname === '/turnstile/hooks') {
@@ -304,8 +329,10 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
     }
     if (pathname === '/turnstile/page') {
       if (req.method === 'GET') {
-        if (!existsSync(pageFile)) return json(200, { status: 'not-generated', file: pageFile, version: 0 });
-        try { return json(200, Object.assign(JSON.parse(readFileSync(pageFile, 'utf8')), { version: pageVersion(pageFile) })); }
+        const got = readPage(pageFile);
+        if (!got.exists) return json(200, { status: 'not-generated', file: pageFile, version: 0 });
+        if (!got.page) return json(500, { error: '读不出页面文件：' + (got.error || '') });
+        try { return json(200, Object.assign(got.page, { version: got.version })); }
         catch (e) { return json(500, { error: '读不出页面文件：' + String(e.message).slice(0, 120) }); }
       }
       if (req.method !== 'POST') return json(405, { error: 'method' });
@@ -316,19 +343,13 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
           if (body.length > 2e6) return json(413, { error: '页面过大' });
         }
         const parsed = JSON.parse(body || '{}');
-        // 多标签页/外部修改保护：客户端回传它读到的版本，不一致就 409，不静默覆盖
-        const currentVersion = pageVersion(pageFile);
-        if (parsed.baseVersion != null && Number(parsed.baseVersion) !== currentVersion) {
-          return json(409, { error: '页面已被其他地方修改（当前版本 ' + currentVersion + '）', version: currentVersion, stale: true });
-        }
         // 严格校验页面树：坏页面不能进渲染器，也不能落盘
         const tree = validatePageTree(parsed.page);
         if (!tree.ok) return json(400, { error: '页面不合法：' + tree.errors[0], errors: tree.errors });
         if (parsed.page?.schema !== 'mini/page@1' || !parsed.page.root || typeof parsed.page.root !== 'object') return json(400, { error: '页面缺少 mini/page@1 schema 或有效 root' });
-        mkdirSync(dirname(pageFile), { recursive: true });
-        if (existsSync(pageFile)) copyFileSync(pageFile, pageFile + '.bak-' + Date.now());
-        writeFileSync(pageFile, JSON.stringify(parsed.page, null, 2) + '\n');
-        return json(200, { ok: true, file: pageFile, version: pageVersion(pageFile) });
+        const wrote = writePage(pageFile, parsed.page, { baseVersion: parsed.baseVersion });
+        if (!wrote.ok) return json(409, { error: '页面已被其他地方修改（当前版本 ' + wrote.version + '）', version: wrote.version, stale: true });
+        return json(200, { ok: true, file: pageFile, version: wrote.version });
       } catch (e) { return json(400, { error: String(e?.message || e).slice(0, 160) }); }
     }
     if (pathname === '/turnstile/export') {

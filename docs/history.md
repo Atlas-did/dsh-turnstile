@@ -55,6 +55,7 @@
 | [168-docs-layering.md](168-docs-layering.md) | 文档分层：索引 + 历史分离（2026-11-01，P5 第一步） |
 | [169-docs-smoke.md](169-docs-smoke.md) | 文档命令冒烟测试（2026-11-01） |
 | [170-audit-p0-fixes.md](170-audit-p0-fixes.md) | 代码质量审查的 P0 处置（2026-11-01） |
+| [171-audit-p1-fixes.md](171-audit-p1-fixes.md) | 审查 P1-1 / P1-2 处置（2026-11-01） |
 | [22-gate-report.md](22-gate-report.md) | 闸门报告（自动生成） |
 | [26-provider-map.md](26-provider-map.md) | 26 · 多接口（provider）地图与切换 |
 | [31-plugin-manager.md](31-plugin-manager.md) | 31 · mini 的插件管理界面：现状与两条路 |

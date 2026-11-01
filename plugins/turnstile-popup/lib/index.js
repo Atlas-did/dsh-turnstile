@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { makePlan, applyPlan, describePlan } from "./txn.js";
 import { validatePageTree } from "./page-validate.js";
+import { readPage, writePage } from "./page-store.js";
 import { collectConsoleData } from "./console-data.js";
 import { readViewState, writeViewState } from "./view-state.js";
 import { toggleText } from "./toggle-text.js";
@@ -830,9 +831,10 @@ export function apply(ctx, config) {
     handler: async (req, res) => {
       const file = join(stateBase(), "page-" + profile + ".json");
       if (req.method === "GET") {
-        if (!existsSync(file)) return sendJson(res, 200, { status: "not-generated", file });
-        try { return sendJson(res, 200, JSON.parse(readFileSync(file, "utf8"))); }
-        catch (e) { return sendJson(res, 500, { error: "读不出页面文件：" + String(e.message).slice(0, 120) }); }
+        const got = readPage(file);
+        if (!got.exists) return sendJson(res, 200, { status: "not-generated", file, version: 0 });
+        if (!got.page) return sendJson(res, 500, { error: "读不出页面文件：" + (got.error || "") });
+        return sendJson(res, 200, Object.assign(got.page, { version: got.version }));
       }
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
       // 写前先校验：没有 schema 标记或根节点不是对象，一律拒绝（B8 的纪律）。
@@ -847,10 +849,10 @@ export function apply(ctx, config) {
         return sendJson(res, 400, { error: "页面缺少 schema 或 root" });
       }
       try {
-        mkdirSync(dirname(file), { recursive: true });
-        if (existsSync(file)) copyFileSync(file, file + ".bak-" + Date.now());
-        writeFileSync(file, JSON.stringify(parsed.page, null, 2) + "\n");
-        return sendJson(res, 200, { ok: true, file });
+        // 与独立控制台共用同一份版本比较 + 备份 + 原子写（审查 P1-1）
+        const wrote = writePage(file, parsed.page, { baseVersion: parsed.baseVersion });
+        if (!wrote.ok) return sendJson(res, 409, { error: "页面已被其他地方修改（当前版本 " + wrote.version + "）", version: wrote.version, stale: true });
+        return sendJson(res, 200, { ok: true, file, version: wrote.version });
       } catch (e) { return sendJson(res, 500, { error: String(e.message).slice(0, 160) }); }
     },
   }), "turnstile: GET/POST /turnstile/page");
