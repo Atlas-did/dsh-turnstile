@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "updatedAt": "2026-11-01",
+  "note": "status 只写实测结论：installed=本机 profile 里真的有；unverified=没装也没读过源码，只按公开描述给接入建议。",
+  "plugins": [
+    {
+      "name": "dsh-genui",
+      "author": "@omdsh-dev",
+      "what": "生成式交互界面：在会话里渲染图表/表单/测验等交互组件（读 schemaJson 代码块）",
+      "status": "installed",
+      "verified": "profile 里存在 dsh-genui 0.3.1，inject 4 个 UI 面；lib/index.js 里确认真读 schemaJson",
+      "integratesWith": "tools/card.mjs → 把体检/占用结论变成可点的 genui 卡片",
+      "tryIt": "node tools/card.mjs --kind health --from state/report-desktop.json"
+    },
+    {
+      "name": "Aegis",
+      "author": "@GanyuanRan",
+      "what": "架构一致性守护：记录既有设计边界，检测后续提交是否偏离初衷",
+      "status": "unverified",
+      "verified": "本机未安装，未读源码；接入点按「它输出 findings」这一通用形态设计",
+      "integratesWith": "作为 preflight 的可选检查：装了就并入总闸门，没装就跳过并说明",
+      "tryIt": "node tools/preflight.mjs <profile> --only aegis"
+    },
+    {
+      "name": "superdesign-skill",
+      "author": "@superdesigndev",
+      "what": "前端 UI 质感增强，解决 AI 生成页面的同质化",
+      "status": "unverified",
+      "verified": "本机未安装，未读源码",
+      "integratesWith": "给本项目两个页面做设计审查：控制台 console.html 与搭建器 builder.html",
+      "tryIt": "把 projects/turnstile-popup/lib/console.html 交给它做一次质感评估"
+    },
+    {
+      "name": "distilly",
+      "author": "@titanwings",
+      "what": "把工作流/排错经验逆向提炼成可复用 AI Skill",
+      "status": "unverified",
+      "verified": "本机未安装，未读源码",
+      "integratesWith": "接在 lab-journal 之后：实验流水账 → 技能草稿",
+      "tryIt": "node tools/lab-journal.mjs --export > journal.md，再交给 distilly 提炼"
+    },
+    {
+      "name": "brooks-lint",
+      "author": "@hyhmrright",
+      "what": "基于经典软件工程思想的 AI 代码审查：坏味道、维护风险",
+      "status": "unverified",
+      "verified": "本机未安装，未读源码",
+      "integratesWith": "作为 preflight 的可选检查（--only brooks），对插件源码做一次坏味道扫描",
+      "tryIt": "node tools/preflight.mjs <profile> --only brooks"
+    }
+  ]
+}

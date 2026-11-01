@@ -56,7 +56,10 @@
     "test:ask": "node plugins/turnstile-popup/test/ask.test.mjs",
     "slot-report": "node tools/slot-map-report.mjs",
     "test:slot-report": "node tools/test-slot-map-report.mjs",
-    "test:slot-attr": "node plugins/turnstile-popup/test/slot-attr.test.mjs"
+    "test:slot-attr": "node plugins/turnstile-popup/test/slot-attr.test.mjs",
+    "recommend": "node tools/recommend.mjs",
+    "card": "node tools/card.mjs",
+    "test:recommend": "node tools/test-recommend-card.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",

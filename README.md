@@ -59,6 +59,8 @@ node tools/sandbox-promote.mjs --dry-run              # 推主环境前先干跑
 | risk / conflict / engines | 三查：装不活的风险 / 服务名冲突 / 版本闸门 |
 | preinstall.mjs <profile> <pkg> | 装前预检 |
 | selftest.mjs | 闸门自检：每个扫描器必须抓住自己的「必须报错」夹具 |
+| recommend.mjs <profile> | 推荐插件：谁值得装、装没装、**装完怎么接进本项目** |
+| card.mjs --kind health/slots | 把结论变成 genui 卡片（贴进对话直接渲染） |
 | diagnose.mjs --live | 从日志判「能不能连、能不能用、什么能证伪它」 |
 | profile-snapshot.mjs --take/--diff | 装前装后对比 |
 
