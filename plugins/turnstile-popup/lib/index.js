@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { makePlan, applyPlan, describePlan } from "./txn.js";
+import { validatePageTree } from "./page-validate.js";
 import { collectConsoleData } from "./console-data.js";
 import { readViewState, writeViewState } from "./view-state.js";
 import { toggleText } from "./toggle-text.js";
@@ -825,6 +826,9 @@ export function apply(ctx, config) {
       await new Promise((resolve) => { req.on("data", (c) => { body += c; if (body.length > 2e6) req.destroy(); }); req.on("end", resolve); });
       let parsed;
       try { parsed = JSON.parse(body); } catch { return sendJson(res, 400, { error: "body 不是 JSON" }); }
+      // 严格校验页面树（与 console-server 同一份实现）
+      const tree = validatePageTree(parsed.page);
+      if (!tree.ok) return sendJson(res, 400, { error: "页面不合法：" + tree.errors[0], errors: tree.errors });
       if (!parsed || !parsed.page || typeof parsed.page !== "object" || !parsed.page.schema || !parsed.page.root) {
         return sendJson(res, 400, { error: "页面缺少 schema 或 root" });
       }

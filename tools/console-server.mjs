@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { copyFileSync, existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { validatePageTree } from '../plugins/turnstile-popup/lib/page-validate.js';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -313,6 +314,9 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
         if (parsed.baseVersion != null && Number(parsed.baseVersion) !== currentVersion) {
           return json(409, { error: '页面已被其他地方修改（当前版本 ' + currentVersion + '）', version: currentVersion, stale: true });
         }
+        // 严格校验页面树：坏页面不能进渲染器，也不能落盘
+        const tree = validatePageTree(parsed.page);
+        if (!tree.ok) return json(400, { error: '页面不合法：' + tree.errors[0], errors: tree.errors });
         if (parsed.page?.schema !== 'mini/page@1' || !parsed.page.root || typeof parsed.page.root !== 'object') return json(400, { error: '页面缺少 mini/page@1 schema 或有效 root' });
         mkdirSync(dirname(pageFile), { recursive: true });
         if (existsSync(pageFile)) copyFileSync(pageFile, pageFile + '.bak-' + Date.now());
