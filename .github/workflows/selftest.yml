@@ -49,8 +49,22 @@ jobs:
           node plugins/turnstile-popup/test/ui-scan.test.mjs
           node tools/test-recommend-card.mjs
 
-      - name: semver drift (跳过无运行时的情况)
+      # 这里以前用 `|| true` 吞掉了真实失败（handoff P0-4）。现在显式声明运行时版本，真的跑。
+      - name: semver drift + slot-map + snapshots
         run: |
-          DSH_VERSION=0.2.1-rc.3 node plugins/turnstile-popup/test/semver-drift.test.mjs || true
+          DSH_VERSION=0.2.1-rc.3 node plugins/turnstile-popup/test/semver-drift.test.mjs
           node tools/test-slot-map-report.mjs
           node tools/test-profile-snapshot.mjs
+
+      # 契约层与证据层：这些人话/next/agentPrompt/六级判定是给智能体读的，不能只在本机跑。
+      - name: contract + evidence + run route
+        run: |
+          node tools/test-report-contract.mjs
+          node tools/test-evidence.mjs
+          node tools/test-verify-live.mjs
+          node tools/test-trial-wiring.mjs
+          node plugins/turnstile-popup/test/run-route.test.mjs
+
+      # 发布一致性：文档链接、命令注册表、npm 包内容
+      - name: release check
+        run: node tools/release-check.mjs --pack --json

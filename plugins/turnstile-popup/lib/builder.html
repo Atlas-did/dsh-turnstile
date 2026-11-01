@@ -488,6 +488,27 @@ function dropInto(parentId) {
   } catch (e) { status(e.message); }
 }
 
+// handoff P0-5：未保存修改保护。保存点用「当前页面的 JSON 摘要」比对，不用时间戳，
+// 这样撤销回到保存点也不会误报脏。
+let savedDigest = null;
+function digestOf(page) {
+  try { return JSON.stringify(page); } catch { return ''; }
+}
+function markSaved() { savedDigest = digestOf(stack.current); document.body.dataset.dirty = 'false'; }
+function isDirty() {
+  if (savedDigest === null) return false;
+  return digestOf(stack.current) !== savedDigest;
+}
+function markDirtyIfNeeded() {
+  document.body.dataset.dirty = isDirty() ? 'true' : 'false';
+}
+window.addEventListener('beforeunload', (e) => {
+  if (!isDirty()) return undefined;
+  e.preventDefault();
+  e.returnValue = '有未保存的修改，确定离开？';
+  return e.returnValue;
+});
+
 async function save() {
   status('保存中…');
   try {
@@ -497,6 +518,7 @@ async function save() {
     const result = await r.json();
     if (!r.ok) throw new Error(result.error || ('HTTP ' + r.status));
     stack = { ...stack, current: pageToSave };
+    markSaved();
     status('已保存 ' + new Date().toLocaleTimeString());
     return true;
   } catch (e) { status('保存失败：' + e.message); return false; }
@@ -566,6 +588,7 @@ function deleteSelected() {
 }
 
 function render() {
+  markDirtyIfNeeded();
   const active = document.activeElement;
   const focusArea = active && active.closest('#canvas') ? 'canvas' : (active && active.closest('#outline') ? 'outline' : null);
   const canvas = document.getElementById('canvas');
