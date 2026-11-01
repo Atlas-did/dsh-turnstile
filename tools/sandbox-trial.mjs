@@ -162,6 +162,7 @@ if (!has('--keep')) {
 } else console.log('5. 保留安装（--keep）；仍需要真实宿主重启验证');
 passed = passed && rollbackOk;
 
-journal(['--kind', 'trial', '--target', name, '--verdict', passed ? 'static-pass' : 'fail', '--note', claimText]);
+// 记 claim（L0–L5 的结论词），而不是笼统的 static-pass；trial-status 读它来给同一种说法
+journal(['--kind', 'trial', '--target', name, '--verdict', passed ? verdictWord : 'fail', '--note', claimText]);
 if (has('--json')) console.log(JSON.stringify({ ok: passed, claim: verdictWord, claimText, levels: levelReport ? levelReport.levels : null, checks: checks.map(([n, okk, d]) => ({ name: n, ok: okk, detail: d })) }, null, 2));
 console.log('结论（' + verdictWord + '）：' + claimText);process.exitCode = passed ? 0 : 1;

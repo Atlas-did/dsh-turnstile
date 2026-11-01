@@ -67,6 +67,19 @@ if (!routes.length && entryFile) {
 }
 routes = [...new Set(routes)].slice(0, 8);
 
+// ---- 真实宿主证据（可选）：它能直接证明「重启后加载 + 路由内容」，比 dump-config 更硬。
+// 给了就优先用它判定 L2/L3；无效则退回 dump/HTTP，并在 note 里说清为什么没用上。
+let hostEv = null;
+const hostEvFile = val('--host-evidence');
+if (hostEvFile) {
+  try {
+    const raw = JSON.parse(readFileSync(hostEvFile, 'utf8'));
+    const { validateHostEvidence } = await import('./lib/host-evidence.mjs');
+    const v = validateHostEvidence(raw, { target: pkgName, profile: profileDir });
+    hostEv = v.ok ? { ok: true, raw } : { ok: false, errors: v.errors };
+  } catch (e) { hostEv = { ok: false, errors: [String(e.message).slice(0, 80)] }; }
+}
+
 // ---- L2 加载层：宿主组合后的配置里有没有它
 let dump = '';
 const dumpCmd = val('--dump-config-cmd');
@@ -81,7 +94,12 @@ if (dshBin) {
   catch (e) { dump = String((e.stdout || '') + (e.stderr || '')); }
 }
 if (!pkgName) layers.push(level('L2', STATUS.skip, ['未指定 --pkg']));
-else if (!dump.trim()) layers.push(level('L2', STATUS.unknown, ['没给 --dump-config-cmd，无法证明宿主加载']));
+else if (hostEv && hostEv.ok) {
+  const h = hostEv.raw.host || {};
+  const r = hostEv.raw.restart || {};
+  layers.push(level('L2', STATUS.pass, ['host-evidence：bootId ' + String(r.beforeBootId).slice(0, 6) + '→' + String(r.afterBootId).slice(0, 6) + ' 已重启', 'bundles 确认：' + (hostEv.raw.bundles && hostEv.raw.bundles.confirmed ? '是' : '否'), 'runtime ' + (h.runtimeVersion || '')]));
+}
+else if (!dump.trim()) layers.push(level('L2', STATUS.unknown, [(hostEv ? 'host-evidence 无效（' + (hostEv.errors || []).join('；').slice(0, 60) + '），' : '') + '也没给 --dump-config-cmd，无法证明宿主加载']));
 else {
   const hit = dump.split(/\r?\n/).filter((l) => l.includes(pkgName)).slice(0, 3);
   const fatal = /fatal|uncaught|cannot find module/i.test(dump) ? '组合时出现致命错误' : '';
@@ -105,7 +123,7 @@ async function get(path) {
 const live = Boolean(base && token);
 let routeResults = [];
 if (!live) {
-  layers.push(level('L3', STATUS.unknown, ['没有 --base/--token：未连活宿主，路由未验证']));
+  layers.push(level('L3', STATUS.unknown, ['没有 --base/--token：未连活宿主，路由未验证', hostEv && hostEv.ok ? '（host-evidence 里有路由 ' + ((hostEv.raw.route && hostEv.raw.route.path) || '') + ' → ' + ((hostEv.raw.route && hostEv.raw.route.status) || '') + '，可作替代证据）' : '']));
 } else if (!routes.length) {
   layers.push(level('L3', STATUS.skip, ['没有可测路由（源码里没找到 path:）']));
 } else {
