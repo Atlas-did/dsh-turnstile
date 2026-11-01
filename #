@@ -1,0 +1,81 @@
+# 闸门报告（自动生成）
+
+> 由 `node tools/report.mjs <profileDir>` 生成，不要手改。
+> profile: `tests/console-fixture`
+> 生成时间: 2026-11-01T11:41:48.929Z
+
+## 1. 版本矩阵
+
+```
+runtime 0.2.1-rc.3   profile tests/console-fixture
+STATE         PLUGIN                            VER       NOTE
+
+summary: {}
+```
+
+## 2. 冲突面
+
+```
+WARNING: knowledge is for dsh 0.2.1-rc.3 but the runtime is unknown (set DSH_BIN or DSH_VERSION)
+         regenerate: node tools/knowledge-gen.mjs
+profile: tests/console-fixture  (known services: 20 via knowledge (STALE: built for 0.2.1-rc.3); ctx evidence: text)
+no conflict patterns found
+```
+
+## 3. 依赖风险
+
+```
+profile: tests/console-fixture
+NAME                            VER       LEVEL   WHY
+
+import evidence: text
+summary: {}
+```
+
+## 4. Prompt 变量
+
+```
+profile: tests/console-fixture   (persona sections may only use: provider, model)
+OK: every persona section uses registered variables
+```
+
+## 5. 决策登记（key 带版本号，升级即失效）
+
+(暂无)
+
+## 6. 最近闸门运行
+
+- 2026-11-01 05:21:03  **clear**  
+- 2026-11-01 05:12:40  **clear**  
+- 2026-11-01 05:12:40  **clear**  
+- 2026-11-01 03:10:26  **clear**  
+
+## 5.1 决策是否过期
+
+```
+summary: every decision matches an installed version
+```
+
+## 5.2 自上次闸门后的 bundle 变化
+
+```
+no gate run with a bundle snapshot yet
+```
+
+## 6.1 闸门统计
+
+```
+runs: 68
+  clear           68
+blocked by check:
+  (none)
+decisions: 0
+```
+
+## 7. 怎么用
+
+```bash
+node tools/preflight.mjs <profileDir>     # 装前闸门（五项阻塞）
+node scripts/install-plugin.mjs <profileDir> <包@版本>   # 一条命令装完并过闸
+node tools/report.mjs <profileDir>        # 重新生成本页
+```
