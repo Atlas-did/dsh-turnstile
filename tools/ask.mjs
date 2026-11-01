@@ -3,6 +3,9 @@
 // usage: node tools/ask.mjs <profileDir> "看看插件状态" --json
 import { COMMANDS, runCommand } from './lib/commands.mjs';
 import { shapeReport } from './lib/report.mjs';
+import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join as joinPath } from 'node:path';
 
 const ANCHORS = { 左上: 'top-left', 右上: 'top-right', 左下: 'bottom-left', 右下: 'bottom-right', 中间: 'center', 中央: 'center' };
 const packageIn = (text) => (/[@a-zA-Z0-9][\w@./-]{2,}/g.exec(text.replace(/左下|左上|右下|右上|中间|中央/g, ' ')) || [])[0] || '';
@@ -68,11 +71,19 @@ function usage() {
 }
 
 if (process.argv[1] && process.argv[1].endsWith('ask.mjs')) {
-  const argv = process.argv.slice(2);
-  const profile = argv[0];
-  const text = argv.slice(1).filter((a) => !a.startsWith('--')).join(' ');
-  const asJson = argv.includes('--json');
-  const apply = argv.includes('--apply');
+  const argv = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+  // 两种顺序都接受：`ask <profile> "话"` 与 `ask "话" <profile>`。
+  // 判断依据是「哪一个看起来像 profile」（带路径分隔符，或在 DSH_HOME 下存在）。
+  const looksProfile = (s) => Boolean(s) && (/[\\/]/.test(s) || existsSync(joinPath(process.env.DSH_HOME || joinPath(homedir(), '.dsh'), 'profiles', s)));
+  const first = argv[0] || '';
+  const second = argv[1] || '';
+  const profile = looksProfile(first) && !looksProfile(second) ? first : (looksProfile(second) ? second : first);
+  const profileIdx = profile === first ? 0 : 1;
+  const textParts = argv.filter((_, i) => i !== profileIdx);
+  const text = textParts.join(' ');
+  const allArgs = process.argv.slice(2);
+  const asJson = allArgs.includes('--json');
+  const apply = allArgs.includes('--apply');
   if (!profile || !text || profile.startsWith('--')) usage();
   const parsed = parseIntent(text);
   const plan = planFor(parsed, profile);

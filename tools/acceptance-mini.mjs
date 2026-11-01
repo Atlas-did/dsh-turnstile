@@ -20,6 +20,8 @@ const outDir = join(parent, name);
 const profileDir = join(mini, 'home', 'profiles', 'mini');
 const dshBin = join(mini, 'runtime', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js');
 
+import { judgeVerify, judgeAcceptance } from './lib/acceptance.mjs';
+
 const steps = [];
 const step = (id, ok, detail, extra) => { steps.push(Object.assign({ id, ok, detail: detail || '' }, extra || {})); return ok; };
 
@@ -73,8 +75,9 @@ if (afterObs.code === 0) {
   const rv = runNode('verify-live.mjs', vlArgs, 300000);
   const rj = jsonOf(rv.out);
   hostClaim = rj && rj.claim;
-  const l2 = rj && (rj.levels || []).find((l) => l.level === 'L2');
-  step('verify-with-host-evidence', Boolean(rj && l2 && l2.status === 'pass'), (hostClaim || 'unknown') + ' / L2=' + (l2 ? l2.status + '：' + String((l2.evidence || [])[0] || '').slice(0, 40) : 'n/a'));
+  // 必须六层全 pass 且 claim 达标；只看 L2 会让 L3/L4/L5 的失败被吞掉（审查 P0-2）
+  const verdict = judgeVerify(rj);
+  step('verify-with-host-evidence', verdict.ok, (hostClaim || 'unknown') + ' / ' + verdict.reason.slice(0, 60));
 }
 
 
@@ -110,7 +113,9 @@ if (live && live.ok) {
 }
 step('rollback-verified', after.route === 404 && after.inDump === false, '路由 ' + after.route + '，dump-config 里 ' + (after.inDump === false ? '已无' : String(after.inDump)), { after });
 // 5) 落成机器可读证据
-const ok = steps.every((s) => s.ok);
+const overall = judgeAcceptance(steps);
+const ok = overall.ok;
+if (!ok) console.log('验收未通过：' + overall.reason);
 const evidence = {
   kind: 'mini-acceptance@1',
   at: new Date().toISOString(),

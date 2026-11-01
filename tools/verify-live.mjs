@@ -139,7 +139,7 @@ if (!live) {
   }
   const bad = routeResults.filter((x) => !x.ok);
   layers.push(level('L3', bad.length ? STATUS.fail : STATUS.pass,
-    routeResults.map((x) => x.route + ' → ' + (x.status || 'ERR'))));
+    routeResults.map((x) => x.route + ' → ' + (x.status || ('ERR ' + (x.error || ''))))));
 }
 
 const expect = val('--expect');
@@ -179,20 +179,36 @@ if (beforeFile && existsSync(beforeFile)) {
     surfNote = lost.length ? { ok: false, text: '原有插件从 UI 面消失：' + lost.slice(0, 3).join(', ') } : { ok: true, text: 'UI 面回归：无插件消失' };
   } catch (e) { surfNote = { ok: null, text: 'UI 面基线读不了：' + String(e.message).slice(0, 40) }; }
 }
+// 回归是否**真的**做了：必须有基线对比，否则只能算「健康检查通过」
+let regressionComplete = Boolean(surfNote && surfNote.ok === true);
 if (!live) layers.push(level('L5', STATUS.unknown, ['未连活宿主，回归未测', surfNote && surfNote.text]));
 else {
   try {
     const h = await get('/turnstile/health');
-    const j = JSON.parse(h.text);
-    const items = j.items || [];
-    const bad = items.filter((i) => i.level === 'fail');
-    const surfBad = surfNote && surfNote.ok === false;
-    layers.push(level('L5', bad.length || surfBad ? STATUS.fail : STATUS.pass,
-      [items.map((i) => i.id + '=' + i.level).join(' '), surfNote && surfNote.text]));
-  } catch (e) { layers.push(level('L5', STATUS.unknown, ['health 读不到：' + String(e.message).slice(0, 50)])); }
+    if (!(h.status >= 200 && h.status < 300)) {
+      layers.push(level('L5', STATUS.unknown, ['health 返回 HTTP ' + h.status + '，不能据此判定回归']));
+      regressionComplete = false;
+    } else {
+      const j = JSON.parse(h.text);
+      const items = Array.isArray(j.items) ? j.items : null;
+      if (!items || !items.length) {
+        // 空健康数据绝不能当成「全员通过」
+        layers.push(level('L5', STATUS.unknown, ['health 没有健康项（items 为空或缺失），无法判定回归']));
+        regressionComplete = false;
+      } else {
+        const bad = items.filter((i) => i.level === 'fail');
+        const pitBad = Array.isArray(j.pits) && j.pits.some((p) => p && (p.level === 'fail' || p.ok === false));
+        const surfBad = surfNote && surfNote.ok === false;
+        if (surfNote && surfNote.ok === null) regressionComplete = false;
+        const failed = bad.length || pitBad || surfBad;
+        layers.push(level('L5', failed ? STATUS.fail : STATUS.pass,
+          [items.map((i) => i.id + '=' + i.level).join(' '), pitBad ? 'pits 有 fail' : '', surfNote ? surfNote.text : '没有 --surfaces-before：未做装前基线对比']));
+      }
+    }
+  } catch (e) { regressionComplete = false; layers.push(level('L5', STATUS.unknown, ['health 读不到：' + String(e.message).slice(0, 50)])); }
 }
 
-const claim = claimOf(layers);
+const claim = claimOf(layers, { regressionComplete });
 const report = renderReport({ pkg: pkgName || '(未指定)', profile: profileName, layers, claim, verdict: verdictOf(layers) });
 const shaped = Object.assign({
   ok: report.verdict !== 'fail', verdict: report.verdict, command: 'verify-live',

@@ -26,7 +26,9 @@ for (const f of files) {
   const text = readFileSync(join(root, f), 'utf8');
   for (const m of text.matchAll(/^\s*\$?\s*node tools\/([\w.-]+\.mjs)([^\n`]*)/gm)) {
     const script = m[1];
-    const rest = (m[2] || '').trim();
+    // 行尾 shell 注释必须去掉：以前 `report.mjs <profile> # 说明` 会把 `#` 当成输出文件，
+    // 于是测试通过、却在仓库根写出一个名为 `#` 的文件（审查 P1-4）。
+    const rest = (m[2] || '').replace(/\s+#.*$/, '').trim();
     if (SKIP_FLAGS.test(rest)) continue;
     cmds.add(script + (rest ? ' ' + rest : ''));
   }
@@ -45,7 +47,9 @@ for (const raw of [...cmds].slice(0, 24)) {
   const isTurnstile = script === 'turnstile.mjs';
   const sub = isTurnstile ? rest[0] : '';
   if (isTurnstile && !SAFE.includes(sub)) { skipped.push(raw); continue; }
-  if (!isTurnstile && !/(read|check|scan|list|index|sanitize|report|smoke|verify|look)/.test(script)) { skipped.push(raw); continue; }
+  // 不再按文件名猜只读：只放行显式白名单里的脚本（report.mjs 会写文件，必须排除）
+  const SCRIPT_SAFE = ['sanitize-docs.mjs', 'docs-index.mjs', 'skill-pack.mjs', 'release-check.mjs'];
+  if (!isTurnstile && !SCRIPT_SAFE.includes(script)) { skipped.push(raw); continue; }
   const args = [join(root, 'tools', script)];
   for (const a of rest) {
     if (a.startsWith('<') || a.includes('<profile>') || a.includes('<pkg>') || a.includes('<mini')) continue;

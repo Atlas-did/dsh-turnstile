@@ -35,7 +35,7 @@ export function reached(layers) {
 }
 
 /** 人能听懂的结论——这是本模块存在的理由。 */
-export function claimOf(layers) {
+export function claimOf(layers, opts = {}) {
   const deep = reached(layers);
   const map = {
     L0: { code: 'static-only', text: '静态检查通过，尚未验证真实运行——不能据此认为插件可用。' },
@@ -53,6 +53,10 @@ export function claimOf(layers) {
     return { code: 'failed', text: '不能认为可用：' + proved + name + '失败' + why + '。' };
   }
   if (!deep) return { code: 'unknown', text: '数据不足：没有任何一层给出证据。' };
+  // L5 通过但没做基线对比（只看了 health）→ 不能宣称「回归已验证」
+  if (deep === 'L5' && opts.regressionComplete === false) {
+    return { code: 'verified', text: '加载、路由、界面都有真实证据，健康检查也通过；但**没有做装前基线对比**，不能声称回归已验证。' };
+  }
   return map[deep];
 }
 
