@@ -57,6 +57,10 @@ if (has('--take')) {
   mkdirSync(snapDir, { recursive: true });
   const file = join(snapDir, snap.at.replace(/[:.]/g, '-') + '.json');
   writeFileSync(file, JSON.stringify(snap, null, 1));
+  if (has('--json')) {
+    console.log(JSON.stringify({ ok: true, file, at: snap.at, label: snap.label, bundles: snap.bundles, surfaces: snap.surfaces.length, patchBytes: snap.patchBytes }, null, 2));
+    process.exit(0);
+  }
   console.log('快照已存 ' + file);
   console.log('  ' + snap.bundles + ' 个插件 · ' + snap.surfaces.length + ' 个 UI 面 · patch ' + snap.patchBytes + ' 字节' + (snap.label ? ' · ' + snap.label : ''));
   process.exit(0);

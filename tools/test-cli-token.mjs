@@ -5,7 +5,11 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const entry = join(here, '..', 'tools', 'turnstile.mjs');
-const fixture = join(here, '..', 'tests', 'console-fixture');
+// 用夹具的临时副本：测试会真写 cordis.patch.yml，不能污染 git 里那份
+import { cpSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+const fixture = join(mkdtempSync(join(tmpdir(), 'token-fixture-')), 'console-fixture');
+cpSync(join(here, '..', 'tests', 'console-fixture'), fixture, { recursive: true });
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
 const run = (args) => {
@@ -13,6 +17,8 @@ const run = (args) => {
   catch (e) { return { code: e.status == null ? 1 : e.status, out: String((e.stdout || '') + (e.stderr || '')) }; }
 };
 
+// 先把目标恢复成启用态，保证 dry-run 走「会改动」的分支
+run(['manage-enable', fixture, 'plug-beta', '--apply', '--token', JSON.parse(run(['manage-enable', fixture, 'plug-beta', '--dry-run']).out).applyToken]);
 const noToken = run(['manage-disable', fixture, 'plug-beta', '--apply']);
 ok('写操作无 token → exit 2', noToken.code === 2, String(noToken.code));
 ok('拒绝原因指向 --dry-run', /--dry-run/.test(noToken.out), noToken.out.trim().slice(0, 30));
@@ -20,6 +26,8 @@ ok('拒绝原因指向 --dry-run', /--dry-run/.test(noToken.out), noToken.out.tr
 const dry = run(['manage-disable', fixture, 'plug-beta', '--dry-run']);
 const j = JSON.parse(dry.out);
 ok('dry-run 出计划', dry.code === 0 && Array.isArray(j.plan) && j.plan.length === 1, (j.plan || [''])[0].slice(0, 40));
+ok('dry-run 计划是底层的真实行改动', /disabled: true/.test(j.plan[0]), j.plan[0]);
+ok('dry-run 带 diff（文件+动作）', Boolean(j.diff && j.diff.file && j.diff.action === 'disable'), JSON.stringify(j.diff || {}).slice(0, 60));
 ok('dry-run 签发 applyToken', typeof j.applyToken === 'string' && j.applyToken.length > 20);
 
 const good = run(['manage-disable', fixture, 'plug-beta', '--apply', '--token', j.applyToken]);

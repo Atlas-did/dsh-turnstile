@@ -25,10 +25,11 @@ export const COMMANDS = {
   'check-conflict': { script: 'conflict.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'] },
   'check-engines': { script: 'engines.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'] },
   // 写操作：必须先 dryRun，拿到 applyToken 才能 apply
-  'snapshot-take': { script: 'profile-snapshot.mjs', mutating: true, json: false, timeout: 60000, positional: ['profile'], fixed: ['--take'] },
-  'manage-enable': { script: 'manage.mjs', mutating: true, json: false, timeout: 60000, positional: ['profile'], flagMap: { package: '--enable' } },
+  // drySafe:false = 底层没有「只读 dry-run」模式，计划阶段绝不能真跑（否则 dry-run 就写了）
+  'snapshot-take': { script: 'profile-snapshot.mjs', mutating: true, drySafe: false, json: true, timeout: 60000, positional: ['profile'], fixed: ['--take'] },
+  'manage-enable': { script: 'manage.mjs', mutating: true, json: true, timeout: 60000, positional: ['profile'], flagMap: { package: '--enable' }, applyFlag: '--yes' },
   // 高危：禁用插件会让界面少一块，apply 时必须逐字确认目标包名（设计 §4.4-3）
-  'manage-disable': { script: 'manage.mjs', mutating: true, danger: true, json: false, timeout: 60000, positional: ['profile'], flagMap: { package: '--disable' } },
+  'manage-disable': { script: 'manage.mjs', mutating: true, danger: true, json: true, timeout: 60000, positional: ['profile'], flagMap: { package: '--disable' }, applyFlag: '--yes' },
 };
 
 /** 极简参数校验：缺必填位置参数就报错（不做类型推断，避免假安全）。 */
@@ -61,7 +62,7 @@ export function argvFor(command, args) {
 }
 
 /** 执行一个命令，返回统一契约。 */
-export function runCommand(command, args, { toolsRoot } = {}) {
+export function runCommand(command, args, { toolsRoot, extraFlags } = {}) {
   const v = validate(command, args);
   if (!v.ok) return { ok: false, verdict: 'unknown', exitCode: v.code, summary: v.error, findings: [], evidence: [], next: [] };
   const spec = v.spec;
@@ -71,7 +72,8 @@ export function runCommand(command, args, { toolsRoot } = {}) {
     base = existsSync(join(toolsRoot, spec.script)) ? toolsRoot : join(toolsRoot, 'tools');
   }
   const started = Date.now();
-  const res = spawnSync(process.execPath, [join(base, spec.script), ...argvFor(command, args)], { encoding: 'utf8', timeout: spec.timeout });
+  const extra = Array.isArray(extraFlags) ? extraFlags : [];
+  const res = spawnSync(process.execPath, [join(base, spec.script), ...argvFor(command, args), ...extra], { encoding: 'utf8', timeout: spec.timeout });
   const durationMs = Date.now() - started;
   const stdout = String(res.stdout || '');
   const stderr = String(res.stderr || '');

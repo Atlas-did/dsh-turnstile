@@ -184,7 +184,8 @@ function toggleInPatch(text, rowId, off) {
 
 if (argv.includes('--menu')) { await menuMode(); }
 
-if (argv.includes('--json')) {
+// --json + 写意图（--disable/--enable）→ 走写路径的 JSON 输出；纯 --json 才是列表
+if (argv.includes('--json') && !doDisable && !doEnable) {
   console.log(JSON.stringify({ profile, rows: rows.map((r) => ({ name: r.name, version: r.version, row: r.ids[0] || '', disabled: r.disabled, engineSkipped: r.engineSkipped, missing: r.missing })) }, null, 2));
   process.exit(0);
 }
@@ -212,7 +213,11 @@ const id = row.ids[0];
 
 let next = patchText;
 if (doDisable) {
-  if (row.disabled) { console.log(target + ' 已经停用 (' + row.disabledIds.join(',') + ')'); process.exit(0); }
+  if (row.disabled) {
+    if (argv.includes('--json')) { console.log(JSON.stringify({ ok: true, noop: true, action: 'disable', target, row: id, file: patchPath, plan: [target + ' 已经是停用状态，无需改动'], note: '已经是停用状态' }, null, 2)); process.exit(0); }
+    console.log(target + ' 已经停用 (' + row.disabledIds.join(',') + ')');
+    process.exit(0);
+  }
   // A profile patch that is an empty flow array (`[]`) cannot also hold block items;
   // replacing the sentinel keeps the file valid YAML.
   const emptyRe = /^\[\]\s*$/m;
@@ -237,7 +242,13 @@ if (doDisable) {
   if (!/^- /m.test(next)) next = next.replace(/\s*$/, '\n') + '[]\n';
 }
 
+const asJson = argv.includes('--json');
 if (!confirmed) {
+  if (asJson) {
+    console.log(JSON.stringify({ ok: true, dryRun: true, action: doDisable ? 'disable' : 'enable', target, row: id, file: patchPath,
+      plan: [doDisable ? '追加 - id: ' + id + ' / disabled: true' : '删除 - id: ' + id + ' / disabled: true'] }, null, 2));
+    process.exit(0);
+  }
   console.log('DRY RUN — 会写 ' + patchPath);
   console.log('  ' + (doDisable ? '追加 - id: ' + id + ' / disabled: true' : '删除 - id: ' + id + ' / disabled: true'));
   console.log('  加 --yes 才执行');
@@ -249,6 +260,10 @@ try {
 } catch (e) {
   console.error(String(e.message));
   process.exit(1);
+}
+if (asJson) {
+  console.log(JSON.stringify({ ok: true, action: doDisable ? 'disable' : 'enable', target, row: id, file: patchPath, backup: patchPath + '.bak' }, null, 2));
+  process.exit(0);
 }
 console.log((doDisable ? 'disabled ' : 'enabled ') + target + '  (row ' + id + ')');
 console.log('备份已写；生效需要重启 DSH。');

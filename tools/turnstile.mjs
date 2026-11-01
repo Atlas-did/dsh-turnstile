@@ -119,9 +119,17 @@ if (COMMANDS[argv[0]] && COMMANDS[argv[0]].mutating) {
   const applyIdx = argv.indexOf('--apply');
   if (dryRun) {
     const issued = issue(argv[0], args);
+    // 真正的结构化计划：直接跑底层脚本的 dry-run/--json（manege 支持；其它退化为一行命令）
+    let plan = ['将执行：' + spec.script + ' ' + argvFor(argv[0], args).join(' ')];
+    let diff = null;
+    try {
+      const diag = runCommandDry(argv[0], args);
+      if (diag && Array.isArray(diag.plan)) plan = diag.plan;
+      if (diag && diag.file) diff = { file: diag.file, action: diag.action || '', target: diag.target || '' };
+    } catch (e) { /* 底层不支持就保留一行说明 */ }
     console.log(JSON.stringify({
       ok: true, verdict: 'ok', dryRun: true, command: argv[0], args,
-      plan: ['将执行：' + spec.script + ' ' + argvFor(argv[0], args).join(' ')],
+      plan, diff,
       applyToken: issued.token, expiresAt: issued.expiresAt,
       next: [{ label: '确认后带 token 重放', command: 'node tools/turnstile.mjs ' + argv[0] + ' ' + positional.join(' ') + ' --apply --token <token>', mutating: true, reason: '写操作两段式' }],
     }, null, 2));
@@ -136,11 +144,28 @@ if (COMMANDS[argv[0]] && COMMANDS[argv[0]].mutating) {
     }
     const v = verify(token, argv[0], args);
     if (!v.ok) { console.error('拒绝：' + v.reason); process.exit(2); }
-    const r = runCommand(argv[0], args);
+    const r = runCommand(argv[0], args, { extraFlags: spec.applyFlag ? [spec.applyFlag] : [] });
     const out = shapeReport({ command: argv[0], exitCode: r.exitCode, parsed: r.data, stderr: (r.evidence || [])[0] || '', mutating: true, dryRun: false, durationMs: r.durationMs });
     console.log(JSON.stringify(out, null, 2));
     process.exit(r.exitCode);
   }
+}
+
+// 底层脚本的 dry-run（写操作计划）：manage 有 --json+--yes 两段，其它脚本没有就返回 null
+function runCommandDry(name, args) {
+  const spec = COMMANDS[name];
+  if (!spec) return null;
+  if (spec.drySafe === false) return null; // 底层 dry-run 不安全就别跑，宁可只给一行说明
+  const parts = [join(here, spec.script)];
+  for (const k of spec.positional || []) parts.push(String(args[k]));
+  for (const f of spec.fixed || []) parts.push(f);
+  for (const [k, flag] of Object.entries(spec.flagMap || {})) parts.push(flag, String(args[k]));
+  if (spec.json) parts.push('--json');
+  try {
+    const out = spawnSync(process.execPath, parts, { encoding: 'utf8', timeout: 30000 }).stdout || '';
+    const start = out.indexOf('{');
+    return start >= 0 ? JSON.parse(out.slice(start)) : null;
+  } catch (e) { return null; }
 }
 
 // 步骤 0（放在分派之前）：注册表里的命令 + --json → 走统一契约给 agent 读。
