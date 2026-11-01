@@ -1,12 +1,25 @@
 // semver 判断的漂移测试：registry 的手写规则 vs version.mjs 的宿主判定器。
 // 不合并两者（registry 有 EXEMPTED/UNCERTIFIED 等额外语义），而是**证明它们不矛盾**。
 import { spawnSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { checkCompatibility } from '../../../tools/version.mjs';
+import { readFileSync, existsSync, mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const profile = process.env.SEMVER_PROFILE || 'C:/Users/finef/.dsh/profiles/desktop';
-const here = new URL('.', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+process.env.DSH_VERSION = process.env.DSH_VERSION || '0.2.1-rc.3';
+const { checkCompatibility } = await import('../../../tools/version.mjs');
+
+// 默认使用自包含夹具：测试不能依赖或扫描开发者真实桌面 profile。
+const fixture = mkdtempSync(join(tmpdir(), 'semver-profile-'));
+const writeJson = (path, value) => writeFileSync(path, JSON.stringify(value, null, 2));
+writeJson(join(fixture, 'package.json'), { private: true, dependencies: { 'fixture-compatible': '1.0.0', 'fixture-incompatible': '1.0.0' } });
+for (const [name, range] of [['fixture-compatible', '>=0.2.0'], ['fixture-incompatible', '<0.1.0']]) {
+  const dir = join(fixture, 'node_modules', name);
+  mkdirSync(dir, { recursive: true });
+  writeJson(join(dir, 'package.json'), { name, version: '1.0.0', engines: { dsh: range } });
+}
+const profile = process.env.SEMVER_PROFILE || fixture;
+const here = dirname(fileURLToPath(import.meta.url));
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
 

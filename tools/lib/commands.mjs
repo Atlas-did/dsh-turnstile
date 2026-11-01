@@ -12,14 +12,16 @@ const toolsDir = dirname(fileURLToPath(import.meta.url)).replace(/[\\/]lib$/, ''
 export const COMMANDS = {
   // doctor 接受 profile 路径（B9 起支持位置参数传目录），所以传 profile
   'doctor': { script: 'doctor.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'] },
-  'gate': { script: 'preflight.mjs', mutating: false, json: true, timeout: 180000, positional: ['profile'] },
+  'gate': { script: 'preflight.mjs', mutating: false, json: true, timeout: 180000, positional: ['profile'], valueFlags: ['--checks', '--only', '--skip'], booleanFlags: ['--no-record', '--no-report'] },
   'surfaces': { script: 'ui-surfaces.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'] },
-  'slot-report': { script: 'slot-map-report.mjs', mutating: false, json: true, timeout: 60000, flags: ['--map'] },
+  'slot-report': { script: 'slot-map-report.mjs', mutating: false, json: true, timeout: 60000, flags: ['--map', '--plugin', '--against'] },
   'snapshot-list': { script: 'profile-snapshot.mjs', mutating: false, json: false, timeout: 60000, positional: ['profile'], fixed: ['--list'] },
   'snapshot-diff': { script: 'profile-snapshot.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'], fixed: ['--diff'] },
-  'inspect': { script: 'inspect-plugin.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile', 'pkg'] },
+  'inspect': { script: 'inspect-plugin.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile', 'pkg'], valueFlags: ['--lines'] },
   'diagnose': { script: 'diagnose.mjs', mutating: false, json: true, timeout: 90000, fixed: ['--live'] },
   'preinstall': { script: 'preinstall.mjs', mutating: false, json: true, timeout: 90000, positional: ['profile', 'pkg'] },
+  'trial-status': { script: 'trial-status.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'] },
+  'host-evidence': { script: 'host-evidence.mjs', mutating: false, json: true, timeout: 60000, positional: ['input'] },
   // 三查也进注册表（以前完全不在表里，面板/智能体只能自己拼命令）
   'check-risk': { script: 'risk.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'] },
   'check-conflict': { script: 'conflict.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'] },
@@ -27,6 +29,8 @@ export const COMMANDS = {
   // 写操作：必须先 dryRun，拿到 applyToken 才能 apply
   // drySafe:false = 底层没有「只读 dry-run」模式，计划阶段绝不能真跑（否则 dry-run 就写了）
   'snapshot-take': { script: 'profile-snapshot.mjs', mutating: true, drySafe: false, json: true, timeout: 60000, positional: ['profile'], fixed: ['--take'] },
+  'anchor': { script: 'anchor.mjs', mutating: true, json: false, timeout: 60000, positional: ['profile'], flagMap: { package: '--package', anchor: '--anchor' }, applyFlag: '--apply' },
+  'fix': { script: 'fix.mjs', mutating: true, json: true, timeout: 180000, positional: ['profile'], applyFlag: '--apply' },
   'manage-enable': { script: 'manage.mjs', mutating: true, json: true, timeout: 60000, positional: ['profile'], flagMap: { package: '--enable' }, applyFlag: '--yes' },
   // 高危：禁用插件会让界面少一块，apply 时必须逐字确认目标包名（设计 §4.4-3）
   'manage-disable': { script: 'manage.mjs', mutating: true, danger: true, json: true, timeout: 60000, positional: ['profile'], flagMap: { package: '--disable' }, applyFlag: '--yes' },
@@ -47,6 +51,44 @@ export function validate(command, args) {
     }
   }
   return { ok: true, spec };
+}
+
+/** 单一 CLI 参数解析器：flag 的值不能再被误当成位置参数。 */
+export function parseCommandArgs(command, argv = []) {
+  const spec = COMMANDS[command];
+  if (!spec) return { args: {}, positional: [], extraFlags: [] };
+  const flagMap = spec.flagMap || {};
+  const valued = new Set([...Object.values(flagMap), ...(spec.flags || []), ...(spec.valueFlags || []), '--token', '--confirm']);
+  const positional = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = String(argv[i]);
+    if (arg.startsWith('--')) {
+      if (valued.has(arg) && i + 1 < argv.length) i++;
+      continue;
+    }
+    positional.push(arg);
+  }
+  const args = {};
+  (spec.positional || []).forEach((key, index) => { if (positional[index] != null) args[key] = positional[index]; });
+  Object.entries(flagMap).forEach(([key, flag], index) => {
+    const at = (spec.positional || []).length + index;
+    if (positional[at] != null) args[key] = positional[at];
+    const flagIndex = argv.indexOf(flag);
+    if (flagIndex >= 0 && argv[flagIndex + 1] != null) args[key] = String(argv[flagIndex + 1]);
+  });
+  for (const flag of spec.flags || []) {
+    const index = argv.indexOf(flag);
+    if (index >= 0 && argv[index + 1] != null) args[flag.replace(/^--/, '')] = String(argv[index + 1]);
+  }
+  const extraFlags = [];
+  for (const flag of spec.valueFlags || []) {
+    const index = argv.indexOf(flag);
+    if (index < 0) continue;
+    extraFlags.push(flag);
+    if (argv[index + 1] != null) extraFlags.push(String(argv[index + 1]));
+  }
+  for (const flag of spec.booleanFlags || []) if (argv.includes(flag)) extraFlags.push(flag);
+  return { args, positional, extraFlags };
 }
 
 /** 把 {profile, pkg, ...} 变成 argv。 */
@@ -87,7 +129,7 @@ export function runCommand(command, args, { toolsRoot, extraFlags } = {}) {
     command,
     exitCode,
     durationMs,
-    summary: parsed ? (parsed.result || parsed.verdict || parsed.summary || '') : (stdout.trim().split('\n').slice(0, 3).join(' / ') || stderr.trim().slice(0, 160)),
+    summary: parsed ? (parsed.result || parsed.summary || parsed.verdict || '') : (stdout.trim().split('\n').slice(0, 3).join(' / ') || stderr.trim().slice(0, 160)),
     data: parsed,
     findings: parsed && Array.isArray(parsed.findings) ? parsed.findings : [],
     evidence: stderr ? [stderr.trim().split('\n')[0].slice(0, 200)] : [],

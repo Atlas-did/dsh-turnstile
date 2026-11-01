@@ -42,23 +42,41 @@ export function anchorPatch(text, rowId, anchor) {
 }
 
 export function applyDesignerOperations(text, operations, plugins) {
-  if (!Array.isArray(operations) || operations.length > 100) throw new Error('invalid-operations');
+  const details = [];
+  const issue = (index, operation, field, code, message) => details.push({ index, package: typeof operation?.package === 'string' ? operation.package : '', field, code, message });
+  if (!Array.isArray(operations)) {
+    const error = new Error('invalid-operations');
+    error.details = [{ index: -1, package: '', field: 'operations', code: 'invalid-operations', message: '命令队列必须是数组。' }];
+    throw error;
+  }
+  if (operations.length > 100) issue(-1, {}, 'operations', 'too-many', '一次最多生成 100 条命令。');
   const byName = new Map(plugins.map((plugin) => [plugin.name, plugin]));
+  operations.slice(0, 101).forEach((operation, index) => {
+    if (!operation || typeof operation !== 'object' || Array.isArray(operation)) { issue(index, operation, 'operation', 'invalid-operation', '命令必须是对象。'); return; }
+    const plugin = byName.get(operation.package);
+    if (!plugin) issue(index, operation, 'package', 'package-missing', '插件不存在或已从快照消失。');
+    else if (plugin.missing || !plugin.row) issue(index, operation, 'package', 'no-row', '插件没有可写入的配置行。');
+    if (operation.type === 'toggle' && typeof operation.disable !== 'boolean') issue(index, operation, 'disabled', 'invalid-boolean', 'disabled 必须是布尔值。');
+    else if (operation.type === 'anchor') {
+      const anchor = operation.anchor == null ? '' : operation.anchor;
+      if (anchor !== '' && !validAnchor(anchor)) issue(index, operation, 'anchor', 'invalid-anchor', 'anchor 格式无效。');
+    } else if (operation.type !== 'toggle') issue(index, operation, 'type', 'unknown-operation', '未知命令类型。');
+  });
+  if (details.length) {
+    const error = new Error(details[0].code + ': ' + details[0].message);
+    error.details = details;
+    throw error;
+  }
   let next = text;
-  const normalized = operations.map((operation, index) => {
-    const plugin = byName.get(operation?.package);
-    if (!plugin || plugin.missing || !plugin.row) throw new Error('no-row: ' + String(operation?.package || index));
+  const normalized = operations.map((operation) => {
+    const plugin = byName.get(operation.package);
     if (operation.type === 'toggle') {
-      const disable = Boolean(operation.disable);
-      next = togglePatch(next, plugin.row, disable);
-      return { type: 'toggle', package: plugin.name, row: plugin.row, disable };
+      next = togglePatch(next, plugin.row, operation.disable);
+      return { type: 'toggle', package: plugin.name, row: plugin.row, disable: operation.disable };
     }
-    if (operation.type === 'anchor') {
-      const anchor = operation.anchor === null || operation.anchor === undefined ? '' : String(operation.anchor);
-      next = anchorPatch(next, plugin.row, anchor);
-      return { type: 'anchor', package: plugin.name, row: plugin.row, anchor };
-    }
-    throw new Error('unknown-operation: ' + String(operation.type));
+    const anchor = operation.anchor == null ? '' : operation.anchor;
+    next = anchorPatch(next, plugin.row, anchor);
+    return { type: 'anchor', package: plugin.name, row: plugin.row, anchor };
   });
   return { before: text, after: next, changed: next !== text, operations: normalized };
 }

@@ -126,6 +126,18 @@ try {
   const injected = await page.request.post(base + '/turnstile/designer', { data: { dryRun: true, operations: [{ type: 'toggle', package: 'plug-alpha', row: 'attacker-row', disable: true }] } });
   const injectedBody = await injected.json();
   ok('server ignores browser-supplied row ids', injectedBody.operations?.[0]?.row === 'alpha-row');
+  const invalidBoolean = await page.request.post(base + '/turnstile/designer', { data: { dryRun: true, operations: [{ type: 'toggle', package: 'plug-alpha', disable: 'false' }] } });
+  const invalidBooleanBody = await invalidBoolean.json();
+  ok('server rejects string booleans with structured field details', invalidBoolean.status() === 400 && invalidBooleanBody.details?.[0]?.code === 'invalid-boolean' && Boolean(invalidBooleanBody.auditId));
+  const malformed = await fetch(base + '/turnstile/designer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{not-json' });
+  const malformedBody = await malformed.json();
+  ok('malformed JSON cannot return a phantom audit id', malformed.status === 400 && !Object.hasOwn(malformedBody, 'auditId'), malformed.status + ' ' + JSON.stringify(malformedBody));
+  const audit = await page.request.get(base + '/turnstile/audit');
+  const auditBody = await audit.json();
+  const auditEntries = auditBody.entries || [];
+  ok('audit API exposes successful previews and failed requests newest first', audit.status() === 200 && auditEntries.some((entry) => entry.id === injectedBody.auditId && entry.status === 'previewed') && auditEntries.some((entry) => entry.id === invalidBooleanBody.auditId && entry.status === 'failed'));
+  const journalText = readFileSync(join(profileDir, '.turnstile', 'turnstile-journal.json'), 'utf8');
+  ok('journal stores summaries without expected snapshots or raw patches', !journalText.includes('token=') && !journalText.includes('"expected"') && !journalText.includes('cordis.patch.yml.bak-') && !journalText.includes(injectedBody.before || '__missing_before__'));
   // Batch slice: a multi-selection in the table becomes several queue entries behind one preview.
   await click('[data-testid="nav-plugins"]');
   await page.waitForTimeout(300);

@@ -1,5 +1,5 @@
 // A 类：实验场闭环的四件工具（快照 / 记录 / trial / promote）。
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -44,13 +44,30 @@ const p2 = profile(join(s2, 'profiles', 'mini'));
 const plug = join(s2, 'plugins', 'hello');
 mkdirSync(plug, { recursive: true });
 writeFileSync(join(plug, 'package.json'), JSON.stringify({ name: 'hello-trial', version: '0.0.1' }));
+writeFileSync(join(plug, 'index.js'), 'export const ok = true;\n');
 const st2 = { DSH_TURNSTILE_STATE: join(s2, 'state') };
+const badState = join(s2, 'state-is-a-file');
+writeFileSync(badState, 'not a directory');
+const noSnapshot = run('sandbox-trial.mjs', [p2, plug, '--state', badState], st2);
+ok('快照失败时停止且不安装', noSnapshot.code !== 0 && /未安装/.test(noSnapshot.out) && !existsSync(join(p2, 'node_modules', 'hello-trial')), noSnapshot.out.split('\n').slice(-2).join(' '));
 const trial = run('sandbox-trial.mjs', [p2, plug], st2);
-ok('trial 通过并给出结论', /结论：通过/.test(trial.out), trial.out.split('\n').slice(-2).join(' '));
+ok('trial 只声明静态通过，不冒称插件已加载', /结论：静态通过/.test(trial.out) && /插件加载未验证/.test(trial.out) && !/结论：通过/.test(trial.out), trial.out.split('\n').slice(-2).join(' '));
 ok('trial 默认回滚：依赖被还原', !JSON.parse(readFileSync(join(p2, 'package.json'), 'utf8')).dependencies['hello-trial']);
 ok('trial 默认回滚：node_modules 清掉', !existsSync(join(p2, 'node_modules', 'hello-trial')));
+// 服务必须在另一个进程：execFileSync 会阻塞测试进程，自己的服务器无法回应。
+const healthProcess = spawn(process.execPath, ['-e', 'require("node:http").createServer((q,s)=>{s.writeHead(200);s.end("{}")}).listen(0,"127.0.0.1",function(){console.log(this.address().port)})'], { stdio: ['ignore', 'pipe', 'pipe'] });
+const healthPort = await new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error('health fixture timeout')), 5000);
+  healthProcess.stdout.once('data', (data) => { clearTimeout(timer); resolve(String(data).trim()); });
+});
+const healthTrial = run('sandbox-trial.mjs', [p2, plug, '--port', healthPort], st2);
+healthProcess.kill();
+ok('宿主健康与插件加载分开报告', /http-health/.test(healthTrial.out) && /SKIP plugin-load/.test(healthTrial.out) && /静态通过/.test(healthTrial.out), healthTrial.out.split('\n').slice(-3).join(' '));
+const lastJournal = run('lab-journal.mjs', ['--list', '--last', '1'], st2).out;
+ok('实验记录使用 static-pass 并标记加载未验证', /static-pass/.test(lastJournal) && /plugin-load=unverified/.test(lastJournal), lastJournal.trim());
 const kept = run('sandbox-trial.mjs', [p2, plug, '--keep'], st2);
 ok('--keep 时保留安装', JSON.parse(readFileSync(join(p2, 'package.json'), 'utf8')).dependencies['hello-trial'] !== undefined, kept.out.split('\n').slice(-1)[0]);
+ok('安全复制保留插件文件', existsSync(join(p2, 'node_modules', 'hello-trial', 'index.js')));
 
 // --- promote ---
 const s3 = mkdtempSync(join(tmpdir(), 'lab3-'));

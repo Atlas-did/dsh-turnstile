@@ -9,6 +9,7 @@ ok('EXIT 常量与设计一致', EXIT.ok === 0 && EXIT.warn === 2 && EXIT.unknow
 
 const failRep = shapeReport({ command: 'gate', exitCode: 1, parsed: { findings: [{ checker: 'prompt-vars', severity: 'error', message: 'bad ${X}', evidence: { file: 'a.yml' } }] }, mutating: false, durationMs: 9 });
 ok('fail 带 findings', failRep.verdict === 'fail' && failRep.findings.length === 1);
+ok('统一契约保留底层完整数据', failRep.data?.findings?.[0]?.message === 'bad ${X}');
 ok('finding 有 falsifier（可证伪）', typeof failRep.findings[0].falsifier === 'string' && failRep.findings[0].falsifier.length > 4);
 ok('finding 证据被规范成数组', Array.isArray(failRep.findings[0].evidence) && failRep.findings[0].evidence.length === 1);
 ok('next 给出可执行命令', failRep.next.length >= 1 && failRep.next[0].command.includes('turnstile'));
@@ -26,6 +27,11 @@ ok('写操作 next 提示确认执行', dry.next.some((n) => n.mutating));
 const readOnly = shapeReport({ command: 'surfaces', exitCode: 0, parsed: {}, mutating: false, durationMs: 1 });
 ok('只读命令没有 rollback', readOnly.rollback === undefined);
 ok('只读 ok 也给下一步', readOnly.next.length >= 1);
+
+const warning = shapeReport({ command: 'trial-status', exitCode: 2, parsed: { verdict: 'warn', summary: '静态通过；插件加载未验证', evidence: [{ source: 'lab-journal.jsonl' }], next: [{ label: '补真实宿主加载证据', command: 'trial --keep', mutating: true, reason: '重启真实宿主并检查路由' }] }, mutating: false, durationMs: 1 });
+ok('summary 保留人话结论而不是状态枚举', warning.summary === '静态通过；插件加载未验证' && warning.verdict === 'warn');
+ok('统一契约保留底层结构化证据', warning.evidence.length === 1 && warning.evidence[0].includes('lab-journal.jsonl'));
+ok('统一契约保留底层下一步与写入标记', warning.next[0].label === '补真实宿主加载证据' && warning.next[0].mutating === true && warning.next[0].reason.includes('真实宿主'));
 
 console.log(fail ? 'REPORT_CONTRACT_FAILED ' + fail : 'REPORT_CONTRACT_OK');
 process.exitCode = fail ? 1 : 0;

@@ -1,16 +1,20 @@
 // 单一入口：转发正确、未知子命令明确报错、旧行为兼容。
 import assert from 'node:assert';
 import { execFileSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const entry = join(here, '..', 'tools', 'turnstile.mjs');
 const fixture = join(here, '..', 'tests', 'console-fixture');
+const state = mkdtempSync(join(tmpdir(), 'turnstile-entry-state-'));
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
 const run = (args) => {
-  try { return { code: 0, out: execFileSync(process.execPath, [entry, ...args], { encoding: 'utf8', timeout: 120000 }) }; }
+  const options = { encoding: 'utf8', timeout: 120000, env: { ...process.env, DSH_TURNSTILE_STATE: state } };
+  try { return { code: 0, out: execFileSync(process.execPath, [entry, ...args], options) }; }
   catch (e) { return { code: e.status == null ? 1 : e.status, out: String((e.stdout || '') + (e.stderr || '')) }; }
 };
 
@@ -24,6 +28,13 @@ ok('未知子命令给出下一步', /turnstile\.mjs help/.test(unknown.out));
 
 const insp = run(['inspect', fixture, 'plug-alpha', '--lines', '2']);
 ok('inspect 转发生效', /plug-alpha @1\.4\.0/.test(insp.out), insp.out.split('\n')[0]);
+const inspJson = run(['inspect', '--lines', '1', fixture, 'plug-alpha', '--json']);
+ok('JSON inspect 的选项值不会冒充位置参数', inspJson.code === 0 && JSON.parse(inspJson.out).data?.pkg === 'plug-alpha', String(inspJson.code));
+
+const map = join(state, 'slot-map.json');
+writeFileSync(map, JSON.stringify({ slots: [{ slot: 'shell.overlay', count: 1, entries: ['plug-alpha:item'] }] }));
+const slotReport = run(['slot-report', '--map', map, '--json']);
+ok('slot-report 转发 map 并保留完整 JSON', slotReport.code === 0 && JSON.parse(slotReport.out).data?.plugins?.[0]?.total === 1, String(slotReport.code));
 
 const preset = run(['snapshot', 'list', fixture]);
 ok('组合命令 snapshot list 生效', /快照|还没有快照|\d{4}-\d{2}-\d{2}T/.test(preset.out), preset.out.trim().split('\n')[0]);

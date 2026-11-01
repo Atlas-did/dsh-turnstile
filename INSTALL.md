@@ -1,101 +1,102 @@
 # Installation
 
-`dsh-turnstile` runs **outside** the harness: it reads a profile directory and reports on it.
-Nothing is installed into DeepSeek Harness itself, and no command below changes a profile
-unless it is explicitly asked to (`--apply`, `--yes`).
+`dsh-turnstile` can run outside the harness and inspect a profile directory. The panel is optional:
+ordinary users can work through the DSH agent instead of opening a terminal or a dashboard.
 
 ## Requirements
 
-- Node.js 22.19+ or 24+ (matches package.json engines; developed on 24/25);
-- a DeepSeek Harness installation, for the version-compatibility check to be authoritative;
-- optional: `playwright-core` plus Microsoft Edge (or Chrome) for the screenshots and the
-  browser end-to-end test. Everything else works without a browser.
+- Node.js 22.19+ or 24+ (see `package.json`).
+- A DSH installation for authoritative runtime compatibility checks.
+- Optional: `playwright-core` plus Edge or Chrome for browser screenshots and e2e tests.
 
-## 1. Get the code
+## 1. Get and verify the code
 
 ```bash
 git clone https://github.com/Atlas-did/dsh-turnstile.git
 cd dsh-turnstile
-npm ci          # or: npm install
+npm ci
+
+# Self-contained fixtures only; does not inspect or change your profile
+node tools/selftest.mjs --allow-skips
+node tools/release-check.mjs --json
 ```
 
-The tools also run straight after `git clone` without installing, because dependencies are
-resolved from a nearby DSH runtime when the local `node_modules` is missing.
+Use `node tools/selftest.mjs --strict` as a release gate when the real DSH environment is available.
+Any skipped environment case then fails instead of being hidden by a green summary.
 
-## 2. Point it at a profile
+## 2. Select a profile
 
-A profile is a directory containing `package.json` (with `dsh.profile.bundles`) and
-`cordis.patch.yml`. Common locations:
+A profile normally contains `package.json` and `cordis.patch.yml`:
 
-| Platform | Path |
+| Platform | Typical location |
 |---|---|
 | Windows | `%USERPROFILE%\.dsh\profiles\<name>` |
 | macOS / Linux | `~/.dsh/profiles/<name>` |
 
-```bash
-node tools/preflight.mjs ~/.dsh/profiles/desktop
-```
-
-If `DSH_HOME` is set, the tools can also auto-detect the profile:
+Start with read-only checks:
 
 ```bash
-DSH_HOME=~/.dsh node tools/manage.mjs --list
+node tools/turnstile.mjs doctor <profile> --json
+node tools/turnstile.mjs gate <profile> --json
+node tools/turnstile.mjs ask <profile> "Check my plugin status" --json
 ```
 
-## 3. Verify the gate itself
+`DSH_HOME` may point to the DSH home containing `profiles/`. `DSH_BIN` may point to the actual
+`@deepseek-ai/dsh/lib/bin.js` when runtime auto-detection is insufficient.
 
-```bash
-node tools/selftest.mjs               # 3 = coverage incomplete (no DSH installed here)
-node tools/selftest.mjs --allow-skips # CI mode: fixture checks only
-node tools/selftest.mjs --strict      # release gate: any skip fails
-```
+## 3. Use the conversation entry
 
-## Exit codes
+Install `skills/turnstile/SKILL.md` as a DSH skill. The user can then ask for status, preinstall risk,
+page creation, trial evidence, repositioning, enable/disable, and snapshots in natural language.
 
-| Code | Meaning |
-|---|---|
-| 0 | everything ran and passed |
-| 1 | at least one blocking finding |
-| 2 | usage error (bad path, bad flag, unknown config key) |
-| 3 | no failure, but coverage was incomplete (something could not run) |
-| 4 | `--strict` and coverage was incomplete |
+The agent reads `actions[]`. Read-only actions may run; `open-builder` opens `/turnstile/builder`;
+mutating actions must enter the unified dry-run/token flow.
 
-Individual checkers keep their own codes (`6` dependency risk, `7` prompt variables, `9` resource
-conflicts, `11` UI crowding). Integrations should read `--json` rather than map exit codes.
+## 4. Optional panel, console, and builder
 
-## 4. Optional: the management panel
-
-The panel is a normal DSH plugin (host half + client half). Install it into a profile you are
-willing to experiment in - never straight into a production profile:
+Install the panel only into an experimental profile:
 
 ```bash
 node tools/setup.mjs --home ~/.dsh --profile <name> --panel --yes
 ```
 
-This copies `plugins/turnstile-popup` into the profile's `node_modules`, appends the bundle entry
-and a `cordis.patch.yml` row, and keeps a `.bak` of every file it touches. Restart DSH to load it.
+This copies `plugins/turnstile-popup`, updates the bundle and patch declarations, and keeps backups.
+Restart DSH to load it. The console provides inspection and the page builder provides save, restore,
+preview, export, and isolated-module verification.
 
-## 5. Optional: the mini-lab skill
+## 5. Optional mini observation
+
+The host observer does **not** start or stop mini. Record `before`, perform a controlled restart through
+an authorized workflow, then record `after`:
 
 ```bash
-mkdir -p ~/.dsh/skills/mini-lab
-cp skills/mini-lab/SKILL.md ~/.dsh/skills/mini-lab/
+node tools/host-observe.mjs before <profile> <pkg> --mini <miniDir> --out observation.json
+node tools/host-observe.mjs after <profile> <pkg> --mini <miniDir> --input observation.json --out evidence.json
+node tools/host-evidence.mjs evidence.json --record --state <stateDir>
+node tools/turnstile.mjs trial-status <profile> --json
 ```
 
-Then type `/mini` in the composer to enter the lab workflow.
+A static pass, an isolated-module pass, or HTTP health alone is not real-host loading evidence.
 
-## Uninstalling
+## Writes and exit status
+
+Unified writes require a dry-run, a one-time apply token, and explicit user confirmation. High-risk disable
+also requires `--confirm <package>` matching the target exactly. Do not bypass this with legacy `--yes` calls.
+
+Integrations should read JSON rather than depend on historical checker-specific exit codes. The unified
+report uses `verdict`: `ok`, `warn`, `fail`, or `unknown`. Unknown means evidence is missing, not success.
+
+## Uninstalling the panel
 
 ```bash
 node tools/lab.mjs <profileDir> --uninstall turnstile-popup
 ```
 
-This removes the package directory, the `dependencies` entry, the bundle entry and the patch row.
-Every write the tools perform leaves a `<file>.bak-<timestamp>` next to the original, so any
-change can also be reverted by hand.
+Review the plan and target before confirming any removal. Backups and snapshots remain separate evidence;
+keep them until the environment has been checked after restart.
 
-## Privacy
+## Privacy and network behavior
 
-The tools read profile files and write their own reports under `state/` (gitignored). Nothing is
-sent anywhere: there is no telemetry, no network call, and no account. `--supply-chain` is the
-only opt-in network feature and it is off by default.
+There is no telemetry or account integration. Most checks are local. The host observer makes explicit
+loopback HTTP requests to the selected mini. Optional supply-chain checks and package installation may use
+the network only when requested. Observation and evidence files do not store the mini URL token.

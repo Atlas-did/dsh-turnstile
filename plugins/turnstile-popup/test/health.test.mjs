@@ -5,8 +5,8 @@ import { credentialsItem, bridgeItem, pluginItem, engineItem, authItem, summariz
 let passed = 0;
 const test = (n, f) => { try { f(); passed++; console.log('ok   ' + n); } catch (e) { console.error('FAIL ' + n + ': ' + e.message); process.exitCode = 1; } };
 
-test('missing credentials warn and name the key', () => {
-  const r = credentialsItem({ exists: true, keys: ['deepseek-api-key'] });
+test('missing declared credentials warn and name the key', () => {
+  const r = credentialsItem({ exists: true, keys: ['deepseek-api-key'], required: ['agnes-api-key'] });
   assert.strictEqual(r.level, 'warn');
   assert.match(r.message, /agnes-api-key/);
   assert.ok(r.next.length > 0);

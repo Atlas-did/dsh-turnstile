@@ -29,6 +29,16 @@ function normalizeFinding(f, i) {
   };
 }
 
+function normalizeNext(n) {
+  if (typeof n === 'string') return { label: n, command: n, mutating: false, reason: '来自命令的下一步建议' };
+  return {
+    label: String(n.label || n.command || '下一步'),
+    command: String(n.command || ''),
+    mutating: Boolean(n.mutating),
+    reason: String(n.reason || ''),
+  };
+}
+
 /**
  * 把一次命令执行结果整形为契约。
  *   command    命令名（用于生成 next 的命令行）
@@ -38,10 +48,10 @@ function normalizeFinding(f, i) {
 export function shapeReport({ command, exitCode, parsed, stderr, mutating, dryRun, applyToken, durationMs }) {
   const findings = Array.isArray(parsed && parsed.findings) ? parsed.findings.map(normalizeFinding) : [];
   const verdict = verdictFromExit(exitCode);
-  const summary = (parsed && (parsed.result || parsed.verdict || parsed.summary))
+  const summary = (parsed && (parsed.result || parsed.summary || parsed.verdict))
     || (exitCode === 0 ? '完成' : (stderr || '').trim().split('\n')[0].slice(0, 160) || '失败（无输出）');
 
-  const next = [];
+  const next = Array.isArray(parsed && parsed.next) ? parsed.next.map(normalizeNext) : [];
   for (const f of findings) {
     if (f.severity === 'error' || f.severity === 'high' || f.severity === 'fail') {
       next.push({ label: '修复：' + (f.title || f.id).slice(0, 40), command: 'node tools/turnstile.mjs ask <profile> "修一下"', mutating: true, reason: f.falsifier });
@@ -53,14 +63,17 @@ export function shapeReport({ command, exitCode, parsed, stderr, mutating, dryRu
     if (verdict === 'fail') next.push({ label: '看完整诊断', command: 'node tools/turnstile.mjs diagnose --live', mutating: false, reason: '失败原因在 stderr，先看诊断再动手' });
     if (verdict === 'ok') next.push({ label: '看整体状态', command: 'node tools/turnstile.mjs doctor <profile>', mutating: false, reason: '本步通过，继续看全局' });
   }
+  const sourceEvidence = Array.isArray(parsed && parsed.evidence) ? parsed.evidence : [];
+  const evidence = sourceEvidence.map((e) => typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 6);
 
   const report = {
     ok: exitCode === 0,
     verdict,
     command,
     summary: String(summary).slice(0, 300),
+    data: parsed ?? null,
     findings,
-    evidence: stderr ? [stderr.trim().split('\n')[0].slice(0, 200)] : [],
+    evidence: evidence.length ? evidence : (stderr ? [stderr.trim().split('\n')[0].slice(0, 200)] : []),
     next: next.slice(0, 5),
     exitCode,
     durationMs,

@@ -9,11 +9,12 @@
 //   5. 记录 journal；除非 --keep，否则回滚到快照
 //
 // usage: node tools/sandbox-trial.mjs <profileDir> <pluginDir> [--keep] [--port 18770] [--state <dir>]
-import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync, rmSync, cpSync } from 'node:fs';
-import { join, basename, dirname } from 'node:path';
+import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync, rmSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { loadYaml } from './config.mjs';
+import { copyTreeSafe } from './safe-copy.mjs';
 
 const argv = process.argv.slice(2);
 const args = argv.filter((a) => !a.startsWith('--'));
@@ -29,7 +30,7 @@ const env = { ...process.env, DSH_TURNSTILE_STATE: state };
 const run = (script, extra) => {
   // 用相对本文件的路径：之前是 join('tools', script)，不在仓库根目录跑就必挂（外部调研 #4）
   const here = dirname(fileURLToPath(import.meta.url));
-  try { return { code: 0, out: execFileSync(process.execPath, [join(here, script), ...extra], { encoding: 'utf8', env, timeout: 120000 }) }; }
+  try { return { code: 0, out: execFileSync(process.execPath, [join(here, script), ...extra], { encoding: 'utf8', env, timeout: 120000, stdio: ['ignore', 'pipe', 'pipe'] }) }; }
   catch (e) { return { code: e.status === undefined ? 1 : e.status, out: String((e.stdout || '') + (e.stderr || '')) }; }
 };
 const journal = (fields) => run('lab-journal.mjs', ['--add', ...fields]);
@@ -38,7 +39,14 @@ if (!name) { console.error('插件 package.json 没有 name'); process.exit(2); 
 
 console.log('== trial ' + name + '  →  ' + profileDir);
 const snap = run('sandbox-snapshot.mjs', [profileDir, '--take', '--label', 'trial ' + name, '--state', state]);
-console.log('1. 快照 ' + (snap.code === 0 ? snap.out.trim() : '失败：' + snap.out.trim()));
+const snapLines = snap.out.trim().split(/\r?\n/);
+const snapReason = snapLines.find((line) => /Error:|ENOTDIR|EEXIST|EACCES|EPERM/.test(line)) || snapLines[0] || 'unknown';
+console.log('1. 快照 ' + (snap.code === 0 ? snap.out.trim() : '失败：' + snapReason));
+if (snap.code !== 0) {
+  // 状态目录本身可能不可写；不要再向同一个位置写 journal，造成第二段堆栈。
+  console.error('结论：已停止，未安装；没有可用快照就不修改 profile（本次也无法写入实验记录）。');
+  process.exit(4);
+}
 
 const pre = run('preinstall.mjs', [profileDir, name, '--json']);
 let preJson = null; try { preJson = JSON.parse(pre.out); } catch {}
@@ -50,13 +58,13 @@ if (blockers.length) {
   run('sandbox-snapshot.mjs', [profileDir, '--restore', 'latest', '--state', state]);
   process.exit(3);
 }
-console.log('2. 装前检查：通过');
+console.log('2. 装前检查：无阻断项');
 
 // 3. 装
 const nm = join(profileDir, 'node_modules', name);
 mkdirSync(join(profileDir, 'node_modules'), { recursive: true });
 rmSync(nm, { recursive: true, force: true });
-cpSync(pluginDir, nm, { recursive: true });
+copyTreeSafe(pluginDir, nm);
 const pkgPath = join(profileDir, 'package.json');
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 pkg.dependencies = pkg.dependencies || {};
@@ -77,26 +85,27 @@ try { yaml.load(readFileSync(join(profileDir, 'cordis.patch.yml'), 'utf8'), { sc
 checks.push(['patch-parses', parses, parses ? 'ok' : 'cordis.patch.yml 无法解析']);
 const port = val('--port');
 if (port) {
-  let health = null;
+  let health = '0';
   try {
-    const res = execFileSync(process.platform === 'win32' ? 'powershell' : 'sh', process.platform === 'win32'
-      ? ['-NoProfile', '-Command', 'try { (Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 http://127.0.0.1:' + port + '/turnstile/health).StatusCode } catch { 0 }']
-      : ['-c', 'curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:' + port + '/turnstile/health'], { encoding: 'utf8' });
-    health = String(res).trim();
-  } catch (e) { health = '0'; }
-  checks.push(['http-health', health === '200' || health === '401', 'status=' + health + '（401=宿主活着但没 token）']);
+    const response = await fetch('http://127.0.0.1:' + port + '/turnstile/health', { signal: AbortSignal.timeout(5000) });
+    health = String(response.status);
+  } catch { health = '0'; }
+  checks.push(['http-health', health === '200' || health === '401', 'status=' + health + '（仅证明宿主响应；401=需要 token）']);
 }
 console.log('4. 验证：');
 for (const [n, okk, detail] of checks) console.log('   ' + (okk ? 'ok  ' : 'FAIL') + ' ' + n.padEnd(14) + detail);
-const passed = checks.every(([, okk]) => okk);
+console.log('   SKIP plugin-load  本工具没有重启真实宿主，不能把静态检查或 http-health 当作插件已加载');
+let passed = checks.every(([, okk]) => okk);
 
-journal(['--kind', 'trial', '--target', name, '--verdict', passed ? 'pass' : 'fail', '--note', checks.map(([n, okk]) => n + '=' + (okk ? 'ok' : 'fail')).join(' ')]);
-
+let rollbackOk = true;
 if (!has('--keep')) {
-  run('sandbox-snapshot.mjs', [profileDir, '--restore', 'latest', '--state', state]);
+  const restored = run('sandbox-snapshot.mjs', [profileDir, '--restore', 'latest', '--state', state]);
+  rollbackOk = restored.code === 0;
   rmSync(nm, { recursive: true, force: true });
-  console.log('5. 已回滚（--keep 可保留）');
-} else console.log('5. 保留安装（--keep）');
+  console.log('5. ' + (rollbackOk ? '已回滚' : '回滚失败：' + restored.out.trim()) + '（--keep 可保留）');
+} else console.log('5. 保留安装（--keep）；仍需要真实宿主重启验证');
+passed = passed && rollbackOk;
 
-console.log(passed ? '结论：通过' : '结论：有问题，见上面的 FAIL');
+journal(['--kind', 'trial', '--target', name, '--verdict', passed ? 'static-pass' : 'fail', '--note', checks.map(([n, okk]) => n + '=' + (okk ? 'ok' : 'fail')).join(' ') + ' plugin-load=unverified rollback=' + (has('--keep') ? 'kept' : (rollbackOk ? 'ok' : 'fail'))]);
+console.log(passed ? '结论：静态通过；插件加载未验证（需要真实宿主重启与路由证据）' : '结论：有问题，见上面的 FAIL');
 process.exitCode = passed ? 0 : 1;

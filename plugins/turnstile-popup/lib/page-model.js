@@ -162,6 +162,18 @@ export function capabilitiesOf(type) {
   const spec = COMPONENTS[type];
   return spec ? spec.capabilities : { draggable: false, droppable: false, acceptsChildren: false };
 }
+
+function cloneWithNewIds(node) {
+  if (!node || !COMPONENTS[node.type]) throw new Error('不能粘贴未知组件');
+  return {
+    id: nextId(node.type),
+    type: node.type,
+    props: JSON.parse(JSON.stringify(node.props || {})),
+    style: { ...defaultStyle(), ...JSON.parse(JSON.stringify(node.style || {})) },
+    children: (node.children || []).map(cloneWithNewIds),
+  };
+}
+
 /** 命令层：每个命令都返回新的 page（不可变），失败时抛错并说明原因。 */
 export function applyCommand(page, cmd) {
   const next = JSON.parse(JSON.stringify(page));
@@ -171,6 +183,15 @@ export function applyCommand(page, cmd) {
       const caps = capabilitiesOf(parent.type);
       if (!caps.acceptsChildren) throw new Error(parent.type + ' 不接受子节点');
       const node = newNode(cmd.component, cmd.props || {});
+      const at = Number.isInteger(cmd.index) ? Math.max(0, Math.min(cmd.index, parent.children.length)) : parent.children.length;
+      parent.children.splice(at, 0, node);
+      return { page: next, focus: node.id };
+    }
+    case 'paste': {
+      const parent = findNode(next.root, cmd.parentId);
+      if (!parent) throw new Error('粘贴目标不存在');
+      if (!capabilitiesOf(parent.type).acceptsChildren) throw new Error(parent.type + ' 不接受子节点');
+      const node = cloneWithNewIds(cmd.node);
       const at = Number.isInteger(cmd.index) ? Math.max(0, Math.min(cmd.index, parent.children.length)) : parent.children.length;
       parent.children.splice(at, 0, node);
       return { page: next, focus: node.id };
@@ -213,6 +234,22 @@ export function applyCommand(page, cmd) {
       if (!spec) throw new Error(node.type + ' 没有属性 ' + cmd.key);
       node.props[cmd.key] = coerce(spec, cmd.value);
       return { page: next, focus: node.id };
+    }
+    case 'setPropMany':
+    case 'setStyleMany': {
+      if (!Array.isArray(cmd.nodeIds) || !cmd.nodeIds.length) throw new Error('批量编辑至少选择一个节点');
+      const singleType = cmd.type === 'setPropMany' ? 'setProp' : 'setStyle';
+      const seen = new Set();
+      let batchPage = next;
+      let focus = null;
+      // 每次都在局部副本上应用同一个声明校验；中途失败时，调用者的原页面完全不变。
+      for (const nodeId of cmd.nodeIds) {
+        if (seen.has(nodeId)) continue;
+        seen.add(nodeId);
+        batchPage = applyCommand(batchPage, { type: singleType, nodeId, key: cmd.key, value: cmd.value }).page;
+        focus = nodeId;
+      }
+      return { page: batchPage, focus };
     }
     default:
       throw new Error('未知命令 ' + cmd.type);
@@ -281,10 +318,13 @@ export function jumpTo(stack, index) {
 export function labelOf(cmd) {
   if (!cmd) return '未知';
   if (cmd.type === 'add') return '添加 ' + cmd.component;
+  if (cmd.type === 'paste') return '粘贴 ' + ((cmd.node || {}).type || '节点');
   if (cmd.type === 'move') return '移动节点';
   if (cmd.type === 'remove') return '删除节点';
   if (cmd.type === 'setProp') return '改 ' + cmd.key;
   if (cmd.type === 'setStyle') return '样式 ' + cmd.key;
+  if (cmd.type === 'setPropMany') return '批量改 ' + cmd.key + '（' + cmd.nodeIds.length + ' 个节点）';
+  if (cmd.type === 'setStyleMany') return '批量样式 ' + cmd.key + '（' + cmd.nodeIds.length + ' 个节点）';
   return cmd.type;
 }
 
