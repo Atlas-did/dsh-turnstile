@@ -102,7 +102,9 @@ if (wantsJson()) {
     severity: r.level === 'RED' ? 'error' : 'warning',
     plugin: r.name + '@' + (r.version || '?'),
     resource: r.why,
-    message: r.level,
+    // title 给人看，不能是 RED/AMBER 这种内部色阶
+    message: r.level === 'RED' ? '装不活：import 了 peer-only 的官方 scope' : '可能装不活：import 了未声明的 scope',
+    level: r.level,
     evidence: { file: 'node_modules/' + r.name + '/package.json', importEvidence: lastEvidence },
     ...(r.alias ? { fix: { kind: 'npm-alias', snippet: r.alias } } : {}),
   }));

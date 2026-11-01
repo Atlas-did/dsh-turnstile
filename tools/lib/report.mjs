@@ -41,7 +41,7 @@ function normalizeFinding(f, i, profile) {
 
 export function humanSummary(verdict, findings, command) {
   const n = findings.length;
-  const errs = findings.filter((f) => ['error', 'high', 'fail'].includes(f.severity)).length;
+  const errs = findings.filter((f) => ['error', 'high', 'fail', 'warning'].includes(f.severity)).length;
   const who = labelOf(command);
   if (verdict === 'ok' && !n) return '通过：' + who + '没有发现问题。';
   if (verdict === 'ok' && n) return '基本可用：' + who + '发现 ' + n + ' 条需要看一眼（不阻塞）。';
