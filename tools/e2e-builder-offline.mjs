@@ -283,6 +283,25 @@ await page.keyboard.press('Control+z');
 await page.waitForTimeout(250);
 ok('undo restores both deleted nodes in one step', (await page.locator('#canvas .node').count()) >= 3, 'canvas=' + (await page.locator('#canvas .node').count()));
 
+
+  // 窄屏：三栏改单列，侧栏/检查器用抽屉打开（不能直接藏没）
+  await page.setViewportSize({ width: 390, height: 760 });
+  await page.waitForTimeout(300);
+  const sideVisible = await page.locator('.palette').isVisible();
+  const inspVisible = await page.locator('.inspector').isVisible();
+  ok('narrow layout hides the side panels by default', !sideVisible && !inspVisible);
+  await page.locator('[data-testid="toggle-side"]').click();
+  await page.waitForTimeout(200);
+  ok('side drawer opens from the toolbar', await page.locator('.palette').isVisible());
+  await page.locator('[data-testid="toggle-inspector"]').click();
+  await page.waitForTimeout(200);
+  ok('inspector sheet opens and replaces the side drawer', await page.locator('.inspector').isVisible() && !(await page.locator('.palette').isVisible()));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  ok('Escape closes the narrow drawers', !(await page.locator('.inspector').isVisible()));
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.waitForTimeout(200);
+  ok('wide layout shows both panels again', await page.locator('.palette').isVisible() && await page.locator('.inspector').isVisible());
 ok('no uncaught errors', errors.length === 0, errors.slice(0, 2).join(' | '));
 
 await browser.close();
