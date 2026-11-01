@@ -636,6 +636,16 @@ function moveSelectionByKeyboard(key) {
   render();
 }
 function moveStructureByKeyboard(key) {
+  // 多选：只支持同父级上下移动（其余先让用户收敛到一个节点）
+  if (selectedIds.length > 1) {
+    if (key !== 'ArrowUp' && key !== 'ArrowDown') { status('多选只支持上下移动；改层级请先单选'); return; }
+    try {
+      commit({ type: 'moveMany', nodeIds: selectedIds.slice(), direction: key === 'ArrowUp' ? 'up' : 'down' });
+      status('已批量调整 ' + selectedIds.length + ' 个节点的顺序 · 可撤销');
+      render();
+    } catch (e) { status(e.message); }
+    return;
+  }
   if (selectedIds.length !== 1) { status('移动节点请先单选一个节点'); return; }
   const node = M.findNode(stack.current.root, selectedId);
   if (!node || node.id === stack.current.root.id) { status('根节点不能移动'); return; }

@@ -196,6 +196,33 @@ export function applyCommand(page, cmd) {
       parent.children.splice(at, 0, node);
       return { page: next, focus: node.id };
     }
+    case 'moveMany': {
+      // 只做「同父级、只调顺序」的批量移动：跨父级批量改层级语义太模糊，直接拒绝并说明。
+      if (!Array.isArray(cmd.nodeIds) || cmd.nodeIds.length < 2) throw new Error('批量移动至少选择两个节点');
+      const dir = cmd.direction === 'up' ? -1 : cmd.direction === 'down' ? 1 : 0;
+      if (!dir) throw new Error('批量移动方向只能是 up / down');
+      const ids = new Set(cmd.nodeIds);
+      if (ids.has(next.root.id)) throw new Error('根节点不能移动');
+      for (const id of ids) if (!findNode(next.root, id)) throw new Error('找不到节点 ' + id);
+      const parent = findParent(next.root, cmd.nodeIds[0]);
+      if (!parent) throw new Error('找不到父节点');
+      for (const id of ids) {
+        const p = findParent(next.root, id);
+        if (!p || p.id !== parent.id) throw new Error('只支持同一父级下的批量移动');
+      }
+      const idxs = parent.children.map((c, i) => (ids.has(c.id) ? i : -1)).filter((i) => i >= 0).sort((a, b) => a - b);
+      const edge = dir < 0 ? idxs[0] === 0 : idxs[idxs.length - 1] === parent.children.length - 1;
+      if (edge) throw new Error('已到同级顺序的边界');
+      const list = parent.children.slice();
+      const picked = idxs.map((i) => list[i]);
+      const rest = list.filter((_, i) => !ids.has(list[i].id));
+      const anchor = dir < 0 ? idxs[0] - 1 : idxs[idxs.length - 1] + 1;
+      const anchorNode = list[anchor];
+      const at = rest.findIndex((c) => c.id === anchorNode.id) + (dir < 0 ? 0 : 1);
+      rest.splice(at, 0, ...picked);
+      parent.children = rest;
+      return { page: next, focus: picked[0].id };
+    }
     case 'move': {
       const node = findNode(next.root, cmd.nodeId);
       if (!node) throw new Error('找不到节点 ' + cmd.nodeId);
@@ -352,6 +379,7 @@ export function labelOf(cmd) {
   if (cmd.type === 'paste') return '粘贴 ' + ((cmd.node || {}).type || '节点');
   if (cmd.type === 'pasteMany') return '粘贴 ' + ((cmd.nodes || []).length) + ' 个节点';
   if (cmd.type === 'removeMany') return '删除 ' + ((cmd.nodeIds || []).length) + ' 个节点';
+  if (cmd.type === 'moveMany') return '批量移动 ' + ((cmd.nodeIds || []).length) + ' 个节点';
   if (cmd.type === 'move') return '移动节点';
   if (cmd.type === 'remove') return '删除节点';
   if (cmd.type === 'setProp') return '改 ' + cmd.key;
