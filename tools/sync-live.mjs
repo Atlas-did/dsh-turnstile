@@ -25,7 +25,7 @@ if (!existsSync(liveDir)) {
 
 // 列清单而不是整目录同步：lib/ 里有些文件是宿主的、不能覆盖。新增文件必须加进来，
 // 否则会静默不生效（页面搭建器第一版就是这么 404 的）。
-const FILES = ['lib/index.js', 'lib/client.js', 'lib/console.html', 'lib/console-designer.js', 'lib/console-data.js', 'lib/designer-ops.js', 'lib/toggle-patch.js', 'lib/view-state.js', 'lib/sort-context.js', 'lib/inspector-model.js', 'lib/diff-state.js', 'lib/virtual-window.js', 'lib/txn.js', 'lib/journal.js', 'lib/toggle-text.js', 'lib/capabilities.js', 'lib/history-timeline.js', 'lib/selection.js', 'lib/field-schema.js', 'lib/hooks.js', 'lib/hook-rules.js', 'lib/health.js', 'lib/page-model.js', 'lib/page-render.js', 'lib/builder.html', 'lib/plugin-inspect.js', 'lib/launcher-index.js', 'lib/reg-diff.js', 'lib/windows-gate.js', 'lib/windows-api.js', 'lib/run-route.js'];
+const FILES = ['lib/index.js', 'lib/client.js', 'lib/console.html', 'lib/console-designer.js', 'lib/console-data.js', 'lib/designer-ops.js', 'lib/toggle-patch.js', 'lib/view-state.js', 'lib/sort-context.js', 'lib/inspector-model.js', 'lib/diff-state.js', 'lib/virtual-window.js', 'lib/txn.js', 'lib/journal.js', 'lib/toggle-text.js', 'lib/capabilities.js', 'lib/history-timeline.js', 'lib/selection.js', 'lib/field-schema.js', 'lib/hooks.js', 'lib/hook-rules.js', 'lib/health.js', 'lib/page-model.js', 'lib/page-render.js', 'lib/plugin-export.js', 'lib/export-verify.js', 'lib/builder.html', 'lib/plugin-inspect.js', 'lib/launcher-index.js', 'lib/reg-diff.js', 'lib/windows-gate.js', 'lib/windows-api.js', 'lib/run-route.js'];
 
 const drift = [];
 const copied = [];

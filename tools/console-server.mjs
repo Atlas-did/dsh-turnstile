@@ -3,7 +3,7 @@
 // npm run dev -- --host 127.0.0.1 --port 7100 --profile tests/console-fixture
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
-import { copyFileSync, existsSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -12,10 +12,15 @@ import { collectConsoleData } from './console-data.mjs';
 import { togglePatch } from './toggle-patch.mjs';
 import { designerTransaction } from './designer-ops.mjs';
 import { readViewState, writeViewState } from '../plugins/turnstile-popup/lib/view-state.js';
+import { exportPlugin } from '../plugins/turnstile-popup/lib/plugin-export.js';
+import { verifyExportedPlugin } from '../plugins/turnstile-popup/lib/export-verify.js';
+import { beginOperation, settleOperation, listOperations } from '../plugins/turnstile-popup/lib/journal.js';
+import { randomUUID } from 'node:crypto';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const consoleFile = join(root, 'plugins', 'turnstile-popup', 'lib', 'console.html');
-const designerFile = join(root, 'plugins', 'turnstile-popup', 'lib', 'console-designer.js');
+const pluginLib = join(root, 'plugins', 'turnstile-popup', 'lib');
+const consoleFile = join(pluginLib, 'console.html');
+const designerFile = join(pluginLib, 'console-designer.js');
 
 // fixture=true 时返回可复现的假数据（仅供 e2e）；默认走真实工具，假数据不再无标注地混进生产路径。
 export function createConsoleServer({ profileDir, stateDir, fixture = false } = {}) {
@@ -220,15 +225,32 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       res.end(readFileSync(designerFile, 'utf8'));
       return;
     }
+    if (pathname === '/turnstile/audit') {
+      if (req.method !== 'GET') return json(405, { error: 'method' });
+      return json(200, { entries: listOperations(state || join(dir, '.turnstile')) });
+    }
     if (pathname === '/turnstile/designer') {
       if (req.method !== 'POST') return json(405, { error: 'method' });
+      const planId = randomUUID();
+      const auditDir = state || join(dir, '.turnstile');
+      let dryRun = true;
+      let started = false;
       try {
         let body = '';
         for await (const chunk of req) body += chunk;
         const args = JSON.parse(body || '{}');
+        dryRun = args.dryRun !== false;
+        const summary = Array.isArray(args.operations) ? args.operations.slice(0, 100).map((op) => ({ type: String(op?.type || ''), package: String(op?.package || ''), disable: typeof op?.disable === 'boolean' ? op.disable : undefined, anchor: typeof op?.anchor === 'string' ? op.anchor : undefined })) : [];
+        beginOperation(auditDir, { planId, kind: 'designer', dryRun, target: 'cordis.patch.yml', workspace: String(args.workspace || 'default').slice(0, 80), operationCount: summary.length, operations: summary });
+        started = true;
         const plugins = collectConsoleData(dir, { stateDir: state }).plugins;
-        return json(200, designerTransaction(dir, args.operations, { dryRun: args.dryRun !== false, expected: args.expected }, plugins));
-      } catch (e) { return json(e.status || 400, { error: String(e?.message || e).slice(0, 180) }); }
+        const result = designerTransaction(dir, args.operations, { dryRun, expected: args.expected }, plugins);
+        settleOperation(auditDir, planId, dryRun ? 'previewed' : 'applied', { changed: result.changed });
+        return json(200, { ...result, auditId: planId });
+      } catch (e) {
+        if (started) { try { settleOperation(auditDir, planId, 'failed', String(e?.message || e).slice(0, 180)); } catch {} }
+        return json(e.status || 400, { error: String(e?.message || e).slice(0, 180), details: e.details || [], auditId: started ? planId : undefined });
+      }
     }
     if (pathname === '/turnstile/toggle') {
       if (req.method !== 'POST') return json(405, { error: 'method' });
@@ -247,6 +269,65 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
         }
         return json(200, { ok: true, package: plugin.name, row: plugin.row, disabled: Boolean(args.disable), dryRun: Boolean(args.dryRun), before, after, changed: before !== after });
       } catch (e) { return json(500, { error: String(e?.message || e).slice(0, 160) }); }
+    }
+    // 页面创作与独立控制台共用同一份模型、渲染器和导出器。
+    const pageFile = join(state || join(dir, '.turnstile'), 'page-console.json');
+    if (pathname === '/turnstile/builder') {
+      res.setHeader('content-type', 'text/html; charset=utf-8');
+      res.setHeader('cache-control', 'no-store');
+      res.end(readFileSync(join(pluginLib, 'builder.html'), 'utf8'));
+      return;
+    }
+    if (pathname === '/turnstile/page-model.js' || pathname === '/turnstile/page-render.js') {
+      const name = pathname.slice('/turnstile/'.length);
+      const src = readFileSync(join(pluginLib, name), 'utf8').replace(/^export\s+(?=(function|const|let|class))/gm, '');
+      res.setHeader('content-type', 'text/javascript; charset=utf-8');
+      res.setHeader('cache-control', 'no-store');
+      res.end(src);
+      return;
+    }
+    if (pathname === '/turnstile/page') {
+      if (req.method === 'GET') {
+        if (!existsSync(pageFile)) return json(200, { status: 'not-generated', file: pageFile });
+        try { return json(200, JSON.parse(readFileSync(pageFile, 'utf8'))); }
+        catch (e) { return json(500, { error: '读不出页面文件：' + String(e.message).slice(0, 120) }); }
+      }
+      if (req.method !== 'POST') return json(405, { error: 'method' });
+      try {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk;
+          if (body.length > 2e6) return json(413, { error: '页面过大' });
+        }
+        const parsed = JSON.parse(body || '{}');
+        if (parsed.page?.schema !== 'mini/page@1' || !parsed.page.root || typeof parsed.page.root !== 'object') return json(400, { error: '页面缺少 mini/page@1 schema 或有效 root' });
+        mkdirSync(dirname(pageFile), { recursive: true });
+        if (existsSync(pageFile)) copyFileSync(pageFile, pageFile + '.bak-' + Date.now());
+        writeFileSync(pageFile, JSON.stringify(parsed.page, null, 2) + '\n');
+        return json(200, { ok: true, file: pageFile });
+      } catch (e) { return json(400, { error: String(e?.message || e).slice(0, 160) }); }
+    }
+    if (pathname === '/turnstile/export') {
+      if (req.method !== 'POST') return json(405, { error: 'method' });
+      try {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk;
+          if (body.length > 2e6) return json(413, { error: '页面过大' });
+        }
+        const parsed = JSON.parse(body || '{}');
+        const renderer = readFileSync(join(pluginLib, 'page-render.js'), 'utf8');
+        const result = exportPlugin(parsed.page, join(state || join(dir, '.turnstile'), 'exports', String(parsed.name || '')), { name: parsed.name, renderer });
+        const verification = await verifyExportedPlugin(result.outDir);
+        return json(200, { ok: verification.ok, ...result, verification });
+      } catch (e) { return json(400, { error: String(e?.message || e).slice(0, 180) }); }
+    }
+    if (pathname === '/turnstile/view') {
+      const html = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>页面预览</title><style>body{margin:0;padding:20px;background:#0b1117;color:#e9eff4;font:13px/1.5 system-ui}main{max-width:1100px;margin:auto}.empty{color:#96a5b2}</style></head><body><main id="root"></main><script src="/turnstile/page-render.js"></script><script>fetch("/turnstile/page").then(function(r){return r.json()}).then(function(j){var root=document.getElementById("root");if(!j.root){root.innerHTML="<p class=empty>还没有保存的页面。</p>";return;}root.append(window.TurnstilePageRender.render(j.root));}).catch(function(e){document.getElementById("root").textContent="读取失败："+e.message;});</script></body></html>';
+      res.setHeader('content-type', 'text/html; charset=utf-8');
+      res.setHeader('cache-control', 'no-store');
+      res.end(html);
+      return;
     }
     if (req.method !== 'GET' && pathname !== '/turnstile/view-state') { res.statusCode = 405; res.end('method'); return; }
     if (pathname === '/turnstile/view-state') {

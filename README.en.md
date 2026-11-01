@@ -7,46 +7,35 @@ Every plugin must pass through one at a time - like a turnstile.
 
 > New here? Start with [INSTALL.md](INSTALL.md) (requirements, first run, exit codes, uninstall).
 
-## Quick start (what to run, in order)
+## Quick start
 
-Everything is read-only unless a command says otherwise. `<profile>` is a DSH profile directory
-(for example `~/.dsh/profiles/desktop`); omit the path where a tool auto-detects it.
+Ordinary users can ask the DSH agent in natural language; the panel is optional. Advanced users share
+the same implementation through one CLI. `<profile>` is a DSH profile directory.
 
 ```bash
-# 1. Install-time gate: 12 checks in parallel, per-check timeout (default 30s)
-node tools/preflight.mjs <profile>
+# Read-only inspection and machine-readable output
+node tools/turnstile.mjs doctor <profile> --json
+node tools/turnstile.mjs gate <profile> --json
+node tools/turnstile.mjs preinstall <profile> <package> --json
+node tools/turnstile.mjs trial-status <profile> --json
 
-#    narrow it while iterating
-node tools/preflight.mjs <profile> --only risk,port
-node tools/preflight.mjs <profile> --skip css
+# Natural language becomes structured read-only, UI, or mutating actions
+node tools/turnstile.mjs ask <profile> "Check my plugin status" --json
+node tools/turnstile.mjs ask <profile> "Create a plugin page" --json
 
-#    refresh the ctx-service allowlist when the runtime moved
-node tools/preflight.mjs <profile> --regen
+# A write always starts with a plan and a one-time token
+node tools/turnstile.mjs manage-disable <profile> <package> --dry-run
 
-# 2. What would it suggest fixing? (nothing is written without --apply)
-node tools/preflight.mjs <profile> --fix
-node tools/preflight.mjs <profile> --fix --apply    # writes npm aliases, keeps a .bak
-
-# 3. Machine-readable output for a panel/CI
-cat state/report-<profile>.json
-node tools/preflight.mjs <profile> --json
-
-# 4. After a restart: did it actually activate?
-node tools/runtime-diff.mjs state/runtime-<profile>.json --profile <profile>
-
-# 5. It crashed - who was waiting for what?
-node tools/watch.mjs <host log> --last 12
-node tools/watch.mjs <host log> --follow --exit-on-crash
-
-# 6. Toggle a plugin without hand-editing YAML
-node tools/manage.mjs <profile> --list
-node tools/manage.mjs <profile> --disable <package> --yes
-node tools/manage.mjs <profile> --enable  <package> --yes
+# Only after the user confirms the exact plan and target
+node tools/turnstile.mjs manage-disable <profile> <package> --apply --token <token> --confirm <package>
 ```
 
-A green run means: each checker ran, each one finished inside its timeout, and none reported a
-blocking finding. Advisory checks (`engine-gate`, `css-collision`, `ui-placement`) print `WARN`
-and do not block - a skipped plugin is a fact about that plugin, not a broken profile.
+Do not call legacy `manage.mjs --yes` to bypass the unified confirmation gate. `open-builder` opens
+`/turnstile/builder`; it is a UI action, not a shell command.
+
+A green static run means each checker completed and reported no blocking finding. It does not prove
+that a plugin loaded in a real host. Use `host-observe` before and after a controlled restart, validate
+with `host-evidence`, and then read the correlated result through `trial-status`.
 
 ---
 
@@ -161,11 +150,11 @@ Plugin nodes and file paths are clickable `vscode://file/...` links, so the repo
 
 ## Boundaries (read this before trusting it)
 
-1. **Static checks only.** Nothing here instruments the runtime. A clean report means "no known failure surface", not "proven working".
+1. **Evidence has a scope.** A static pass, an isolated-module load, HTTP health, and a real-host route after restart are different claims. A clean static report means "no known failure surface", not "proven working".
 2. **`UNCERTIFIED` is registered, not verified.** The version matrix records what a plugin declares; it does not prove compatibility.
 3. **The gate is DSH-shaped.** It understands `cordis.patch.yml` arrays and `--dump-config`. A major harness change needs an adapter.
 4. **Row-id scope is per parent group.** The same id in two presets is legal; reporting it as a conflict is a false positive. This tool matches the harness's own scope rules.
-5. **No auto-fix.** Findings name the file and the fix; changing your profile stays your call.
+5. **Fixes stay behind confirmation.** `fix` can propose and apply specific npm aliases, but only through the unified dry-run/token flow after the user approves the plan.
 
 ---
 
@@ -307,11 +296,23 @@ Each plugin runs in its own child process, so a hang or a crash cannot take the 
 
 ## Adding a check
 
-1. Write `tools/your-check.mjs` — take a profile dir, exit `0` on clear, non-zero on findings.
-2. Add `tests/your-fixture/` that **must** make it fail.
-3. Register the case in `tools/selftest.mjs`.
-4. Add one line to the table in `tools/preflight.mjs`.
+External checks no longer require editing the core. Write a checker that accepts `<profile> --json` and emits a
+`{ "checker": "...", "findings": [] }` envelope, then declare it in a `turnstile/checks@1` manifest:
 
+```json
+{
+  "schema": "turnstile/checks@1",
+  "checks": [
+    { "name": "my-check", "script": "./my-check.mjs", "advisory": false }
+  ]
+}
+```
+
+Run it explicitly with `node tools/preflight.mjs <profile> --checks <manifest.json> --json`.
+A non-zero checker exit blocks unless `advisory` is true. Turnstile never auto-discovers executable checks
+from a profile; the user must opt into the manifest. See [the extension contract](docs/148-check-extension.md).
+
+For a new **built-in** check, also add a fixture that must fail and register it in `tools/selftest.mjs`.
 The gate grows by adding checks and their counter-examples, never by loosening an existing one.
 
 ---

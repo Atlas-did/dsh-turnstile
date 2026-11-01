@@ -95,6 +95,11 @@ try {
     const text = (selector) => page.locator(selector).first().innerText();
 
     ok('full-window overview mounts', (await count('[data-testid="metric-plugins"]')) === 1);
+    const navText = await text('#nav');
+    ok('navigation never exposes undefined counts', !navText.includes('undefined'), JSON.stringify(navText));
+    ok('navigation groups match user tasks', ['开始', '插件工作', '观察与诊断'].every((label) => navText.includes(label)), JSON.stringify(navText));
+    ok('active navigation exposes its page to assistive technology', await page.locator('[data-testid="nav-overview"]').getAttribute('aria-current') === 'page');
+    ok('the product shell has a visible identity', await page.locator('.brand-mark').isVisible());
     ok('plugin action is disabled without a selection', await page.locator('[data-testid="toggle-plugin"]').isDisabled());
     const snapshot = await (await page.request.get(base + '/api/console')).json();
     ok('arbitrary config fields become drillable nodes', ['density', 'route'].every((key) => snapshot.architecture.nodes.some((n) => n.id.endsWith(':config:' + key))));
@@ -339,24 +344,35 @@ try {
     ok('skeleton view shows inject surfaces', skel.includes('ui-settings'), skel.slice(0, 60));
     ok('skeleton view shows patch rows', skel.includes('alpha-row'));
     ok('skeleton view says when the entry is undeclared', /入口/.test(skel) && (skel.includes('（无）') || skel.includes('lib/')), skel.slice(0, 100));
+    const skeletonGrid = await page.locator('[data-testid="skeleton"]').evaluate((el) => ({
+      rows: el.querySelectorAll('.prop').length,
+      grid: getComputedStyle(el.querySelector('.prop')).display,
+      labels: el.querySelectorAll('dt').length,
+      values: el.querySelectorAll('dd').length,
+    }));
+    ok('skeleton properties use an aligned label-value grid', skeletonGrid.rows === 7 && skeletonGrid.grid === 'grid' && skeletonGrid.labels === 7 && skeletonGrid.values === 7, JSON.stringify(skeletonGrid));
 
-    // 启动器视图：输入即搜，结果带路径
+    // 启动器视图：输入即搜，结果带路径；无索引必须给出明确下一步。
     await page.locator('[data-testid="nav-launcher"]').click();
     await page.waitForTimeout(300);
     ok('launcher view renders its input', (await page.locator('[data-testid="launcher-input"]').count()) === 1);
-    // 路由连通性：从页面里真发一次请求（UI 渲染链路仍标 unverified，见 docs/121）
     const routeHits = await page.evaluate(async () => {
       const r = await fetch('/turnstile/search?q=launcher');
       const j = await r.json();
       return (j.hits || []).length;
     });
     ok('launcher search route returns hits', routeHits >= 1, 'hits=' + routeHits);
-    // 修掉 ?token 拼接后，UI 真的能渲染出结果（之前这条是 unverified）
+    await page.route('**/turnstile/search?q=noindex*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ query: 'noindex', hits: [], status: 'no-index', hint: 'node tools/launcher.mjs index --root <目录>' }) }));
+    await page.locator('[data-testid="launcher-input"]').fill('noindex');
+    await page.waitForTimeout(900);
+    const noIndexText = await text('[data-testid="launcher-results"]');
+    ok('launcher explains a missing index instead of showing the initial prompt', noIndexText.includes('尚未建立文件索引') && noIndexText.includes('launcher.mjs index'), noIndexText);
+    await page.unroute('**/turnstile/search?q=noindex*');
     await page.locator('[data-testid="launcher-input"]').fill('launcher');
-    await page.locator('[data-testid="launcher-input"]').press('Enter');
     await page.waitForTimeout(900);
     const launcherText = await page.locator('[data-testid="launcher-results"]').innerText().catch(() => '');
-    ok('launcher results render in the UI', launcherText.includes('launcher.mjs'), JSON.stringify(launcherText.slice(0, 60)));
+    ok('launcher results render from input without pressing Enter', launcherText.includes('launcher.mjs'), JSON.stringify(launcherText.slice(0, 60)));
+    ok('launcher keeps input focus after rendering results', await page.locator('[data-testid="launcher-input"]').evaluate((el) => document.activeElement === el));
 
     // B11: a failed read must not look healthy (green dot + '0/0').
     await page.route('**/api/console*', (route) => route.fulfill({ status: 500, body: 'boom' }));

@@ -18,6 +18,12 @@ function writeJournal(stateDir, entries) {
   writeFileSync(journalPath(stateDir), JSON.stringify({ version: 1, entries: entries.slice(-200) }, null, 1));
 }
 
+/** Public read model for audit consumers; callers receive copies, not mutable journal objects. */
+export function listOperations(stateDir, { limit = 200 } = {}) {
+  const size = Math.max(1, Math.min(200, Number(limit) || 200));
+  return readJournal(stateDir).slice(-size).reverse().map((entry) => JSON.parse(JSON.stringify(entry)));
+}
+
 /** Record the intent of an operation: this entry exists before any file is touched. */
 export function beginOperation(stateDir, record) {
   const entries = readJournal(stateDir);

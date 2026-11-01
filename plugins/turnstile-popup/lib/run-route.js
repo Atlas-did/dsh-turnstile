@@ -49,7 +49,7 @@ async function tokens() {
 }
 
 export async function handleRun(body, { toolsRoot } = {}) {
-  const { COMMANDS, runCommand } = await registry({ toolsRoot });
+  const { COMMANDS, runCommand, argvFor } = await registry({ toolsRoot });
   const command = String((body && body.command) || '').trim();
   const args = (body && body.args) || {};
   const dryRun = body && body.dryRun === true;
@@ -80,7 +80,13 @@ export async function handleRun(body, { toolsRoot } = {}) {
     }
   }
 
-  const result = runCommand(command, args, { toolsRoot });
+  const planOnly = Boolean(spec.mutating && dryRun && spec.drySafe === false);
+  const result = planOnly ? {
+    ok: true, verdict: 'ok', command, exitCode: 0, durationMs: 0,
+    summary: '仅生成写入计划，未修改文件',
+    data: { summary: '仅生成写入计划，未修改文件', dryRun: true, plan: ['将执行：' + spec.script + ' ' + argvFor(command, args).join(' ')] },
+    findings: [], evidence: ['drySafe:false：计划阶段未执行底层脚本'], next: [],
+  } : runCommand(command, args, { toolsRoot });
   // 统一契约整形（03 设计 §2）：next[] / rollback / findings 规范化都在这一个地方
   let shape = null;
   try {

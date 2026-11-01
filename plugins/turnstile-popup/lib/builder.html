@@ -1,10 +1,11 @@
 <!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
 <title>Turnstile 页面搭建器</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font:13px/1.5 ui-sans-serif,system-ui,"Microsoft YaHei";background:#0d141c;color:#dce3ea;height:100vh;display:grid;grid-template-rows:46px 1fr 26px}
+*{box-sizing:border-box}body{margin:0;font:13px/1.5 ui-sans-serif,system-ui,"Microsoft YaHei";background:#0d141c;color:#dce3ea;height:100vh;display:grid;grid-template-rows:52px 1fr 26px}
 .top{display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid #22303d;background:#111a23}
-.top b{font-size:14px;margin-right:8px}.top .sp{flex:1}
-button{font:inherit;padding:4px 10px;border:1px solid #2b3a49;border-radius:6px;background:#16212b;color:#dce3ea;cursor:pointer}
+.top b{font-size:14px;margin-right:8px}.top .sp{flex:1}.export-name{width:150px;padding:5px 8px;border:1px solid #2b3a49;border-radius:6px;background:#0d141c;color:#dce3ea;font:inherit}
+button,.top-link{font:inherit;padding:4px 10px;border:1px solid #2b3a49;border-radius:6px;background:#16212b;color:#dce3ea;cursor:pointer;text-decoration:none;white-space:nowrap}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #5aa9ff;outline-offset:2px}
 button:disabled{opacity:.45;cursor:default}
 .body{display:grid;grid-template-columns:190px 1fr 260px;min-height:0}
 .palette,.inspector{border-right:1px solid #22303d;padding:10px;overflow:auto;background:#0f1720}
@@ -26,35 +27,105 @@ button:disabled{opacity:.45;cursor:default}
 .err{color:#e86161;font-size:11px;margin-top:3px}
 .bar{border-top:1px solid #22303d;display:flex;align-items:center;gap:12px;padding:0 14px;font-size:11px;color:#8fa3b5}
 .snaps{max-height:180px;overflow:auto}.snaps button{display:block;width:100%;text-align:left;margin-bottom:4px;font-size:11px}
+.outline{max-height:230px;overflow:auto;margin:0 -4px;padding:2px 4px}.outline-row{display:flex;align-items:center;gap:2px;min-width:0}.outline-toggle{flex:0 0 22px;width:22px;height:26px;padding:0;border-color:transparent;background:transparent;color:#7d8fa1}.outline-toggle.leaf{visibility:hidden}.outline-select{flex:1;min-width:0;display:flex;align-items:center;gap:6px;padding:4px 6px;text-align:left;overflow:hidden;font-size:11px}.outline-select .outline-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.outline-select small{flex:0 0 auto;color:#7d8fa1;font-size:10px}.outline-select.active{border-color:#5aa9ff;background:#5aa9ff12;color:#8fc5ff}.outline-children{margin-left:13px;border-left:1px solid #22303d;padding-left:2px}
+.history{max-height:220px;overflow:auto}.history button{display:block;width:100%;text-align:left;margin-bottom:4px;padding:6px 7px;font-size:11px;line-height:1.45;white-space:normal}.history button.active{border-color:#5aa9ff;background:#5aa9ff12;color:#8fc5ff}.history small{display:block;color:#7d8fa1}
 </style></head><body>
 <div class="top">
-  <b>页面搭建器</b><span style="color:#7d8fa1;font-size:11px">mini · 拖进来 · 改属性 · 可撤销 · 可跳快照</span><span class="sp"></span>
-  <button id="undo" data-testid="undo">↶ 撤销</button><button id="redo" data-testid="redo">↷ 重做</button>
-  <button id="save" data-testid="save">保存</button>
+  <b>页面搭建器</b><span style="color:#7d8fa1;font-size:11px">Ctrl+C／V 复制粘贴 · Alt+方向键移动 · Ctrl+S 保存</span><span class="sp"></span>
+  <label for="export-name" style="color:#8fa3b5;font-size:11px">插件名</label><input id="export-name" class="export-name" data-testid="export-name" value="my-page" aria-label="导出插件名" spellcheck="false">
+  <button id="undo" data-testid="undo" title="撤销（Ctrl／Cmd+Z）">↶ 撤销</button><button id="redo" data-testid="redo" title="重做（Ctrl+Y／Cmd+Shift+Z）">↷ 重做</button>
+  <a id="preview" class="top-link" data-testid="preview" href="/turnstile/view" target="_blank" rel="noopener">预览</a>
+  <button id="save" data-testid="save" title="保存（Ctrl／Cmd+S）">保存</button><button id="export" data-testid="export">导出插件</button>
 </div>
 <div class="body">
   <div class="palette"><h4>组件（拖到画布）</h4><div id="palette" data-testid="palette"></div>
+    <h4 style="margin-top:14px">页面大纲</h4><div class="outline" id="outline" data-testid="outline" role="tree" aria-label="页面组件大纲" aria-multiselectable="true"></div>
     <h4 style="margin-top:14px">模板</h4><div id="templates" data-testid="templates"></div>
-    <h4 style="margin-top:14px">快照</h4><div class="snaps" id="snaps" data-testid="snaps"></div></div>
+    <h4 style="margin-top:14px">快照</h4><div class="snaps" id="snaps" data-testid="snaps"></div>
+    <h4 style="margin-top:14px">编辑历史</h4><div class="history" id="history" data-testid="builder-history"></div></div>
   <div class="canvas"><div id="canvas" data-testid="canvas"></div></div>
   <div class="inspector"><h4>属性</h4><div id="inspector" data-testid="inspector"><p style="color:#7d8fa1">选中一个节点</p></div></div>
 </div>
 <div class="bar"><span id="status" data-testid="status">就绪</span><span class="sp"></span><span id="snapinfo"></span></div>
 <script src="/turnstile/page-model.js"></script>
 <script src="/turnstile/page-render.js"></script>
+<script src="/turnstile/selection.js"></script>
+<script src="/turnstile/history-timeline.js"></script>
 <script>
 'use strict';
 const M = window.TurnstilePageModel;
+const H = window.TurnstileHistory;
+const S = window.TurnstileSelection;
+if (!H || !S) throw new Error('编辑历史或多选模块未加载');
 const token = new URLSearchParams(location.search).get('token') || '';
 const api = (p, init) => fetch(p + (p.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token), init);
+const copy = (value) => JSON.parse(JSON.stringify(value));
 let stack = M.createStack(M.newPage());
+let timeline = H.createTimeline({ limit: 100 });
 let selectedId = stack.current.root.id;
+let selectedIds = [selectedId];
+let selectionAnchor = selectedId;
 let dragPayload = null;
 let pendingType = null;
+let clipboardNode = null;
+
+function setSelection(next, primary) {
+  selectedIds = (next.ids || []).filter((id, i, all) => all.indexOf(id) === i);
+  selectionAnchor = next.anchor || selectedIds[0] || null;
+  selectedId = primary && selectedIds.includes(primary) ? primary : (selectedIds[selectedIds.length - 1] || stack.current.root.id);
+}
+function selectSingle(id) { setSelection({ ids: [id], anchor: id }, id); }
+function nodeOrder(node, out = []) { out.push(node.id); for (const child of node.children || []) nodeOrder(child, out); return out; }
+function selectNodeFromEvent(id, event = {}) {
+  if (!M.findNode(stack.current.root, id)) return;
+  const next = S.select(
+    { ids: selectedIds, anchor: selectionAnchor },
+    id,
+    { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey, order: nodeOrder(stack.current.root) }
+  );
+  setSelection(next, id);
+  const node = M.findNode(stack.current.root, id);
+  status(selectedIds.length > 1 ? '已选 ' + selectedIds.length + ' 个节点，可批量修改共同属性和样式' : '已选中 ' + node.type);
+  render();
+}
+
+function resetHistory(label) {
+  H.reset(timeline, copy(stack.current), { kind: H.STEP_KIND.RESET, label, at: Date.now() });
+}
+function commandLabel(cmd) {
+  if (cmd.type === 'add') return '添加' + ((M.COMPONENTS[cmd.component] || {}).label || cmd.component);
+  if (cmd.type === 'paste') return '粘贴' + ((M.COMPONENTS[(cmd.node || {}).type] || {}).label || (cmd.node || {}).type || '节点');
+  if (cmd.type === 'setProp') return '修改属性 · ' + cmd.key;
+  if (cmd.type === 'setStyle') return '修改样式 · ' + cmd.key;
+  if (cmd.type === 'setPropMany') return '批量修改属性 · ' + cmd.key + '（' + cmd.nodeIds.length + ' 个节点）';
+  if (cmd.type === 'setStyleMany') return '批量修改样式 · ' + cmd.key + '（' + cmd.nodeIds.length + ' 个节点）';
+  return M.labelOf(cmd);
+}
+function commandKind(cmd) {
+  if (cmd.type === 'add' || cmd.type === 'paste') return H.STEP_KIND.ADD;
+  if (cmd.type === 'remove') return H.STEP_KIND.REMOVE;
+  if (cmd.type === 'move') return H.STEP_KIND.MOVE;
+  return H.STEP_KIND.EDIT;
+}
+function commit(cmd) {
+  const previous = stack;
+  const next = M.run(stack, cmd);
+  // 无实际变化的命令不进入撤销栈或时间线，避免下一次撤销跳到错误步骤。
+  if (JSON.stringify(previous.current) === JSON.stringify(next.current)) return stack;
+  stack = next;
+  if (Array.isArray(cmd.nodeIds)) {
+    selectedIds = cmd.nodeIds.filter((id, i, all) => all.indexOf(id) === i && M.findNode(stack.current.root, id));
+    selectedId = stack.focus || selectedIds[selectedIds.length - 1] || stack.current.root.id;
+    selectionAnchor = selectedId;
+  } else selectSingle(stack.focus || selectedId);
+  H.append(timeline, { state: copy(stack.current), kind: commandKind(cmd), label: commandLabel(cmd), at: Date.now() });
+  return stack;
+}
+resetHistory('空白画布');
 
 function addToSelected() {
   if (!pendingType) return;
-  try { stack = M.run(stack, { type: 'add', parentId: selectedId, component: pendingType }); selectedId = stack.focus; status('已添加 ' + pendingType); pendingType = null; render(); }
+  try { commit({ type: 'add', parentId: selectedId, component: pendingType }); status('已添加 ' + pendingType); pendingType = null; render(); }
   catch (e) { status(e.message); }
 }
 
@@ -78,9 +149,12 @@ function renderPalette() {
 
 function renderNode(node) {
   const wrap = document.createElement('div');
-  wrap.className = 'node' + (node.id === selectedId ? ' sel' : '');
+  const spec = M.COMPONENTS[node.type] || {};
+  wrap.className = 'node' + (selectedIds.includes(node.id) ? ' sel' : '');
   wrap.dataset.testid = 'node-' + node.id;
   wrap.dataset.nodeId = node.id;
+  wrap.tabIndex = 0;
+  wrap.setAttribute('aria-label', (spec.label || node.type) + '，类型 ' + node.type + '，编号 ' + node.id);
   const tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = node.type;
   wrap.append(tag);
   const caps = M.capabilitiesOf(node.type);
@@ -95,15 +169,60 @@ function renderNode(node) {
     if (pendingType) {
       // 点击放置：优先放进被点的容器，容器不接受就退回它的父级
       const target = (M.capabilitiesOf(node.type).acceptsChildren) ? node.id : (M.findParent(stack.current.root, node.id) || stack.current.root).id;
-      try { stack = M.run(stack, { type: 'add', parentId: target, component: pendingType }); selectedId = stack.focus; status('已添加 ' + pendingType); pendingType = null; render(); return; }
+      try { commit({ type: 'add', parentId: target, component: pendingType }); status('已添加 ' + pendingType); pendingType = null; render(); return; }
       catch (err) { status(err.message); }
     }
-    selectedId = node.id; render();
+    selectNodeFromEvent(node.id, e);
+  });
+  wrap.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault(); e.stopPropagation(); selectNodeFromEvent(node.id, e);
+    }
   });
   wrap.append(renderBody(node));
   if (caps.acceptsChildren) { const kids = document.createElement('div'); kids.className = node.type === 'grid' ? 'grid' : (node.props.direction === 'row' ? 'stack-row' : 'stack-column'); if (node.type === 'grid') kids.style.gridTemplateColumns = 'repeat(' + node.props.columns + ', minmax(0,1fr))'; kids.style.gap = (node.props.gap || 0) + 'px'; for (const c of node.children) kids.append(renderNode(c)); wrap.append(kids); }
   return wrap;
-}function renderBody(node) {
+}
+
+const collapsedOutlineIds = new Set();
+function renderOutlineBranch(node, depth) {
+  const branch = document.createElement('div'); branch.setAttribute('role', 'none');
+  const row = document.createElement('div'); row.className = 'outline-row';
+  const children = node.children || [];
+  const collapsed = collapsedOutlineIds.has(node.id);
+  const toggle = document.createElement('button');
+  toggle.type = 'button'; toggle.dataset.testid = 'outline-toggle'; toggle.dataset.nodeId = node.id; toggle.tabIndex = -1;
+  toggle.className = 'outline-toggle' + (children.length ? '' : ' leaf');
+  toggle.textContent = collapsed ? '▸' : '▾'; toggle.setAttribute('aria-label', (collapsed ? '展开' : '折叠') + node.type);
+  if (!children.length) { toggle.disabled = true; toggle.setAttribute('aria-hidden', 'true'); }
+  else toggle.addEventListener('click', () => {
+    if (collapsed) collapsedOutlineIds.delete(node.id); else collapsedOutlineIds.add(node.id);
+    renderOutline();
+    const nextToggle = Array.from(document.querySelectorAll('[data-testid="outline-toggle"]')).find((el) => el.dataset.nodeId === node.id);
+    if (nextToggle) nextToggle.focus({ preventScroll: true });
+  });
+  const select = document.createElement('button');
+  select.type = 'button'; select.dataset.testid = 'outline-select'; select.dataset.nodeId = node.id;
+  select.className = 'outline-select' + (selectedIds.includes(node.id) ? ' active' : '');
+  select.setAttribute('role', 'treeitem'); select.setAttribute('aria-level', String(depth + 1));
+  select.setAttribute('aria-selected', String(selectedIds.includes(node.id)));
+  if (children.length) select.setAttribute('aria-expanded', String(!collapsed));
+  const label = document.createElement('span'); label.className = 'outline-label'; label.textContent = (M.COMPONENTS[node.type] || {}).label || node.type;
+  const type = document.createElement('small'); type.textContent = node.type;
+  select.append(label, type); select.addEventListener('click', (e) => selectNodeFromEvent(node.id, e));
+  row.append(toggle, select); branch.append(row);
+  if (children.length && !collapsed) {
+    const group = document.createElement('div'); group.className = 'outline-children'; group.setAttribute('role', 'group');
+    for (const child of children) group.append(renderOutlineBranch(child, depth + 1));
+    branch.append(group);
+  }
+  return branch;
+}
+function renderOutline() {
+  document.getElementById('outline').replaceChildren(renderOutlineBranch(stack.current.root, 0));
+}
+
+function renderBody(node) {
   // 内容渲染统一交给 page-render.js：搭建器和宿主内页面用同一份实现，不会再出现「预览和画布不一致」。
   if (window.TurnstilePageRender) {
     const box = window.TurnstilePageRender.renderBody(node);
@@ -119,10 +238,66 @@ function renderNode(node) {
   return el;
 }
 
+function compatibleField(a, b) {
+  return a.type === b.type && JSON.stringify(a.options || []) === JSON.stringify(b.options || []) && a.min === b.min && a.max === b.max;
+}
+
+function commonFields(nodes, kind) {
+  const schemas = nodes.map((n) => kind === 'style' ? M.STYLE_SCHEMA : ((M.COMPONENTS[n.type] || {}).propsSchema || {}));
+  return Object.entries(schemas[0] || {}).filter(([key, field]) => schemas.every((schema) => schema[key] && compatibleField(field, schema[key])));
+}
+
+function renderBatchFields(box, nodes, kind, fields) {
+  for (const [key, field] of fields) {
+    const wrap = document.createElement('div'); wrap.className = 'field';
+    const label = document.createElement('label'); label.textContent = (kind === 'style' ? '样式 · ' : '') + field.label;
+    const common = S.commonValue(nodes.map((n) => ({ value: kind === 'style' ? (n.style || {})[key] : n.props[key] })), 'value');
+    let input;
+    if (field.type === 'enum') {
+      input = document.createElement('select');
+      if (common.mixed) { const mixed = document.createElement('option'); mixed.value = '__turnstile_mixed__'; mixed.textContent = '多个值'; mixed.selected = true; mixed.disabled = true; input.append(mixed); }
+      for (const o of field.options || []) { const op = document.createElement('option'); op.value = o; op.textContent = String(o); if (!common.mixed && String(common.value) === String(o)) op.selected = true; input.append(op); }
+    } else {
+      input = document.createElement('input'); input.type = field.type === 'number' ? 'number' : 'text';
+      input.value = common.mixed || common.value == null ? '' : common.value;
+      if (common.mixed) input.placeholder = '多个值';
+      if (field.min !== undefined) input.min = field.min; if (field.max !== undefined) input.max = field.max;
+    }
+    input.dataset.testid = 'batch-' + kind + '-' + key;
+    input.setAttribute('aria-label', '批量' + field.label);
+    input.addEventListener('change', () => {
+      if (input.value === '__turnstile_mixed__') return;
+      try {
+        commit({ type: kind === 'style' ? 'setStyleMany' : 'setPropMany', nodeIds: selectedIds.slice(), key, value: input.value });
+        status('已批量修改 ' + selectedIds.length + ' 个节点的 ' + key); render();
+      } catch (e) {
+        const err = document.createElement('div'); err.className = 'err'; err.dataset.testid = 'batch-error'; err.textContent = e.message; wrap.append(err);
+      }
+    });
+    wrap.append(label, input); box.append(wrap);
+  }
+}
+
+function renderMultiInspector(nodes) {
+  const box = document.getElementById('inspector');
+  const head = document.createElement('p'); head.dataset.testid = 'multi-inspector'; head.style.color = '#8fa3b5'; head.textContent = '已选 ' + nodes.length + ' 个节点';
+  const hint = document.createElement('p'); hint.style.color = '#7d8fa1'; hint.style.fontSize = '11px'; hint.textContent = '只显示共同属性；一次批量修改对应一个历史步骤。';
+  const propHead = document.createElement('h4'); propHead.textContent = '共同属性';
+  const propBox = document.createElement('div');
+  const props = commonFields(nodes, 'prop');
+  if (props.length) renderBatchFields(propBox, nodes, 'prop', props);
+  else propBox.append(Object.assign(document.createElement('p'), { textContent: '这些节点没有共同的属性。', style: 'color:#7d8fa1;font-size:11px' }));
+  const styleHead = document.createElement('h4'); styleHead.textContent = '共同样式'; styleHead.style.marginTop = '14px';
+  const styleBox = document.createElement('div'); renderBatchFields(styleBox, nodes, 'style', commonFields(nodes, 'style'));
+  box.replaceChildren(head, hint, propHead, propBox, styleHead, styleBox);
+}
+
 function renderInspector() {
   const box = document.getElementById('inspector');
-  const node = M.findNode(stack.current.root, selectedId);
-  if (!node) { box.replaceChildren(Object.assign(document.createElement('p'), { textContent: '选中一个节点', style: 'color:#7d8fa1' })); return; }
+  const nodes = selectedIds.map((id) => M.findNode(stack.current.root, id)).filter(Boolean);
+  if (nodes.length > 1) { renderMultiInspector(nodes); return; }
+  const node = nodes[0] || null;
+  if (!node) { box.replaceChildren(Object.assign(document.createElement('p'), { textContent: '未选中节点；点击画布可选中，Ctrl／Shift 可多选。', style: 'color:#7d8fa1' })); return; }
   const spec = M.COMPONENTS[node.type];
   const head = document.createElement('p'); head.style.color = '#8fa3b5'; head.textContent = spec.label + ' · ' + node.id;
   const box2 = document.createElement('div');
@@ -140,7 +315,7 @@ function renderInspector() {
     }
     input.dataset.testid = 'prop-' + key;
     input.addEventListener('change', () => {
-      try { stack = M.run(stack, { type: 'setProp', nodeId: node.id, key, value: input.value }); status('已修改 ' + key); render(); }
+      try { commit({ type: 'setProp', nodeId: node.id, key, value: input.value }); status('已修改 ' + key); render(); }
       catch (e) { const err = document.createElement('div'); err.className = 'err'; err.dataset.testid = 'prop-error'; err.textContent = e.message; wrap.append(err); }
     });
     wrap.append(label, input); box2.append(wrap);
@@ -163,16 +338,21 @@ function renderInspector() {
     }
     input.dataset.testid = 'style-' + key;
     input.addEventListener('change', () => {
-      try { stack = M.run(stack, { type: 'setStyle', nodeId: node.id, key, value: input.value }); status('样式 ' + key + ' 已改'); render(); }
+      try { commit({ type: 'setStyle', nodeId: node.id, key, value: input.value }); status('样式 ' + key + ' 已改'); render(); }
       catch (e) { const err = document.createElement('div'); err.className = 'err'; err.dataset.testid = 'style-error'; err.textContent = e.message; wrap.append(err); }
     });
     wrap.append(label, input); styleBox.append(wrap);
   }
 
+  const actions = document.createElement('div'); actions.style.display = 'flex'; actions.style.flexWrap = 'wrap'; actions.style.gap = '6px';
+  const copyButton = document.createElement('button'); copyButton.textContent = '复制节点'; copyButton.dataset.testid = 'copy-node'; copyButton.title = 'Ctrl／Cmd+C';
+  copyButton.disabled = node.id === stack.current.root.id; copyButton.addEventListener('click', copySelected);
+  const pasteButton = document.createElement('button'); pasteButton.textContent = '粘贴到此处'; pasteButton.dataset.testid = 'paste-node'; pasteButton.title = 'Ctrl／Cmd+V';
+  pasteButton.disabled = !clipboardNode; pasteButton.addEventListener('click', pasteSelected);
   const del = document.createElement('button'); del.textContent = '删除节点'; del.dataset.testid = 'remove-node';
   del.disabled = node.id === stack.current.root.id;
-  del.addEventListener('click', () => { try { stack = M.run(stack, { type: 'remove', nodeId: node.id }); selectedId = stack.current.root.id; render(); } catch (e) { status(e.message); } });
-  box2.append(del);
+  del.addEventListener('click', deleteSelected);
+  actions.append(copyButton, pasteButton, del); box2.append(actions);
   box.replaceChildren(head, box2, styleHead, styleBox);
 }
 
@@ -202,9 +382,80 @@ function renderTemplates() {
     b.style.display = 'block'; b.style.width = '100%'; b.style.marginBottom = '4px';
     b.dataset.testid = 'template-' + key;
     b.textContent = t.label;
-    b.addEventListener('click', () => { stack = t.build(M); selectedId = stack.current.root.id; status('已套用模板 ' + t.label); render(); });
+    b.addEventListener('click', () => { stack = { ...t.build(M), past: [], future: [] }; selectSingle(stack.current.root.id); resetHistory('模板 · ' + t.label); status('已套用模板 ' + t.label); render(); });
     box.append(b);
   }
+}
+
+function ensureSelection() {
+  selectedIds = selectedIds.filter((id) => M.findNode(stack.current.root, id));
+  if (!selectedIds.length) { selectSingle(stack.current.root.id); return; }
+  if (!selectedIds.includes(selectionAnchor)) selectionAnchor = selectedIds[0];
+  if (!selectedIds.includes(selectedId)) selectedId = selectedIds[selectedIds.length - 1];
+}
+
+// 时间线不是另一份只读日志：跳转后同步重建 past/future，后续撤销、重做和新分支都指向同一状态。
+function syncStackToTimeline() {
+  stack = {
+    ...stack,
+    current: copy(H.current(timeline)),
+    past: timeline.steps.slice(0, timeline.cursor).map((s) => ({ cmd: null, page: copy(s.state) })),
+    future: timeline.steps.slice(timeline.cursor + 1).map((s) => copy(s.state)),
+    focus: undefined,
+  };
+  ensureSelection();
+}
+
+function jumpHistory(index) {
+  if (!H.jumpTo(timeline, index)) return;
+  syncStackToTimeline();
+  status('已回到历史步骤 ' + (index + 1) + ' · ' + timeline.steps[index].label);
+  render();
+}
+
+function moveHistory(delta) {
+  const next = delta < 0 ? M.undo(stack) : M.redo(stack);
+  if (next === stack) { status(delta < 0 ? '没有可撤销的编辑' : '没有可重做的编辑'); return; }
+  stack = next;
+  H.step(timeline, delta);
+  ensureSelection();
+  status(delta < 0 ? '已撤销' : '已重做');
+  render();
+}
+
+function jumpSnapshot(index) {
+  const snap = stack.snapshots[index];
+  if (!snap) return;
+  const signature = JSON.stringify(snap.page);
+  let historyIndex = -1;
+  for (let i = timeline.steps.length - 1; i >= 0; i--) {
+    if (JSON.stringify(timeline.steps[i].state) === signature) { historyIndex = i; break; }
+  }
+  if (historyIndex >= 0) {
+    if (H.jumpTo(timeline, historyIndex)) syncStackToTimeline();
+  } else {
+    // 超出时间线容量的旧快照仍可使用；它成为一个新的、明确标记的基线。
+    stack = M.jumpTo(stack, index);
+    resetHistory('快照 · ' + snap.label);
+    ensureSelection();
+  }
+  status('跳到快照 ' + (index + 1));
+  render();
+}
+
+function renderHistory() {
+  const box = document.getElementById('history');
+  box.replaceChildren();
+  H.rows(timeline).slice().reverse().forEach((row) => {
+    const b = document.createElement('button');
+    b.dataset.testid = 'builder-history-' + row.index;
+    b.className = row.current ? 'active' : '';
+    if (row.current) b.setAttribute('aria-current', 'step');
+    b.title = '回到：' + row.label;
+    b.textContent = new Date(row.at).toLocaleTimeString('zh-CN', { hour12: false }) + ' · ' + row.label;
+    b.addEventListener('click', () => jumpHistory(row.index));
+    box.append(b);
+  });
 }
 
 function renderSnaps() {
@@ -214,10 +465,10 @@ function renderSnaps() {
     const b = document.createElement('button');
     b.dataset.testid = 'snap-' + i;
     b.textContent = (i + 1) + '. ' + s.label + ' · ' + s.at.slice(11, 19);
-    b.addEventListener('click', () => { stack = M.jumpTo(stack, i); status('跳到快照 ' + (i + 1)); render(); });
+    b.addEventListener('click', () => jumpSnapshot(i));
     box.append(b);
   });
-  document.getElementById('snapinfo').textContent = stack.snapshots.length + ' 个快照 · ' + stack.past.length + ' 步可撤销';
+  document.getElementById('snapinfo').textContent = stack.snapshots.length + ' 个快照 · ' + timeline.steps.length + ' 个历史步骤 · ' + stack.past.length + ' 步可撤销';
 }
 
 function dropInto(parentId) {
@@ -226,12 +477,12 @@ function dropInto(parentId) {
   if (!M.capabilitiesOf(target.type).acceptsChildren) { status(target.type + ' 不接受子节点'); return; }
   try {
     if (dragPayload && dragPayload.kind === 'new') {
-      stack = M.run(stack, { type: 'add', parentId, component: dragPayload.type });
-      selectedId = stack.focus; status('已添加 ' + dragPayload.type);
+      commit({ type: 'add', parentId, component: dragPayload.type });
+      status('已添加 ' + dragPayload.type);
     } else if (dragPayload && dragPayload.kind === 'move') {
       if (dragPayload.id === parentId) { status('不能移动到自身'); return; }
-      stack = M.run(stack, { type: 'move', nodeId: dragPayload.id, parentId });
-      selectedId = dragPayload.id; status('已移动');
+      commit({ type: 'move', nodeId: dragPayload.id, parentId });
+      status('已移动');
     }
     render();
   } catch (e) { status(e.message); }
@@ -240,24 +491,159 @@ function dropInto(parentId) {
 async function save() {
   status('保存中…');
   try {
-    const r = await api('/turnstile/page', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ page: stack.current }) });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const pluginName = document.getElementById('export-name').value;
+    const pageToSave = { ...stack.current, meta: { ...(stack.current.meta || {}), pluginName } };
+    const r = await api('/turnstile/page', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ page: pageToSave }) });
+    const result = await r.json();
+    if (!r.ok) throw new Error(result.error || ('HTTP ' + r.status));
+    stack = { ...stack, current: pageToSave };
     status('已保存 ' + new Date().toLocaleTimeString());
-  } catch (e) { status('保存失败：' + e.message); }
+    return true;
+  } catch (e) { status('保存失败：' + e.message); return false; }
+}
+
+async function exportPage() {
+  status('正在导出当前画布…');
+  try {
+    const name = document.getElementById('export-name').value;
+    const r = await api('/turnstile/export', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, page: stack.current }) });
+    const result = await r.json();
+    if (!r.ok) throw new Error(result.error || ('HTTP ' + r.status));
+    const verification = result.verification;
+    const summary = verification ? (verification.ok ? '导出与隔离模块自检通过' : '已导出，但隔离模块自检未通过') : '已导出';
+    status(summary + ' · ' + result.outDir + ' · 路由 ' + result.route + ' · 尚未试装真实 mini');
+  } catch (e) { status('导出失败：' + e.message); }
+}
+
+async function restore() {
+  try {
+    const r = await api('/turnstile/page');
+    const savedPage = await r.json();
+    if (!r.ok) throw new Error(savedPage.error || ('HTTP ' + r.status));
+    if (savedPage.schema !== M.PAGE_SCHEMA || !savedPage.root) return;
+    stack = M.createStack(savedPage);
+    selectSingle(stack.current.root.id);
+    resetHistory('已保存页面');
+    if (savedPage.meta && savedPage.meta.pluginName) document.getElementById('export-name').value = savedPage.meta.pluginName;
+    render();
+    status('已恢复上次保存的页面');
+  } catch (e) { status('读取已保存页面失败：' + e.message); }
+}
+
+function copySelected() {
+  if (selectedIds.length !== 1) { status('复制请先单选一个节点'); return false; }
+  const node = M.findNode(stack.current.root, selectedId);
+  if (!node || node.id === stack.current.root.id) { status('根节点不能复制'); return false; }
+  clipboardNode = copy(node);
+  status('已复制 ' + node.type + ' · 选择目标位置后粘贴');
+  render();
+  return true;
+}
+function pasteSelected() {
+  if (!clipboardNode) { status('剪贴板为空，请先复制一个节点'); return false; }
+  if (selectedIds.length !== 1) { status('粘贴请先单选目标位置'); return false; }
+  const selected = M.findNode(stack.current.root, selectedId);
+  if (!selected) return false;
+  const parent = M.capabilitiesOf(selected.type).acceptsChildren ? selected : M.findParent(stack.current.root, selected.id);
+  try {
+    commit({ type: 'paste', parentId: parent.id, node: copy(clipboardNode) });
+    status('已粘贴 ' + clipboardNode.type + ' · 可撤销');
+    render();
+    return true;
+  } catch (e) { status(e.message); return false; }
+}
+function deleteSelected() {
+  if (selectedIds.length !== 1) { status(selectedIds.length > 1 ? '多选删除尚未支持；请先单选一个节点' : '请先选中一个节点'); return false; }
+  const node = M.findNode(stack.current.root, selectedId);
+  if (!node || node.id === stack.current.root.id) { status('根节点不能删除'); return false; }
+  try {
+    commit({ type: 'remove', nodeId: node.id });
+    selectSingle(stack.current.root.id);
+    status('已删除 ' + node.type + ' · 可撤销');
+    render();
+    return true;
+  } catch (e) { status(e.message); return false; }
 }
 
 function render() {
+  const active = document.activeElement;
+  const focusArea = active && active.closest('#canvas') ? 'canvas' : (active && active.closest('#outline') ? 'outline' : null);
   const canvas = document.getElementById('canvas');
   canvas.replaceChildren(renderNode(stack.current.root));
   document.getElementById('undo').disabled = stack.past.length === 0;
   document.getElementById('redo').disabled = stack.future.length === 0;
-  renderInspector(); renderSnaps();
+  renderOutline(); renderInspector(); renderSnaps(); renderHistory();
+  // DOM 重建后恢复键盘焦点；选择、折叠和焦点本身不进入编辑历史。
+  if (focusArea) {
+    const selector = focusArea === 'canvas' ? '#canvas .node' : '#outline .outline-select';
+    const target = Array.from(document.querySelectorAll(selector)).find((el) => el.dataset.nodeId === selectedId);
+    if (target) target.focus({ preventScroll: true });
+  }
 }
 
-document.getElementById('undo').addEventListener('click', () => { stack = M.undo(stack); status('已撤销'); render(); });
-document.getElementById('redo').addEventListener('click', () => { stack = M.redo(stack); status('已重做'); render(); });
+function isEditableTarget(target) {
+  return Boolean(target && (target.isContentEditable || target.closest('input, textarea, select, [contenteditable="true"]')));
+}
+function isCanvasContext(target) {
+  return Boolean(target && (target === document.body || target.closest('#canvas, #outline')));
+}
+function moveSelectionByKeyboard(key) {
+  if (selectedIds.length !== 1) { status('方向键导航请先单选一个节点'); return; }
+  const order = nodeOrder(stack.current.root);
+  const index = order.indexOf(selectedId);
+  const nextIndex = index + (key === 'ArrowDown' ? 1 : -1);
+  if (index < 0 || nextIndex < 0 || nextIndex >= order.length) { status('已到组件顺序的边界'); return; }
+  selectSingle(order[nextIndex]);
+  status('已选中 ' + M.findNode(stack.current.root, selectedId).type);
+  render();
+}
+function moveStructureByKeyboard(key) {
+  if (selectedIds.length !== 1) { status('移动节点请先单选一个节点'); return; }
+  const node = M.findNode(stack.current.root, selectedId);
+  if (!node || node.id === stack.current.root.id) { status('根节点不能移动'); return; }
+  const parent = M.findParent(stack.current.root, node.id);
+  const index = parent.children.findIndex((child) => child.id === node.id);
+  let targetParent = parent;
+  let targetIndex = index;
+  let message = '已调整同级顺序';
+  if (key === 'ArrowRight') {
+    const previous = parent.children[index - 1];
+    if (!previous || !M.capabilitiesOf(previous.type).acceptsChildren) { status('前一个同级节点不是可接收子节点的容器'); return; }
+    targetParent = previous; targetIndex = previous.children.length; message = '已增加层级 · 移入 ' + previous.type;
+  } else if (key === 'ArrowLeft') {
+    const grandparent = M.findParent(stack.current.root, parent.id);
+    if (!grandparent) { status('节点已在最外层'); return; }
+    targetParent = grandparent; targetIndex = grandparent.children.findIndex((child) => child.id === parent.id) + 1; message = '已减少层级 · 移到 ' + parent.type + ' 后面';
+  } else {
+    targetIndex = index + (key === 'ArrowDown' ? 1 : -1);
+    if (targetIndex < 0 || targetIndex >= parent.children.length) { status('已到同级顺序的边界'); return; }
+  }
+  try { commit({ type: 'move', nodeId: node.id, parentId: targetParent.id, index: targetIndex }); status(message); render(); }
+  catch (e) { status(e.message); }
+}
+document.addEventListener('keydown', (e) => {
+  const key = e.key.toLowerCase();
+  const command = e.ctrlKey || e.metaKey;
+  if (command && key === 's' && !e.altKey) { e.preventDefault(); save(); return; }
+  if (isEditableTarget(e.target)) return;
+  if (command && key === 'z') { e.preventDefault(); moveHistory(e.shiftKey ? 1 : -1); return; }
+  if (command && key === 'y' && !e.shiftKey) { e.preventDefault(); moveHistory(1); return; }
+  if (command && !e.altKey && key === 'c' && isCanvasContext(e.target)) { e.preventDefault(); copySelected(); return; }
+  if (command && !e.altKey && key === 'v' && isCanvasContext(e.target)) { e.preventDefault(); pasteSelected(); return; }
+  if (e.altKey && !command && !e.shiftKey && isCanvasContext(e.target) && e.key.startsWith('Arrow')) { e.preventDefault(); moveStructureByKeyboard(e.key); return; }
+  if (e.key === 'Escape' && pendingType) { e.preventDefault(); pendingType = null; status('已取消组件放置'); return; }
+  if (e.altKey || command || !isCanvasContext(e.target)) return;
+  if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); return; }
+  if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.shiftKey) { e.preventDefault(); moveSelectionByKeyboard(e.key); }
+});
+
+document.getElementById('undo').addEventListener('click', () => moveHistory(-1));
+document.getElementById('redo').addEventListener('click', () => moveHistory(1));
 document.getElementById('save').addEventListener('click', save);
+document.getElementById('export').addEventListener('click', exportPage);
+document.getElementById('preview').href = '/turnstile/view?token=' + encodeURIComponent(token);
 
 renderPalette(); renderTemplates(); render();
 status('拖一个组件到画布开始');
+restore();
 </script></body></html>

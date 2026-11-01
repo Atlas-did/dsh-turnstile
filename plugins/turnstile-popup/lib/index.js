@@ -11,8 +11,11 @@ import { readViewState, writeViewState } from "./view-state.js";
 import { toggleText } from "./toggle-text.js";
 import { DEFAULT_RULES as DEFAULT_HOOK_RULES, validateRules as validateHookRules } from "./hook-rules.js";
 import * as health from "./health.js";
+import { exportPlugin } from "./plugin-export.js";
+import { verifyExportedPlugin } from "./export-verify.js";
 import { designerTransaction } from "./designer-ops.js";
-import { beginOperation, settleOperation, recoverJournal } from "./journal.js";
+import { beginOperation, settleOperation, recoverJournal, listOperations } from "./journal.js";
+import { randomUUID } from "node:crypto";
 
 const STATE_DIR = () => process.env.DSH_TURNSTILE_STATE || join(process.env.DSH_TURNSTILE_HOME || process.cwd(), "state");
 // B17: every endpoint must read the same state base, or two of them disagree about the same data.
@@ -417,17 +420,37 @@ export function apply(ctx, config) {
 
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
+    path: "/turnstile/audit",
+    handler: async (req, res) => {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
+      if (!requestRejection(req, res)) return;
+      sendJson(res, 200, { entries: listOperations(STATE_DIR()) });
+    },
+  }), "turnstile: GET /turnstile/audit");
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
     path: "/turnstile/designer",
     handler: async (req, res) => {
       if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
       if (!requestRejection(req, res)) return;
+      const planId = randomUUID();
+      let dryRun = true;
+      let started = false;
       try {
         let body = "";
         for await (const chunk of req) body += chunk;
         const args = JSON.parse(body || "{}");
-        const result = designerTransaction(dir, args.operations, { dryRun: args.dryRun !== false, expected: args.expected }, readRows(dir));
-        sendJson(res, 200, result);
-      } catch (e) { sendJson(res, e.status || 400, { error: String((e && e.message) || e).slice(0, 180) }); }
+        dryRun = args.dryRun !== false;
+        const summary = Array.isArray(args.operations) ? args.operations.slice(0, 100).map((op) => ({ type: String(op?.type || ""), package: String(op?.package || ""), disable: typeof op?.disable === "boolean" ? op.disable : undefined, anchor: typeof op?.anchor === "string" ? op.anchor : undefined })) : [];
+        beginOperation(STATE_DIR(), { planId, kind: "designer", dryRun, target: "cordis.patch.yml", workspace: String(args.workspace || "default").slice(0, 80), operationCount: summary.length, operations: summary });
+        started = true;
+        const result = designerTransaction(dir, args.operations, { dryRun, expected: args.expected }, readRows(dir));
+        settleOperation(STATE_DIR(), planId, dryRun ? "previewed" : "applied", { changed: result.changed });
+        sendJson(res, 200, Object.assign({}, result, { auditId: planId }));
+      } catch (e) {
+        if (started) { try { settleOperation(STATE_DIR(), planId, "failed", String((e && e.message) || e).slice(0, 180)); } catch {} }
+        sendJson(res, e.status || 400, { error: String((e && e.message) || e).slice(0, 180), details: e.details || [], auditId: started ? planId : undefined });
+      }
     },
   }), "turnstile: POST /turnstile/designer");
   ctx.effect(() => ctx.webServer.register({
@@ -813,6 +836,30 @@ export function apply(ctx, config) {
       } catch (e) { return sendJson(res, 500, { error: String(e.message).slice(0, 160) }); }
     },
   }), "turnstile: GET/POST /turnstile/page");
+
+  // 导出只写本插件的 state/exports；浏览器只能给插件名和页面，不能指定任意输出路径。
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/export",
+    handler: async (req, res) => {
+      if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
+      if (!requestRejection(req, res)) return;
+      try {
+        let body = "";
+        for await (const chunk of req) {
+          body += chunk;
+          if (body.length > 2e6) return sendJson(res, 413, { error: "页面过大" });
+        }
+        const parsed = JSON.parse(body || "{}");
+        const renderer = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "page-render.js"), "utf8");
+        const result = exportPlugin(parsed.page, join(stateBase(), "exports", String(parsed.name || "")), { name: parsed.name, renderer });
+        const verification = await verifyExportedPlugin(result.outDir);
+        return sendJson(res, 200, { ok: verification.ok, ...result, verification });
+      } catch (e) {
+        return sendJson(res, 400, { error: String((e && e.message) || e).slice(0, 180) });
+      }
+    },
+  }), "turnstile: POST /turnstile/export");
   // B11: there used to be two shells (/turnstile/ = a 6 KB light summary, /turnstile/console = the
   // real 44 KB console). Two shells showing the same data differently is how "same data, two verdicts"
   // happens; keep one, and redirect the old address so existing links still work.

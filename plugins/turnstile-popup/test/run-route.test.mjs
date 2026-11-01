@@ -1,9 +1,15 @@
 // /turnstile/run 的契约与安全约束（02 设计 §4.2/§4.4）。
 import { handleRun, _resetForTests } from '../lib/run-route.js';
+import { cpSync, existsSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
-const profile = 'tests/console-fixture';
+const profile = join(mkdtempSync(join(tmpdir(), 'run-route-profile-')), 'console-fixture');
+const state = mkdtempSync(join(tmpdir(), 'run-route-state-'));
+cpSync('tests/console-fixture', profile, { recursive: true });
+process.env.DSH_TURNSTILE_STATE = state;
 
 _resetForTests();
 
@@ -24,10 +30,12 @@ ok('写操作必须先 dry-run', noToken.status === 403 && /dry-run/.test(noToke
 _resetForTests();
 const dry = await handleRun({ command: 'snapshot-take', args: { profile }, dryRun: true });
 ok('dryRun 成功并签发 applyToken', dry.status === 200 && typeof dry.body.applyToken === 'string' && dry.body.applyToken.length > 10, String(dry.status));
+ok('drySafe:false 的路由计划阶段不写快照', !existsSync(join(state, 'snapshots')) && dry.body.data?.dryRun === true);
 
 // 5) 用 token 执行成功，且 token 一次性
 const applied = await handleRun({ command: 'snapshot-take', args: { profile }, applyToken: dry.body.applyToken });
 ok('带 token 执行成功', applied.status === 200 && applied.body.ok === true, String(applied.status));
+ok('只有确认执行后才写快照', existsSync(join(state, 'snapshots')));
 const reuse = await handleRun({ command: 'snapshot-take', args: { profile }, applyToken: dry.body.applyToken });
 ok('token 不能复用', reuse.status === 403, String(reuse.status));
 

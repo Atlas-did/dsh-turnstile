@@ -1,0 +1,53 @@
+{
+ "version": 1,
+ "entries": [
+  {
+   "id": "7e7232fc-254e-43da-9b68-1a4d5c38d807",
+   "at": "2026-11-01T09:21:28.049Z",
+   "status": "previewed",
+   "planId": "7e7232fc-254e-43da-9b68-1a4d5c38d807",
+   "kind": "designer",
+   "dryRun": true,
+   "target": "cordis.patch.yml",
+   "workspace": "default",
+   "operationCount": 0,
+   "operations": [],
+   "detail": {
+    "changed": false
+   },
+   "settledAt": "2026-11-01T09:21:28.053Z"
+  },
+  {
+   "id": "584e4496-8d00-41d3-a1a6-6f6e11990c15",
+   "at": "2026-11-01T09:35:35.901Z",
+   "status": "previewed",
+   "planId": "584e4496-8d00-41d3-a1a6-6f6e11990c15",
+   "kind": "designer",
+   "dryRun": true,
+   "target": "cordis.patch.yml",
+   "workspace": "default",
+   "operationCount": 0,
+   "operations": [],
+   "detail": {
+    "changed": false
+   },
+   "settledAt": "2026-11-01T09:35:35.906Z"
+  },
+  {
+   "id": "139d4ecc-577b-4cb3-8eac-362bb7779882",
+   "at": "2026-11-01T09:46:14.339Z",
+   "status": "previewed",
+   "planId": "139d4ecc-577b-4cb3-8eac-362bb7779882",
+   "kind": "designer",
+   "dryRun": true,
+   "target": "cordis.patch.yml",
+   "workspace": "default",
+   "operationCount": 0,
+   "operations": [],
+   "detail": {
+    "changed": false
+   },
+   "settledAt": "2026-11-01T09:46:14.343Z"
+  }
+ ]
+}

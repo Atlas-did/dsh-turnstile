@@ -87,5 +87,55 @@ threw = '';
 try { applyCommand(sz, { type: 'setStyle', nodeId: sz.root.children[0].id, key: 'fontSize', value: '99' }); } catch (e) { threw = e.message; }
 ok('字号超范围被拒', /不能大于/.test(threw), threw);
 
+// 多选批量编辑：一个原子命令、一个撤销步骤，失败时原页面不变。
+const batchBase = applyCommand(newPage(), { type: 'add', parentId: 'stack-root', component: 'heading' }).page;
+const batchBoth = applyCommand(batchBase, { type: 'add', parentId: 'stack-root', component: 'text' }).page;
+const batchIds = batchBoth.root.children.map((n) => n.id);
+const batchChanged = applyCommand(batchBoth, { type: 'setPropMany', nodeIds: batchIds, key: 'text', value: '统一文字' }).page;
+ok('批量属性写入所有选中节点', batchChanged.root.children.every((n) => n.props.text === '统一文字'));
+ok('批量命令不修改输入页面', batchBoth.root.children[0].props.text !== '统一文字' && batchBoth.root.children[1].props.text === '一段说明');
+const batchStyled = applyCommand(batchChanged, { type: 'setStyleMany', nodeIds: batchIds, key: 'align', value: 'center' }).page;
+ok('批量样式写入所有选中节点', batchStyled.root.children.every((n) => n.style.align === 'center'));
+let batchStack = createStack(batchBoth);
+batchStack = run(batchStack, { type: 'setPropMany', nodeIds: batchIds, key: 'text', value: '统一文字' });
+ok('一次批量修改只产生一个命令步骤', batchStack.past.length === 1);
+batchStack = undo(batchStack);
+ok('一次撤销恢复所有节点的原值', batchStack.current.root.children[0].props.text !== '统一文字' && batchStack.current.root.children[1].props.text === '一段说明');
+batchStack = redo(batchStack);
+ok('一次重做恢复所有节点的新值', batchStack.current.root.children.every((n) => n.props.text === '统一文字'));
+threw = '';
+try { applyCommand(batchBoth, { type: 'setPropMany', nodeIds: batchIds, key: 'columns', value: 3 }); } catch (e) { threw = e.message; }
+ok('任一目标不支持属性时整个批量命令失败', /没有属性/.test(threw) && batchBoth.root.children.every((n) => n.props.columns === undefined), threw);
+threw = '';
+try { applyCommand(batchBoth, { type: 'setPropMany', nodeIds: [], key: 'text', value: 'x' }); } catch (e) { threw = e.message; }
+ok('空选择不能执行批量命令', /至少选择一个节点/.test(threw), threw);
+
+// 粘贴：整棵子树保留属性与样式，但所有节点都获得新 id，并作为一个原子步骤撤销。
+const pasteBase = applyCommand(newPage(), { type: 'add', parentId: 'stack-root', component: 'panel' }).page;
+const pastePanelId = pasteBase.root.children[0].id;
+const pasteWithChild = applyCommand(pasteBase, { type: 'add', parentId: pastePanelId, component: 'text', props: { text: '复制这段' } }).page;
+const pasteSource = pasteWithChild.root.children[0];
+const pastedPage = applyCommand(pasteWithChild, { type: 'paste', parentId: pasteWithChild.root.id, node: pasteSource }).page;
+const pastedCopy = pastedPage.root.children[1];
+ok('粘贴保留子树内容', pastedCopy.children[0].props.text === '复制这段' && pastedCopy.props.title === pasteSource.props.title);
+ok('粘贴重新生成整棵子树编号', pastedCopy.id !== pasteSource.id && pastedCopy.children[0].id !== pasteSource.children[0].id);
+ok('粘贴不会修改源节点', JSON.stringify(pastedPage.root.children[0]) === JSON.stringify(pasteSource));
+const pastedTwice = applyCommand(pastedPage, { type: 'paste', parentId: pastedPage.root.id, node: pasteSource, index: 0 }).page;
+ok('重复粘贴的编号仍唯一且支持位置索引', pastedTwice.root.children[0].id !== pastedCopy.id && new Set(pastedTwice.root.children.map((n) => n.id)).size === 3);
+let pasteStack = createStack(pasteWithChild);
+pasteStack = run(pasteStack, { type: 'paste', parentId: pasteStack.current.root.id, node: pasteSource });
+ok('粘贴只产生一个历史步骤', pasteStack.past.length === 1 && pasteStack.current.root.children.length === 2);
+pasteStack = undo(pasteStack);
+ok('一次撤销移除整棵粘贴子树', pasteStack.current.root.children.length === 1);
+pasteStack = redo(pasteStack);
+ok('一次重做恢复整棵粘贴子树', pasteStack.current.root.children.length === 2 && pasteStack.current.root.children[1].children.length === 1);
+threw = '';
+const beforeBadPaste = JSON.stringify(pasteWithChild);
+try { applyCommand(pasteWithChild, { type: 'paste', parentId: pasteSource.children[0].id, node: pasteSource }); } catch (e) { threw = e.message; }
+ok('粘贴到叶子节点会原子失败', /不接受子节点/.test(threw) && JSON.stringify(pasteWithChild) === beforeBadPaste, threw);
+threw = '';
+try { applyCommand(pasteWithChild, { type: 'paste', parentId: pasteWithChild.root.id, node: { type: 'not-registered' } }); } catch (e) { threw = e.message; }
+ok('未知组件不能通过粘贴绕过注册表', /未知组件/.test(threw), threw);
+
 console.log(fail ? 'PAGEMODEL_TEST_FAILED ' + fail : 'PAGEMODEL_TEST_OK');
 process.exitCode = fail ? 1 : 0;

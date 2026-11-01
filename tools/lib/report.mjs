@@ -1,7 +1,7 @@
 'use strict';
-// 统一输出契约（03 设计 §2）：CLI 与 /turnstile/run 共用这一份整形逻辑。
-//   { ok, verdict, summary, findings[], evidence[], next[], rollback?, exitCode, durationMs }
-// summary 必须是人话；next[] 必须指得动且不自指；agentPrompt 由这里生产。
+// 统一输出契约（03 §2）：CLI / 面板 / 智能体读同一份。
+// 合并后保留两边的东西：人话 summary、agentPrompt 生产者、next 表（我） +
+// 底层 next 透传、data 透传、evidence 合并（kimi）。
 
 export const EXIT = { ok: 0, fail: 1, warn: 2, unknown: 3, usage: 4 };
 
@@ -15,7 +15,7 @@ export function verdictFromExit(code) {
 const LABELS = {
   doctor: '整体体检', gate: '门禁检查', surfaces: 'UI 占用检查', 'slot-report': '槽位分布',
   'check-risk': '依赖风险检查', 'check-conflict': '冲突检查', 'check-engines': '版本闸门',
-  inspect: '插件骨架读取', diagnose: '诊断', preinstall: '装前预检',
+  inspect: '插件骨架读取', diagnose: '诊断', preinstall: '装前预检', 'trial-status': '试装结果',
   'snapshot-take': '拍照快照', 'manage-enable': '启用插件', 'manage-disable': '停用插件',
 };
 const labelOf = (c) => LABELS[c] || ('「' + c + '」');
@@ -32,11 +32,7 @@ function normalizeFinding(f, i, profile) {
     '请先用只读命令确认，再给最小改动方案；写操作必须先 dry-run，等用户确认后才 --apply。',
     '如果 ' + falsifier + '，说明这条是误报，直接告诉用户忽略。',
   ].filter(Boolean).join(' '));
-  return {
-    id: String(f.id || f.checker || 'finding-' + (i + 1)),
-    severity: String(f.severity || f.level || 'warn'),
-    title, evidence: evidence.slice(0, 6), falsifier, agentPrompt,
-  };
+  return { id: String(f.id || f.checker || 'finding-' + (i + 1)), severity: String(f.severity || f.level || 'warn'), title, evidence: evidence.slice(0, 6), falsifier, agentPrompt };
 }
 
 export function humanSummary(verdict, findings, command) {
@@ -49,7 +45,6 @@ export function humanSummary(verdict, findings, command) {
   if (verdict === 'fail') return '存在问题：' + who + '发现 ' + n + ' 条' + (errs ? '（含 ' + errs + ' 条严重）' : '') + '，需要处理。';
   return '数据不足：' + who + '没能给出结论（缺证据，不要据此修复）。';
 }
-
 const NEXT_BY_COMMAND = {
   doctor: [['gate', '跑完整门禁（逐项检查）']],
   gate: [['doctor', '回到整体体检'], ['fix', '把发现转成修复计划']],
@@ -61,16 +56,24 @@ const NEXT_BY_COMMAND = {
   inspect: [['surfaces', '看这个面还被谁占用'], ['doctor', '回到整体体检']],
   diagnose: [['doctor', '回到整体体检']],
   preinstall: [['doctor', '装之前先体检'], ['inspect', '先看这个插件怎么插的']],
+  'trial-status': [['create', '继续创作 / 再试装一次'], ['doctor', '回到整体体检']],
 };
+
+function normalizeNext(n) {
+  if (typeof n === 'string') return { label: n, command: n, mutating: false, reason: '来自命令的下一步建议' };
+  return { label: String(n.label || n.command || '下一步'), command: String(n.command || ''), mutating: Boolean(n.mutating), reason: String(n.reason || '') };
+}
 
 export function shapeReport({ command, exitCode, parsed, stderr, mutating, dryRun, applyToken, durationMs, profile }) {
   const findings = Array.isArray(parsed && parsed.findings) ? parsed.findings.map((f, i) => normalizeFinding(f, i, profile)) : [];
   const verdict = verdictFromExit(exitCode);
   const raw = parsed && typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
-  const isStatusWord = ['warn', 'ok', 'fail', 'clear', 'blocked', 'unknown'].includes(raw.toLowerCase());
-  const summary = (!isStatusWord && raw) ? raw : humanSummary(verdict, findings, command);
+  const isStatusWord = ['warn', 'ok', 'fail', 'clear', 'blocked', 'unknown', 'static-pass'].includes(raw.toLowerCase());
+  const warned = parseTypedWarn(raw);
+  const summary = warned || ((!isStatusWord && raw) ? raw : humanSummary(verdict, findings, command));
+
   const p = profile || '<profile>';
-  const next = [];
+  const next = Array.isArray(parsed && parsed.next) ? parsed.next.map(normalizeNext) : [];
   const add = (label, cmd, isMutating, reason) => next.push({ label, command: cmd, mutating: Boolean(isMutating), reason });
   for (const [cmd, label] of (NEXT_BY_COMMAND[command] || [])) {
     if (cmd === command) continue;
@@ -79,14 +82,17 @@ export function shapeReport({ command, exitCode, parsed, stderr, mutating, dryRu
   if (mutating && dryRun) add('确认执行（写入）', '# 前端点确认执行，或带 applyToken 重放', true, '写操作两段式：先计划，后确认');
   if (verdict === 'unknown') add('补齐证据再判断', 'node tools/turnstile.mjs doctor ' + p, false, 'undetermined：缺证据，不要擅自修复');
   if (!next.length && command !== 'doctor') add('回到整体体检', 'node tools/turnstile.mjs doctor ' + p, false, '本命令没有更具体的下一步');
+
+  const evidence = Array.isArray(parsed && parsed.evidence) ? parsed.evidence.map((e) => (typeof e === 'string' ? e : JSON.stringify(e))).slice(0, 6) : [];
   const report = {
     ok: exitCode === 0,
     verdict,
     command,
     summary: String(summary).slice(0, 300),
+    data: parsed ?? null,
     findings,
-    evidence: stderr ? [stderr.trim().split('\n')[0].slice(0, 200)] : [],
-    next: next.slice(0, 3),
+    evidence: evidence.length ? evidence : (stderr ? [stderr.trim().split('\n')[0].slice(0, 200)] : []),
+    next: next.slice(0, 5),
     exitCode,
     durationMs,
   };
@@ -95,4 +101,11 @@ export function shapeReport({ command, exitCode, parsed, stderr, mutating, dryRu
     if (dryRun && applyToken) report.applyToken = applyToken;
   }
   return report;
+}
+
+// static-pass 这类状态词要变成人话（否则用户看到的就是一个英文枚举）
+function parseTypedWarn(raw) {
+  if (!raw) return '';
+  if (raw.toLowerCase() === 'static-pass') return '静态通过：文件与配置已就位；插件是否被真实宿主加载尚未验证。';
+  return '';
 }

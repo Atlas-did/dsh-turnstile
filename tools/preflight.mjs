@@ -10,6 +10,7 @@ import { promisify } from 'node:util';
 import { existsSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadCheckManifest } from './lib/check-manifest.mjs';
 
 const run = promisify(execFile);
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -33,13 +34,13 @@ const CHECKS = [
   { name: 'ui-placement', script: 'tools/slot-scan.mjs', hint: 'advisory: client plugins whose UI position is hardcoded (no slot/anchor/order)', advisory: true },
 ];
 
-const VALUE_FLAGS = new Set(['--only', '--skip']);
+const VALUE_FLAGS = new Set(['--only', '--skip', '--checks']);
 let dir = '';
 for (let i = 0; i < argv.length; i++) {
   if (VALUE_FLAGS.has(argv[i])) { i++; continue; }
   if (!argv[i].startsWith('--')) { dir = argv[i]; break; }
 }
-if (!dir) { console.error('usage: node tools/preflight.mjs <profileDir> [--only a,b] [--skip c] [--json]'); process.exit(2); }
+if (!dir) { console.error('usage: node tools/preflight.mjs <profileDir> [--only a,b] [--skip c] [--checks manifest.json] [--json]'); process.exit(2); }
 if (!existsSync(join(dir, 'package.json'))) { console.error('not a profile (no package.json): ' + dir); process.exit(2); }
 
 const timeout = Number(process.env.DSH_CHECK_TIMEOUT || 30000);
@@ -52,7 +53,28 @@ const timeout = Number(process.env.DSH_CHECK_TIMEOUT || 30000);
   if (snap) CHECKS.push({ name: 'runtime-truth', script: 'tools/runtime-diff.mjs', args: [snap, '--profile', dir], hint: 'declared in the profile but never activated at runtime' });
 })();
 
-// Selection happens after the runtime check may have been appended above.
+// 外部检查器只在用户显式提供清单时运行；绝不自动发现或执行 profile 中的代码。
+const checkManifest = flagValue('--checks');
+if (isFlag('--checks') && (!checkManifest || checkManifest.startsWith('--'))) {
+  console.error('检查器清单无效：--checks 后面必须给 manifest.json 路径');
+  process.exit(2);
+}
+if (checkManifest) {
+  try {
+    const extensions = loadCheckManifest(checkManifest);
+    const names = new Set(CHECKS.map((c) => c.name));
+    for (const check of extensions) {
+      if (names.has(check.name)) throw new Error('检查器清单无效：与内置检查器重名：' + check.name);
+      names.add(check.name);
+      CHECKS.push(check);
+    }
+  } catch (error) {
+    console.error(error.message);
+    process.exit(2);
+  }
+}
+
+// Selection happens after runtime and extension checks may have been appended above.
 const only = (flagValue('--only') || '').split(',').map((s) => s.trim()).filter(Boolean);
 const skip = (flagValue('--skip') || '').split(',').map((s) => s.trim()).filter(Boolean);
 const aliasOf = (c) => [c.name, c.name.split('-')[0], c.script.split('/').pop().replace(/\.mjs$/, '')];
@@ -92,11 +114,13 @@ function parseEnvelope(stdout) {
 
 async function one(c) {
   const started = Date.now();
-  const args = c.args ? [join(root, c.script), ...c.args, '--json'] : [join(root, c.script), dir, '--json'];
+  const script = c.source ? c.script : join(root, c.script);
+  const source = c.source || 'builtin';
+  const args = c.args ? [script, ...c.args, '--json'] : [script, dir, '--json'];
   try {
     const { stdout } = await run(process.execPath, args, { timeout, maxBuffer: 32 * 1024 * 1024 });
     const j = parseEnvelope(stdout);
-    return { name: c.name, hint: c.hint, exit: 0, ok: true, ms: Date.now() - started, structured: Boolean(j), findings: j ? j.findings : [], out: j ? '' : String(stdout) };
+    return { name: c.name, hint: c.hint, source, exit: 0, ok: true, ms: Date.now() - started, structured: Boolean(j), findings: j ? j.findings : [], out: j ? '' : String(stdout) };
   } catch (e) {
     const code = typeof e.code === 'number' ? e.code : (e.killed ? 'timeout' : 'error');
     const j = parseEnvelope(String(e.stdout || ''));
@@ -106,7 +130,7 @@ async function one(c) {
     const missing = /MISSING_DEPENDENCY|缺少依赖 ([\w@/-]+)/.exec(text);
     if (missing) {
       return {
-        name: c.name, hint: c.hint, exit: 0, ok: true, ms: Date.now() - started,
+        name: c.name, hint: c.hint, source, exit: 0, ok: true, ms: Date.now() - started,
         skipped: true, skipReason: 'missing-dependency',
         next: 'npm install（仓库根）',
         structured: Boolean(j), findings: [],
@@ -114,7 +138,7 @@ async function one(c) {
       };
     }
     return {
-      name: c.name, hint: c.hint, exit: code, ok: false, ms: Date.now() - started,
+      name: c.name, hint: c.hint, source, exit: code, ok: false, ms: Date.now() - started,
       timedOut: e.killed === true, structured: Boolean(j), findings: j ? j.findings : [],
       out: j ? '' : text,
     };
@@ -140,7 +164,7 @@ if (!isFlag('--no-report')) {
       generatedAt: new Date().toISOString(),
       runtimeTimeoutMs: timeout,
       checks: results.map((r) => ({
-        name: r.name, ok: r.ok, exit: r.exit, ms: r.ms, timedOut: Boolean(r.timedOut),
+        name: r.name, source: r.source, ok: r.ok, exit: r.exit, ms: r.ms, timedOut: Boolean(r.timedOut),
         skipped: Boolean(r.skipped), skipReason: r.skipReason || null, next: r.next || null,
         structured: r.structured, findings: r.findings,
         summary: r.structured ? '' : (r.out.trim().split('\n').pop() || '').slice(0, 200),
@@ -157,11 +181,12 @@ if (isFlag('--json')) {
     profile: dir,
     timeoutMs: timeout,
     checks: results.map((r) => ({
-      name: r.name, ok: r.ok, exit: r.exit, ms: r.ms, timedOut: Boolean(r.timedOut),
+      name: r.name, source: r.source, ok: r.ok, exit: r.exit, ms: r.ms, timedOut: Boolean(r.timedOut),
       skipped: Boolean(r.skipped), skipReason: r.skipReason || null, next: r.next || null,
       structured: r.structured, findings: r.findings,
       summary: r.structured ? '' : (r.out.trim().split('\n').pop() || '').slice(0, 200),
     })),
+    blocking: blocking.map((r) => r.name),
     result: failed.length ? 'blocked' : 'clear',
     exit: failed.length ? 1 : 0,
   }, null, 2));

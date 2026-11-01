@@ -8,7 +8,7 @@
 //
 // usage: node tools/turnstile.mjs <子命令> [...]
 import { spawnSync } from 'node:child_process';
-import { COMMANDS, runCommand, argvFor } from './lib/commands.mjs';
+import { COMMANDS, runCommand, argvFor, parseCommandArgs, validate } from './lib/commands.mjs';
 import { shapeReport } from './lib/report.mjs';
 import { issue, verify } from './lib/apply-token.mjs';
 import { join, dirname } from 'node:path';
@@ -17,26 +17,19 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
 
-// 子命令表：key 是给人用的名字，值是脚本名（tools/ 下）
+// 注册命令直接从 COMMANDS 生成；这里只保留没有统一契约的旧入口和组合别名。
 const TABLE = {
-  gate: 'preflight.mjs',
+  ...Object.fromEntries(Object.entries(COMMANDS).map(([name, spec]) => [name, spec.script])),
   preflight: 'preflight.mjs',
-  diagnose: 'diagnose.mjs',
-  doctor: 'doctor.mjs',
   selftest: 'selftest.mjs',
-  inspect: 'inspect-plugin.mjs',
   'diff-plugins': 'diff-plugins.mjs',
   recommend: 'recommend.mjs',
   card: 'card.mjs',
   ask: 'ask.mjs',
-  fix: 'fix.mjs',
-  anchor: 'anchor.mjs',
   manage: 'manage.mjs',
-  preinstall: 'preinstall.mjs',
+  'host-observe': 'host-observe.mjs',
   atlas: 'ui-atlas.mjs',
-  surfaces: 'ui-surfaces.mjs',
   occupancy: 'occupancy.mjs',
-  'slot-report': 'slot-map-report.mjs',
   snapshot: 'profile-snapshot.mjs',
   mini: 'mini-ctl.mjs',
   trial: 'sandbox-trial.mjs',
@@ -104,30 +97,21 @@ if (!argv.length || ['help', '-h', '--help'].includes(argv[0])) { help(); proces
 // 步骤 3：写操作在 CLI 侧也要 token（把 skill 里的口头纪律变成代码约束）。
 if (COMMANDS[argv[0]] && COMMANDS[argv[0]].mutating) {
   const spec = COMMANDS[argv[0]];
-  const positional = argv.slice(1).filter((a) => !a.startsWith('--'));
-  const args = {};
-  const flagKeys = Object.keys(spec.flagMap || {});
-  (spec.positional || []).forEach((k, i) => { if (positional[i] != null) args[k] = positional[i]; });
-  // flagMap 的键也可以按位置传（manage-disable <profile> <pkg>），省得记 --package
-  flagKeys.forEach((k, i) => {
-    const at = (spec.positional || []).length + i;
-    if (positional[at] != null) args[k] = positional[at];
-    const fi = argv.indexOf('--' + k);
-    if (fi >= 0 && argv[fi + 1] != null) args[k] = argv[fi + 1];
-    if (args[k] == null) delete args[k];
-  });
+  const { args, positional } = parseCommandArgs(argv[0], argv.slice(1));
+  const valid = validate(argv[0], args);
+  if (!valid.ok) { console.error('拒绝：' + valid.error); process.exit(2); }
   const dryRun = argv.includes('--dry-run');
   const applyIdx = argv.indexOf('--apply');
   if (dryRun) {
     const issued = issue(argv[0], args);
-    // 真正的结构化计划：直接跑底层脚本的 dry-run/--json（manege 支持；其它退化为一行命令）
+    // 真正的结构化计划：直接跑底层脚本的 dry-run/--json（manage 支持；其它退化为一行命令）
     let plan = ['将执行：' + spec.script + ' ' + argvFor(argv[0], args).join(' ')];
     let diff = null;
     try {
       const diag = runCommandDry(argv[0], args);
       if (diag && Array.isArray(diag.plan)) plan = diag.plan;
       if (diag && diag.file) diff = { file: diag.file, action: diag.action || '', target: diag.target || '' };
-    } catch (e) { /* 底层不支持就保留一行说明 */ }
+    } catch { /* 底层不支持就保留一行说明 */ }
     console.log(JSON.stringify({
       ok: true, verdict: 'ok', dryRun: true, command: argv[0], args,
       plan, diff,
@@ -143,6 +127,15 @@ if (COMMANDS[argv[0]] && COMMANDS[argv[0]].mutating) {
       console.error('拒绝：写操作必须先生成计划。先跑 `node tools/turnstile.mjs ' + argv[0] + ' ' + positional.join(' ') + ' --dry-run` 拿 applyToken。');
       process.exit(2);
     }
+    if (spec.danger) {
+      const target = String(args.package || args.profile || '');
+      const confirmIdx = argv.indexOf('--confirm');
+      const confirm = confirmIdx >= 0 ? argv[confirmIdx + 1] : '';
+      if (confirm !== target) {
+        console.error('拒绝：高危操作必须带 --confirm ' + target + '，且与目标逐字一致。');
+        process.exit(2);
+      }
+    }
     const v = verify(token, argv[0], args);
     if (!v.ok) { console.error('拒绝：' + v.reason); process.exit(2); }
     const r = runCommand(argv[0], args, { extraFlags: spec.applyFlag ? [spec.applyFlag] : [] });
@@ -150,50 +143,32 @@ if (COMMANDS[argv[0]] && COMMANDS[argv[0]].mutating) {
     console.log(JSON.stringify(out, null, 2));
     process.exit(r.exitCode);
   }
+  // 没有显式选择计划或执行时，绝不能落入普通 JSON 分派而绕过写入闸门。
+  console.error('拒绝：写操作必须显式使用 --dry-run，或确认后使用 --apply --token <token>。');
+  process.exit(2);
 }
 
-// 底层脚本的 dry-run（写操作计划）：manage 有 --json+--yes 两段，其它脚本没有就返回 null
+// 底层脚本的 dry-run（写操作计划）：drySafe:false 时绝不能执行底层写入。
 function runCommandDry(name, args) {
   const spec = COMMANDS[name];
-  if (!spec) return null;
-  if (spec.drySafe === false) return null; // 底层 dry-run 不安全就别跑，宁可只给一行说明
-  const parts = [join(here, spec.script)];
-  for (const k of spec.positional || []) parts.push(String(args[k]));
-  for (const f of spec.fixed || []) parts.push(f);
-  for (const [k, flag] of Object.entries(spec.flagMap || {})) parts.push(flag, String(args[k]));
-  if (spec.json) parts.push('--json');
+  if (!spec || spec.drySafe === false) return null;
+  const parts = [join(here, spec.script), ...argvFor(name, args)];
   try {
     const out = spawnSync(process.execPath, parts, { encoding: 'utf8', timeout: 30000 }).stdout || '';
     const start = out.indexOf('{');
     return start >= 0 ? JSON.parse(out.slice(start)) : null;
-  } catch (e) { return null; }
+  } catch { return null; }
 }
 
-// 命令名双轨统一：`check risk` 与 `check-risk` 等价（注册表用的是后者）
-if (argv[0] === 'check' && argv[1] && COMMANDS['check-' + argv[1]]) {
-  argv.splice(0, 2, 'check-' + argv[1]);
-}
-
-// 步骤 0（放在分派之前）：注册表里的命令 + --json → 走统一契约给 agent 读。
+// 注册表里的命令 + --json → 统一参数解析、开关转发与报告契约。
 if (COMMANDS[argv[0]] && argv.includes('--json')) {
   const spec = COMMANDS[argv[0]];
-  const positional = argv.slice(1).filter((a) => !a.startsWith('--') && !/^--.+/.test(a));
-  const args = {};
-  const flagKeys = Object.keys(spec.flagMap || {});
-  (spec.positional || []).forEach((k, i) => { if (positional[i] != null) args[k] = positional[i]; });
-  // flagMap 的键也可以按位置传（manage-disable <profile> <pkg>），省得记 --package
-  flagKeys.forEach((k, i) => {
-    const at = (spec.positional || []).length + i;
-    if (positional[at] != null) args[k] = positional[at];
-    const fi = argv.indexOf('--' + k);
-    if (fi >= 0 && argv[fi + 1] != null) args[k] = argv[fi + 1];
-    if (args[k] == null) delete args[k];
-  });
-  const r = runCommand(argv[0], args);
+  const { args, extraFlags } = parseCommandArgs(argv[0], argv.slice(1));
+  const r = runCommand(argv[0], args, { extraFlags });
   const out = shapeReport({
     command: argv[0], exitCode: r.exitCode, parsed: r.data,
     stderr: (r.evidence || [])[0] || '', mutating: Boolean(spec.mutating),
-    dryRun: argv.includes('--dry-run'), durationMs: r.durationMs, profile: args.profile,
+    dryRun: argv.includes('--dry-run'), profile: args.profile, durationMs: r.durationMs,
   });
   console.log(JSON.stringify(out, null, 2));
   process.exit(r.exitCode);
@@ -217,33 +192,6 @@ if (PRESETS[two]) {
   console.error('不认识的子命令：' + argv[0]);
   console.error('试试 node tools/turnstile.mjs help');
   process.exit(2);
-}
-
-// 步骤 0：注册表里的命令 + --json → 走统一契约（给 agent 读）；
-// 其余情况（不加 --json，或命令不在注册表）保持原来的裸转发，行为零变化。
-if (COMMANDS[argv[0]] && argv.includes('--json')) {
-  const spec = COMMANDS[argv[0]];
-  const positional = argv.slice(1).filter((a) => !a.startsWith('--'));
-  const args = {};
-  const flagKeys = Object.keys(spec.flagMap || {});
-  (spec.positional || []).forEach((k, i) => { if (positional[i] != null) args[k] = positional[i]; });
-  // flagMap 的键也可以按位置传（manage-disable <profile> <pkg>），省得记 --package
-  flagKeys.forEach((k, i) => {
-    const at = (spec.positional || []).length + i;
-    if (positional[at] != null) args[k] = positional[at];
-    const fi = argv.indexOf('--' + k);
-    if (fi >= 0 && argv[fi + 1] != null) args[k] = argv[fi + 1];
-    if (args[k] == null) delete args[k];
-  });
-  const dryRun = argv.includes('--dry-run');
-  const r = runCommand(argv[0], args);
-  const out = shapeReport({
-    command: argv[0], exitCode: r.exitCode, parsed: r.data,
-    stderr: (r.evidence || [])[0] || '', mutating: Boolean(spec.mutating),
-    dryRun, durationMs: r.durationMs,
-  });
-  console.log(JSON.stringify(out, null, 2));
-  process.exit(r.exitCode);
 }
 
 const child = spawnSync(process.execPath, [join(here, script), ...rest], { stdio: 'inherit' });
