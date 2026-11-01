@@ -1,0 +1,20 @@
+// console-data 的 issue 出口：缺宿主入口时 bundles 只能是 unknown。
+import { collectConsoleData } from '../tools/console-data.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+let fail = 0;
+const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
+const tmp = mkdtempSync(join(tmpdir(), 'cd-'));
+const profile = join(tmp, 'p');
+mkdirSync(profile, { recursive: true });
+writeFileSync(join(profile, 'package.json'), JSON.stringify({ name: 'p', version: '0.0.1', dsh: { profile: { bundles: ['definitely-missing'] } } }));
+const data = collectConsoleData(profile, { stateDir: join(tmp, 's') });
+ok('数据里带 issues 与分组', Array.isArray(data.issues) && data.issueGroups && typeof data.issueGroups === 'object');
+const bundles = data.issues.find((i) => i.id === 'plugins.bundles');
+ok('缺包在无宿主入口时是 unknown', bundles && bundles.severity === 'unknown', bundles && bundles.severity);
+ok('unknown 归入「尚无结论」组', data.issueGroups.unknown.some((i) => i.id === 'plugins.bundles'));
+ok('issue 带四段式详情', Boolean(bundles && bundles.detail && bundles.detail.what && bundles.detail.why.length));
+rmSync(tmp, { recursive: true, force: true });
+console.log(fail ? 'CONSOLE_DATA_ISSUES_FAILED ' + fail : 'CONSOLE_DATA_ISSUES_OK');
+process.exitCode = fail ? 1 : 0;

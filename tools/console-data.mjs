@@ -2,6 +2,8 @@
 // Manifest data is labelled "declared"; only runtime snapshot data may be labelled "observed".
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { issuesFromHealth, groupIssues, issueDetail } from '../plugins/turnstile-popup/lib/health-issues.js';
+import { collectHealth } from '../plugins/turnstile-popup/lib/health-collect.js';
 
 const cleanPath = (p) => String(p || '').replace(/\\/g, '/');
 const readJson = (file) => {
@@ -177,8 +179,22 @@ export function collectConsoleData(profileDir, options = {}) {
   const history = (historyFile?.runs || []).filter((r) => !r.profile || String(r.profile) === profileDir || basename(String(r.profile)) === profileName).slice(-40).reverse();
   const runtime = readJson(join(state, 'runtime-' + profileName + '.json'));
   const occupancy = readJson(join(state, 'occupancy-' + profileName + '.json'));
+  // 诊断 issue：与 CLI/宿主同一份归一化规则；采集失败就是空数组，不补默认通过项
+  const hostBases = Array.isArray(options.hostBases) ? options.hostBases.filter(Boolean) : [];
+  let healthItems = [];
+  try { healthItems = collectHealth({ profileDir, hostBases }).items; } catch { healthItems = []; }
+  // 独立控制台没有宿主入口时，无法判断某个 bundle 是「宿主提供」还是「真缺」→ 只能未知
+  const issues = issuesFromHealth(healthItems, { source: 'console-data' }).map((issue) => {
+    const row = Object.assign({}, issue, { detail: issueDetail(issue) });
+    if (row.id === 'plugins.bundles' && !hostBases.length) {
+      row.severity = 'unknown';
+      row.evidence = (row.evidence || []).map((e) => Object.assign({}, e, { status: 'unknown', locator: (e.locator || '') + '（未提供宿主入口，无法区分宿主自带与真缺）' }));
+    }
+    return row;
+  });
   return {
-    schema: 'turnstile/console@1', generatedAt: new Date().toISOString(),
+    schema: 'turnstile/console@1',
+    issues, issueGroups: groupIssues(issues), generatedAt: new Date().toISOString(),
     profile: { name: profileName, dir: cleanPath(profileDir), bundles: bundleNames.length },
     plugins, surfaces, architecture: { rootId, nodes }, report, history, runtime, occupancy,
     coverage: {

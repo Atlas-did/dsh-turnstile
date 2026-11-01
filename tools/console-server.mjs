@@ -406,7 +406,9 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
     }
     if (pathname === '/api/console') {
       try {
-        const data = collectConsoleData(dir, { stateDir: state });
+        const hostBases = [];
+        if (process.env.DSH_BIN) hostBases.push(process.env.DSH_BIN);
+        const data = collectConsoleData(dir, { stateDir: state, hostBases });
         res.setHeader('content-type', 'application/json; charset=utf-8');
         res.setHeader('cache-control', 'no-store');
         res.end(JSON.stringify(data));

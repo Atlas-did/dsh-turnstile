@@ -41,6 +41,9 @@ function patchRows(file) {
   return found;
 }
 
+import { issuesFromHealth, groupIssues, issueDetail } from './health-issues.js';
+import { collectHealth } from './health-collect.js';
+
 export function collectConsoleData(profileDir, options = {}) {
   const profilePackagePath = join(profileDir, 'package.json');
   const profilePackage = readJson(profilePackagePath);
@@ -177,8 +180,13 @@ export function collectConsoleData(profileDir, options = {}) {
   const history = (historyFile?.runs || []).filter((r) => !r.profile || String(r.profile) === profileDir || basename(String(r.profile)) === profileName).slice(-40).reverse();
   const runtime = readJson(join(state, 'runtime-' + profileName + '.json'));
   const occupancy = readJson(join(state, 'occupancy-' + profileName + '.json'));
+  // 诊断 issue：与 CLI 同一份归一化规则（方案 02-A），没有数据就是空数组，不补默认通过项
+  let healthItems = [];
+  try { healthItems = collectHealth({ profileDir, hostBases: [import.meta.url] }).items; } catch { healthItems = []; }
+  const issues = issuesFromHealth(healthItems, { source: 'console-data' }).map((issue) => Object.assign({}, issue, { detail: issueDetail(issue) }));
   return {
     schema: 'turnstile/console@1', generatedAt: new Date().toISOString(),
+    issues, issueGroups: groupIssues(issues),
     profile: { name: profileName, dir: cleanPath(profileDir), bundles: bundleNames.length },
     plugins, surfaces, architecture: { rootId, nodes }, report, history, runtime, occupancy,
     coverage: {
