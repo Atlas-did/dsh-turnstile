@@ -278,10 +278,12 @@ try {
     await page.waitForTimeout(400);
     await click('[data-testid="health-run"]');
     await page.waitForTimeout(1200);
-    const healthItems = await page.locator('[data-testid^="health-"]').count();
-    ok('the health scan renders items', healthItems >= 2, String(healthItems));
+    const issueRowsCount = await page.locator('[data-testid^="issue-"]').count();
+    ok('the health scan renders issue rows', issueRowsCount >= 1, String(issueRowsCount));
+    const groupCounts = await page.locator('[data-testid^="issues-"]').count();
+    ok('issues are split into three groups', groupCounts === 3, String(groupCounts));
     const summaryText = await text('[data-testid="health-summary"]').catch(() => '');
-    ok('the scan summarises pass/warn/fail', /通过/.test(summaryText), summaryText);
+    ok('the scan summarises the three issue groups', /需要处理/.test(summaryText) && /尚无结论/.test(summaryText), summaryText);
     ok('the trap checks render next to the health scan', (await text('[data-testid="health-pits"]')).includes('插件市场'));
     // 环境管家: left health, right profile table, both read-only.
     await click('[data-testid="nav-steward"]');

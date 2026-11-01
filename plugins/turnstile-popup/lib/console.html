@@ -162,12 +162,37 @@ async function runProfiles(){
     box.replaceChildren(node('p',{class:'hint','data-testid':'steward-summary',text:'共 '+(j.profiles||[]).length+' 个 profile，当前 '+j.current}),node('p',{class:'hint','data-testid':'steward-lkg',text:lkg}),rows,cmds);
   }catch(e){box.replaceChildren(node('p',{class:'hint',text:'读取失败：'+e.message}));}
 }
+
+function issueRows(group,label,testid){
+  const rows=node('div',{class:'action-stack','data-testid':testid});
+  if(!group||!group.length){rows.append(node('p',{class:'hint',text:'（无）'}));return rows;}
+  for(const issue of group){
+    const d=issue.detail||{};
+    const det=node('details',{class:'history-row','data-testid':'issue-'+issue.id});
+    const summ=document.createElement('summary');
+    summ.append(node('strong',{text:(issue.severity==='error'?'✗ ':issue.severity==='unknown'?'? ':'! ')+issue.summary}));
+    det.append(summ);
+    det.append(node('small',{text:'影响：'+d.who}));
+    det.append(node('small',{text:'凭什么：'+(d.why&&d.why.length?d.why.join(' | '):'本次没有采集到证据')}));
+    det.append(node('small',{text:'下一步：'+((d.next||[]).map(x=>x.label).join('、')||'只读查看')}));
+    rows.append(det);
+  }
+  return rows;
+}
 async function runHealth(){
   const box=document.querySelector('[data-testid="health-box"]');if(!box)return;
   box.replaceChildren(node('p',{class:'hint',text:'体检中…'}));
   try{
     const r=await fetch('/turnstile/health',{headers:{accept:'application/json'}});
     const j=await r.json();
+    if(j.issueGroups){
+      const g=j.issueGroups;
+      const head=node('p',{class:'hint','data-testid':'health-summary',text:'需要处理 '+g.needsAction.length+' · 需要了解 '+g.needsReview.length+' · 尚无结论 '+g.unknown.length});
+      const pitBox=node('div',{class:'action-stack','data-testid':'health-pits'});
+      for(const p of (j.pits||[])){const mark=p.level==='pass'?'✓':p.level==='warn'?'!':p.level==='fail'?'✗':'·';const row=node('div',{class:'history-row'},[node('strong',{text:mark+' '+p.message})]);if(p.next)row.append(node('small',{text:'→ '+p.next}));pitBox.append(row);}
+      box.replaceChildren(head,node('strong',{text:'需要处理'}),issueRows(g.needsAction,'action','issues-action'),node('strong',{text:'需要了解'}),issueRows(g.needsReview,'review','issues-review'),node('strong',{text:'尚无结论'}),issueRows(g.unknown,'unknown','issues-unknown'),node('strong',{text:'检查项（pits）'}),pitBox);
+      return;
+    }
     const s=j.summary||{};
     const head=node('p',{class:'hint','data-testid':'health-summary',text:'体检结果：'+s.pass+' 通过 / '+s.warn+' 警告 / '+s.fail+' 失败'+(s.skip?' / '+s.skip+' 跳过':'')});
     const list=node('div',{class:'action-stack','data-testid':'health-items'});

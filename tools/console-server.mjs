@@ -170,6 +170,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
     if (pathname === '/turnstile/health') {
       const healthMod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health.js')).href);
       const collectMod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health-collect.js')).href);
+      const issuesMod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health-issues.js')).href);
       let items = [];
       let notes = [];
       if (fixture) {
@@ -198,7 +199,8 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
         } catch (e) { pits = [{ id: 'pit:unavailable', level: 'warn', message: 'pits 检查跑不动：' + String(e.message).slice(0, 80), next: 'node tools/pits.mjs <profile>' }]; }
       }
       res.setHeader('content-type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ items, pits, notes, summary: healthMod.summarize(items), profile: fixture ? 'console-fixture' : dir, fixture: Boolean(fixture), at: new Date().toISOString() }));
+      const issues = issuesMod.issuesFromHealth(items, { source: 'console-health' }).map((x) => Object.assign({}, x, { detail: issuesMod.issueDetail(x) }));
+      res.end(JSON.stringify({ items, pits, notes, issues, issueGroups: issuesMod.groupIssues(issues), summary: healthMod.summarize(items), profile: fixture ? 'console-fixture' : dir, fixture: Boolean(fixture), at: new Date().toISOString() }));
       return;
     }
     if (pathname === '/turnstile/hooks') {

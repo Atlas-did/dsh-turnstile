@@ -561,7 +561,9 @@ export function apply(ctx, config) {
         pits = pitsMod.runPitChecks(profileDir);
       } catch (e) { pits = [{ id: "pit:unavailable", level: "skip", message: "无法加载 pits 模块：" + String(e && e.message), next: "" }]; }
       const healthMod = await import(pathToFileURL(join(here, "health.js")).href);
-      sendJson(res, 200, { items, pits, notes: healthNotes, summary: healthMod.summarize(items), profile: profileName, fixture: false, at: new Date().toISOString() });
+      const issuesMod = await import(pathToFileURL(join(here, "health-issues.js")).href);
+      const issues = issuesMod.issuesFromHealth(items, { source: "host-health" }).map((x) => Object.assign({}, x, { detail: issuesMod.issueDetail(x) }));
+      sendJson(res, 200, { items, pits, notes: healthNotes, issues, issueGroups: issuesMod.groupIssues(issues), summary: healthMod.summarize(items), profile: profileName, fixture: false, at: new Date().toISOString() });
     },
   }), "turnstile: GET /turnstile/health");
   ctx.effect(() => ctx.webServer.register({
