@@ -9,7 +9,7 @@
 //   1. mutating 命令必须 dryRun:true 才允许执行，响应里签发一次性 applyToken；
 //   2. applyToken 绑定 command+args 的哈希，5 分钟过期；
 //   3. 同一命令 2s 内去重（防连点）。
-import { createHash, randomUUID } from 'node:crypto';
+// token 逻辑抽到 tools/lib/apply-token.mjs，CLI 与面板共用同一套（05 指南 步骤 3）
 import { pathToFileURL } from 'node:url';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -33,17 +33,19 @@ async function registry({ toolsRoot } = {}) {
   return registryPromise;
 }
 
-const tokens = new Map(); // token -> { hash, expires, used }
-const recent = new Map(); // hash -> timestamp
-const TTL = 5 * 60 * 1000;
-const DEDUPE = 2000;
-
-function hashOf(command, args) {
-  return createHash('sha256').update(command + '|' + JSON.stringify(args || {})).digest('hex').slice(0, 32);
-}
-
-function sweep(now) {
-  for (const [k, v] of tokens) if (v.expires < now || v.used) tokens.delete(k);
+// 动态 import（live 部署时插件与 tools/ 不在同一棵树，静态 import 会 404）
+let tokenMod = null;
+async function tokens() {
+  if (tokenMod) return tokenMod;
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    process.env.DSH_TURNSTILE_HOME && join(process.env.DSH_TURNSTILE_HOME, 'tools', 'lib', 'apply-token.mjs'),
+    join(here, '..', '..', '..', 'tools', 'lib', 'apply-token.mjs'),
+    join(here, '..', '..', 'tools', 'lib', 'apply-token.mjs'),
+  ].filter(Boolean);
+  const found = candidates.find((p) => existsSync(p));
+  tokenMod = await import(pathToFileURL(found).href);
+  return tokenMod;
 }
 
 export async function handleRun(body, { toolsRoot } = {}) {
@@ -54,20 +56,16 @@ export async function handleRun(body, { toolsRoot } = {}) {
   const spec = COMMANDS[command];
   if (!spec) return { status: 404, body: { ok: false, verdict: 'unknown', summary: '未知命令：' + command + '（白名单里没有）' } };
 
-  const hash = hashOf(command, args);
+  const T = await tokens();
   const now = Date.now();
-  sweep(now);
 
   // 写操作：没有 dryRun 且没有有效 token → 403
   if (spec.mutating) {
     if (!dryRun) {
       const token = String((body && body.applyToken) || '');
-      const rec = tokens.get(token);
-      if (!rec || rec.expires < now || rec.used) {
-        return { status: 403, body: { ok: false, verdict: 'unknown', summary: '写操作必须先 dry-run：缺少或无效的 applyToken', next: ['先用 dryRun:true 调一次，拿 applyToken'] } };
-      }
-      if (rec.hash !== hash) {
-        return { status: 403, body: { ok: false, verdict: 'unknown', summary: 'applyToken 与本次参数不匹配（参数被改过？）' } };
+      const v = T.verify(token, command, args, now, { consume: false });
+      if (!v.ok) {
+        return { status: 403, body: { ok: false, verdict: 'unknown', summary: '写操作必须先 dry-run：' + v.reason, next: ['先用 dryRun:true 调一次，拿 applyToken'] } };
       }
       // 高危命令：apply 时必须逐字确认目标（防「手滑点到确认」）
       if (spec.danger) {
@@ -76,11 +74,9 @@ export async function handleRun(body, { toolsRoot } = {}) {
           return { status: 403, body: { ok: false, verdict: 'unknown', summary: '高危操作需要 confirm 与目标逐字一致（收到 "' + String((body && body.confirm) || '') + '"，期望 "' + target + '"）', next: ['先 dry-run 看计划，再带 confirm 重放'] } };
         }
       }
-      rec.used = true;
+      T.consume(token);
     } else {
-      const last = recent.get(hash) || 0;
-      if (now - last < DEDUPE) return { status: 429, body: { ok: false, verdict: 'unknown', summary: '同一命令 2 秒内重复请求（防连点）' } };
-      recent.set(hash, now);
+      if (T.tooSoon(command, args, now)) return { status: 429, body: { ok: false, verdict: 'unknown', summary: '同一命令 2 秒内重复请求（防连点）' } };
     }
   }
 
@@ -96,9 +92,8 @@ export async function handleRun(body, { toolsRoot } = {}) {
   } catch (e) { shape = null; }
   const out = { ...result, ...(shape || {}) };
   if (spec.mutating && dryRun && result.exitCode === 0) {
-    const token = randomUUID();
-    tokens.set(token, { hash, expires: now + TTL, used: false });
-    out.applyToken = token;
+    const issued = T.issue(command, args, now);
+    out.applyToken = issued.token;
     out.dryRun = true;
   }
   // 未知/失败命令给「下一步」建议，而不是只报错
@@ -109,4 +104,4 @@ export async function handleRun(body, { toolsRoot } = {}) {
 }
 
 /** 仅供测试：清空 token 与去重状态。 */
-export function _resetForTests() { tokens.clear(); recent.clear(); }
+export async function _resetForTests() { const T = await tokens(); T._resetForTests(); }

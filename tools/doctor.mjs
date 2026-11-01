@@ -14,6 +14,10 @@ const { yaml, schema } = loadYaml();
 const jsType = new yaml.Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: (d) => String(d) });
 
 const argv = process.argv.slice(2);
+// --json 时先静音所有人类可读输出，最后只打一份 JSON（agent 读的），避免文本+JSON 混排
+const jsonMode = process.argv.includes('--json');
+const realLog = console.log.bind(console);
+if (jsonMode) console.log = function () {};
 let profileName = null, home = process.env.DSH_HOME || null, dir = null, budget = Number(process.env.DSH_BUDGET_LIMIT || 4194304);
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === '--home') home = argv[++i];
@@ -25,9 +29,10 @@ for (let i = 0; i < argv.length; i++) {
 // so doctor rejecting one was an inconsistency, not a policy).
 if (!dir && profileName && /[\\/]/.test(profileName) && existsSync(profileName)) dir = profileName;
 if (dir) { profileName = dir.split(/[\\/]/).pop(); home = dirname(dirname(dir)); }
+// 给了 --dir / 位置路径就直接用它，别再拼 <home>/profiles/<name>（否则传目录必挂）
 if (!profileName) { console.error('usage: node tools/doctor.mjs <profileName> [--home <DSH_HOME>]'); process.exit(2); }
 if (!home) home = join(root, 'home');
-const profileDir = join(home, 'profiles', profileName);
+const profileDir = dir || join(home, 'profiles', profileName);
 const bar = (t) => '\n== ' + t + ' ' + '='.repeat(Math.max(0, 62 - t.length));
 console.log('doctor · ' + profileName + '  (' + profileDir + ')');
 if (!existsSync(profileDir)) { console.error('profile not found: ' + profileDir); process.exit(2); }
@@ -111,6 +116,22 @@ for (const name of bundles) {
 }
 console.log('   host ' + hostVer + '；会被跳过的: ' + (skipped.length ? skipped.join(', ') : '无'));
 const warn = userOff.length + dups.length + hot.length + skipped.length;
+
+// --json：给 agent 读的统一形状（doctor 的发现就是「停用 / 路由重名 / UI 抢占 / 引擎跳过」四类）
+if (process.argv.includes('--json')) {
+  const findings = [];
+  for (const n of skipped) findings.push({ checker: 'engines', severity: 'error', id: 'engine-skip', title: n + ' 会被引擎闸门跳过', evidence: ['engines.dsh 不满足当前运行时'], falsifier: '运行时升级/降级到该范围后，本条消失' });
+  for (const d of dups) findings.push({ checker: 'providers', severity: 'warn', id: 'route-dup-' + d[0], title: '模型 id ' + d[0] + ' 在 ' + d[1].size + ' 个路由重复', evidence: [...d[1]], falsifier: '只保留一个路由里的该模型即为误报' });
+  for (const h of hot) findings.push({ checker: 'ui-surface', severity: 'warn', id: 'ui-hot-' + h[0], title: h[0] + ' 被 ' + h[1] + ' 个插件注入', evidence: ['ui-scan surfaces'], falsifier: '把其中一个插件换到别的面后，本条消失' });
+  for (const off of userOff) findings.push({ checker: 'manage', severity: 'warn', id: 'disabled-' + off, title: off + ' 被手动停用', evidence: ['cordis.patch.yml disabled:true'], falsifier: '启用后本条消失' });
+  realLog(JSON.stringify({
+    profile: profileName, runtime: hostVer,
+    verdict: warn === 0 ? 'ok' : (skipped.length ? 'fail' : 'warn'),
+    summary: warn === 0 ? '干净' : warn + ' 处需要看一眼（停用 ' + userOff.length + ' / 路由重名 ' + dups.length + ' / UI 抢占 ' + hot.length + ' / 引擎跳过 ' + skipped.length + '）',
+    findings, next: warn === 0 ? [] : [{ label: '看完整闸门', command: 'node tools/turnstile.mjs gate <profile> --json', mutating: false, reason: 'doctor 是概览，gate 有逐项检查' }],
+  }, null, 2));
+  process.exit(skipped.length ? 1 : 0);
+}
 const mapPath = join(root, 'state', 'gate-map-' + profileName + '.html');
 if (existsSync(mapPath)) console.log('\n详细视图: ' + mapPath + '   (node tools/gate-map.mjs ' + profileName + ' 可刷新)');
 else console.log('\n详细视图: 还没生成 —— 跑 node tools/gate-map.mjs ' + profileName + ' 会产出一张可点的拓扑图');

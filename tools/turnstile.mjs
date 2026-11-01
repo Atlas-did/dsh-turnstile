@@ -8,6 +8,9 @@
 //
 // usage: node tools/turnstile.mjs <子命令> [...]
 import { spawnSync } from 'node:child_process';
+import { COMMANDS, runCommand, argvFor } from './lib/commands.mjs';
+import { shapeReport } from './lib/report.mjs';
+import { issue, verify } from './lib/apply-token.mjs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -98,6 +101,72 @@ function help() {
 
 if (!argv.length || ['help', '-h', '--help'].includes(argv[0])) { help(); process.exit(0); }
 
+// 步骤 3：写操作在 CLI 侧也要 token（把 skill 里的口头纪律变成代码约束）。
+if (COMMANDS[argv[0]] && COMMANDS[argv[0]].mutating) {
+  const spec = COMMANDS[argv[0]];
+  const positional = argv.slice(1).filter((a) => !a.startsWith('--'));
+  const args = {};
+  const flagKeys = Object.keys(spec.flagMap || {});
+  (spec.positional || []).forEach((k, i) => { if (positional[i] != null) args[k] = positional[i]; });
+  // flagMap 的键也可以按位置传（manage-disable <profile> <pkg>），省得记 --package
+  flagKeys.forEach((k, i) => {
+    const at = (spec.positional || []).length + i;
+    if (positional[at] != null) args[k] = positional[at];
+    const fi = argv.indexOf('--' + k);
+    if (fi >= 0 && argv[fi + 1] != null) args[k] = argv[fi + 1];
+  });
+  const dryRun = argv.includes('--dry-run');
+  const applyIdx = argv.indexOf('--apply');
+  if (dryRun) {
+    const issued = issue(argv[0], args);
+    console.log(JSON.stringify({
+      ok: true, verdict: 'ok', dryRun: true, command: argv[0], args,
+      plan: ['将执行：' + spec.script + ' ' + argvFor(argv[0], args).join(' ')],
+      applyToken: issued.token, expiresAt: issued.expiresAt,
+      next: [{ label: '确认后带 token 重放', command: 'node tools/turnstile.mjs ' + argv[0] + ' ' + positional.join(' ') + ' --apply --token <token>', mutating: true, reason: '写操作两段式' }],
+    }, null, 2));
+    process.exit(0);
+  }
+  if (applyIdx >= 0) {
+    const tokenIdx = argv.indexOf('--token');
+    const token = tokenIdx >= 0 ? argv[tokenIdx + 1] : '';
+    if (!token) {
+      console.error('拒绝：写操作必须先生成计划。先跑 `node tools/turnstile.mjs ' + argv[0] + ' ' + positional.join(' ') + ' --dry-run` 拿 applyToken。');
+      process.exit(2);
+    }
+    const v = verify(token, argv[0], args);
+    if (!v.ok) { console.error('拒绝：' + v.reason); process.exit(2); }
+    const r = runCommand(argv[0], args);
+    const out = shapeReport({ command: argv[0], exitCode: r.exitCode, parsed: r.data, stderr: (r.evidence || [])[0] || '', mutating: true, dryRun: false, durationMs: r.durationMs });
+    console.log(JSON.stringify(out, null, 2));
+    process.exit(r.exitCode);
+  }
+}
+
+// 步骤 0（放在分派之前）：注册表里的命令 + --json → 走统一契约给 agent 读。
+if (COMMANDS[argv[0]] && argv.includes('--json')) {
+  const spec = COMMANDS[argv[0]];
+  const positional = argv.slice(1).filter((a) => !a.startsWith('--') && !/^--.+/.test(a));
+  const args = {};
+  const flagKeys = Object.keys(spec.flagMap || {});
+  (spec.positional || []).forEach((k, i) => { if (positional[i] != null) args[k] = positional[i]; });
+  // flagMap 的键也可以按位置传（manage-disable <profile> <pkg>），省得记 --package
+  flagKeys.forEach((k, i) => {
+    const at = (spec.positional || []).length + i;
+    if (positional[at] != null) args[k] = positional[at];
+    const fi = argv.indexOf('--' + k);
+    if (fi >= 0 && argv[fi + 1] != null) args[k] = argv[fi + 1];
+  });
+  const r = runCommand(argv[0], args);
+  const out = shapeReport({
+    command: argv[0], exitCode: r.exitCode, parsed: r.data,
+    stderr: (r.evidence || [])[0] || '', mutating: Boolean(spec.mutating),
+    dryRun: argv.includes('--dry-run'), durationMs: r.durationMs,
+  });
+  console.log(JSON.stringify(out, null, 2));
+  process.exit(r.exitCode);
+}
+
 let script = '';
 let rest = [];
 
@@ -116,6 +185,32 @@ if (PRESETS[two]) {
   console.error('不认识的子命令：' + argv[0]);
   console.error('试试 node tools/turnstile.mjs help');
   process.exit(2);
+}
+
+// 步骤 0：注册表里的命令 + --json → 走统一契约（给 agent 读）；
+// 其余情况（不加 --json，或命令不在注册表）保持原来的裸转发，行为零变化。
+if (COMMANDS[argv[0]] && argv.includes('--json')) {
+  const spec = COMMANDS[argv[0]];
+  const positional = argv.slice(1).filter((a) => !a.startsWith('--'));
+  const args = {};
+  const flagKeys = Object.keys(spec.flagMap || {});
+  (spec.positional || []).forEach((k, i) => { if (positional[i] != null) args[k] = positional[i]; });
+  // flagMap 的键也可以按位置传（manage-disable <profile> <pkg>），省得记 --package
+  flagKeys.forEach((k, i) => {
+    const at = (spec.positional || []).length + i;
+    if (positional[at] != null) args[k] = positional[at];
+    const fi = argv.indexOf('--' + k);
+    if (fi >= 0 && argv[fi + 1] != null) args[k] = argv[fi + 1];
+  });
+  const dryRun = argv.includes('--dry-run');
+  const r = runCommand(argv[0], args);
+  const out = shapeReport({
+    command: argv[0], exitCode: r.exitCode, parsed: r.data,
+    stderr: (r.evidence || [])[0] || '', mutating: Boolean(spec.mutating),
+    dryRun, durationMs: r.durationMs,
+  });
+  console.log(JSON.stringify(out, null, 2));
+  process.exit(r.exitCode);
 }
 
 const child = spawnSync(process.execPath, [join(here, script), ...rest], { stdio: 'inherit' });
