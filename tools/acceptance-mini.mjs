@@ -54,7 +54,7 @@ step('host-observe-after', afterObs.code === 0, afterObs.code === 0 ? evFile : (
 // 2.7) 用真实宿主证据再判一次 L2/L3（claim 应升级或至少证据来源变成 host）
 let hostClaim = null;
 if (afterObs.code === 0) {
-  const rv = runNode('verify-live.mjs', [profileDir, '--pkg', name, '--host-evidence', evFile, '--json'], 300000);
+  const rv = runNode('verify-live.mjs', [profileDir, '--pkg', name, '--host-evidence', evFile, '--expect', name, '--json'], 300000);
   const rj = jsonOf(rv.out);
   hostClaim = rj && rj.claim;
   const l2 = rj && (rj.levels || []).find((l) => l.level === 'L2');

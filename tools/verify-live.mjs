@@ -143,7 +143,15 @@ if (!live) {
 }
 
 const expect = val('--expect');
-if (!live) layers.push(level('L4', STATUS.unknown, ['未连活宿主，界面未验证']));
+if (!live) {
+  // 真实宿主证据里如果带了正文摘录，L4 也能判（摘录来自真 HTTP 响应，不是编的）
+  const evRoute = hostEv && hostEv.ok ? (hostEv.raw.route || null) : null;
+  const excerpt = evRoute && evRoute.bodyExcerpt ? String(evRoute.bodyExcerpt) : '';
+  if (!expect) layers.push(level('L4', STATUS.unknown, ['未连活宿主，且没给 --expect，界面内容无法判定']));
+  else if (!excerpt) layers.push(level('L4', STATUS.unknown, ['未连活宿主；宿主证据里没有正文摘录，界面未验证']));
+  else layers.push(level('L4', excerpt.includes(expect) ? STATUS.pass : STATUS.fail,
+    [excerpt.includes(expect) ? 'host-evidence 正文摘录含「' + expect + '」' : '宿主证据摘录不含「' + expect + '」', evRoute.path + ' ' + evRoute.bodyBytes + ' 字节']));
+}
 else if (!expect) layers.push(level('L4', STATUS.unknown, ['没给 --expect，界面内容无法判定']));
 else {
   const ok = routeResults.filter((x) => x.ok && x.body.includes(expect));

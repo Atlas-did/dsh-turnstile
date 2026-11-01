@@ -58,6 +58,8 @@ export async function finishHostObservation(session, { route }, adapter) {
       status: response.status,
       bodyBytes: response.bodyBytes,
       bodySha256: response.bodySha256,
+      // 可选：正文摘录（L4 判定用；校验器不强制要求）
+      ...(response.bodyExcerpt ? { bodyExcerpt: response.bodyExcerpt } : {}),
     },
   };
   const validation = validateHostEvidence(evidence, { target: session.target, profile: session.profile });

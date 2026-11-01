@@ -16,6 +16,12 @@ ok('没有活宿主时用证据里的路由判 L3', /evRoute && evRoute\.path &&
 const acc = readFileSync(join(here, '..', 'tools', 'acceptance-mini.mjs'), 'utf8');
 ok('验收器自动做 before/after 采集', /host-observe\.mjs', \['before'/.test(acc) && /host-observe\.mjs', \['after'/.test(acc));
 ok('验收器会用宿主证据复判一次', /--host-evidence/.test(acc) && /verify-with-host-evidence/.test(acc));
+ok('验收器复判时带 --expect（否则 L4 永远 unknown）', /--host-evidence', evFile, '--expect'/.test(acc));
+const col = readFileSync(join(here, '..', 'tools', 'lib', 'host-collector.mjs'), 'utf8');
+const adp = readFileSync(join(here, '..', 'tools', 'lib', 'mini-host-adapter.mjs'), 'utf8');
+ok('采集器抓正文摘录（L4 判据）', /bodyExcerpt/.test(col) && /bodyExcerpt/.test(adp));
+ok('摘录截断，不把整页塞进证据', /slice\(0, 800\)/.test(adp));
+ok('L4 可用摘录判定', /host-evidence 正文摘录含/.test(vl));
 ok('trial-status 输出 claim 字段', /claim,/.test(ts));
 ok('trial-status 的 claim 只用阶梯词', ['static-only', 'verified-with-regression', 'failed', 'unknown'].every((w) => ts.includes("'" + w + "'")));
 ok('两边没有第二套成功词（loaded/pass/ok 之外的）', !/claim\s*=\s*'pass'/.test(ts) && !/claim\s*=\s*'loaded'/.test(ts));

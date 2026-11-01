@@ -67,7 +67,10 @@ export function createMiniHostAdapter({ mini, findProcess } = {}) {
       url.searchParams.set('token', boot.token);
       const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
       const body = Buffer.from(await response.arrayBuffer());
-      return { status: response.status, bodyBytes: body.length, bodySha256: sha256(body) };
+      // 正文摘录：给 L4（界面内容）用；截断到 800 字，避免证据文件里塞整个页面
+      const text = body.toString('utf8').replace(/\s+/g, ' ').trim();
+      const bodyExcerpt = text.slice(0, 800);
+      return { status: response.status, bodyBytes: body.length, bodySha256: sha256(body), bodyExcerpt };
     },
   };
 }
