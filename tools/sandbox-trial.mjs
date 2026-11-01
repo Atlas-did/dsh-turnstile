@@ -71,6 +71,30 @@ console.log('3. 已装进 node_modules 并写进 bundles');
 // 4. 验证
 // 4a. 真机六级验证：这是「试装通过」的新定义（P1.1）。没有证据就记 unknown，不补绿。
 const verifyArgs = [join(here, 'verify-live.mjs'), profileDir, '--pkg', name, '--json'];
+// --mini：一条命令搞定「重启 → 取新 token → 用真宿主验证」（token 每次重启都变，人工捞太蠢）
+if (has('--mini')) {
+  const miniArg = (val('--mini') && val('--mini') !== 'true') ? val('--mini') : '';
+  const reloadArgs = [join(here, 'lab-reload.mjs'), '--json'];
+  if (miniArg) reloadArgs.push('--mini', miniArg);
+  let live = null;
+  try {
+    const out = execFileSync(process.execPath, reloadArgs, { encoding: 'utf8', timeout: 300000 });
+    live = JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1));
+  } catch (e) {
+    const s = String((e.stdout || '') + (e.stderr || ''));
+    try { live = JSON.parse(s.slice(s.indexOf('{'), s.lastIndexOf('}') + 1)); } catch { live = null; }
+  }
+  if (live && live.ok) {
+    verifyArgs.push('--base', 'http://127.0.0.1:' + live.port, '--token', live.token);
+    const dshBin = join(miniArg || '', 'runtime', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js');
+    if (dshBin && existsSync(dshBin)) verifyArgs.push('--dsh-bin', dshBin);
+    const miniHome = join(miniArg || '', 'home');
+    if (existsSync(miniHome)) verifyArgs.push('--home', miniHome);
+    // 页面断言：用包名当文本（新脚手架一定会把包名写进页面）
+    verifyArgs.push('--expect', name, '--routes', '/' + name);
+    console.log('   已重启 mini 并取到新 token（' + live.readyMs + 'ms）');
+  } else console.log('   ⚠ mini 重启没就绪，本次只能验到文件层');
+}
 for (const [flag, key] of [['--dsh-bin', 'dsh-bin'], ['--base', 'base'], ['--token', 'token'], ['--expect', 'expect'], ['--routes', 'routes'], ['--surfaces-before', 'surfaces-before']]) {
   const v = val(flag);
   if (v) verifyArgs.push(flag, v);

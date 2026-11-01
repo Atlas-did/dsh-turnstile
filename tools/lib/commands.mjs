@@ -19,6 +19,10 @@ export const COMMANDS = {
   'snapshot-diff': { script: 'profile-snapshot.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'], fixed: ['--diff'] },
   'inspect': { script: 'inspect-plugin.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile', 'pkg'] },
   'diagnose': { script: 'diagnose.mjs', mutating: false, json: true, timeout: 90000, fixed: ['--live'] },
+  // 重启 mini 并取新 token（写操作：会中断正在跑的会话）
+  'lab-reload': { script: 'lab-reload.mjs', mutating: true, drySafe: true, json: true, timeout: 240000 },
+  // 把搭建器产物导出成插件（写文件）
+  'export-page': { script: 'builder-export.mjs', mutating: true, json: false, timeout: 60000 },
   // 创作闭环第 1 步：生成一个「能被宿主真的加载」的最小插件
   'new-plugin': { script: 'new-plugin.mjs', mutating: true, drySafe: true, json: true, timeout: 60000, positional: ['name'], flagMap: { dir: '--dir', template: '--template' } },
   'preinstall': { script: 'preinstall.mjs', mutating: false, json: true, timeout: 90000, positional: ['profile', 'pkg'] },
