@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const docs = join(here, '..', 'docs');
 // 两种形态都要抓：Windows 盘符路径（C:/Users/...）与 MSYS 路径（/c/Users/...）
-const PATTERN = /(?:[A-Za-z]:[\\/]Users|[\\/][a-z][\\/]Users)[\\/][^\\/\s`'"]+/g;
+// 占位符（如 C:/Users/<user> 或 /home/<user>）不算泄漏：真正的路径不会带尖括号
+const PATTERN = /(?:[A-Za-z]:[\\/]|\/)[Uu]sers[\\/](?![<`])[^\\/\s`'"]+[\\/][^\\/\s`'"]+/g;
 const apply = process.argv.includes('--apply');
 let hits = 0; const files = [];
 for (const f of readdirSync(docs)) {

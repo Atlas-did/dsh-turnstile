@@ -8,7 +8,8 @@ const root = join(here, '..');
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
 
-const HOME = /(?:[A-Za-z]:[\\/]Users|[\\/][a-z][\\/]Users)[\\/][^\\/\s`'"]+/;
+// 与 sanitize-docs 同一条规则：占位符（后面跟 <）不算泄漏
+const HOME = /(?:[A-Za-z]:[\\/]|\/)[Uu]sers[\\/](?![<`])[^\\/\s`'"]+[\\/][^\\/\s`'"]+/;
 const docsDir = join(root, 'docs');
 const dirty = readdirSync(docsDir).filter((f) => f.endsWith('.md') && HOME.test(readFileSync(join(docsDir, f), 'utf8')));
 ok('docs 里没有本机绝对路径', dirty.length === 0, dirty.slice(0, 3).join(','));
