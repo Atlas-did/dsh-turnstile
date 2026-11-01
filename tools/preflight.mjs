@@ -100,10 +100,23 @@ async function one(c) {
   } catch (e) {
     const code = typeof e.code === 'number' ? e.code : (e.killed ? 'timeout' : 'error');
     const j = parseEnvelope(String(e.stdout || ''));
+    const text = String((e.stdout || '') + (e.stderr || ''));
+    // 缺依赖不是「你的 profile 坏了」：报 skipped + 可执行下一步，别让它冒充 FAIL。
+    // （外部审查在没 npm install 的环境里只看到一句 profile-yaml FAIL，根因无从判断）
+    const missing = /MISSING_DEPENDENCY|缺少依赖 ([\w@/-]+)/.exec(text);
+    if (missing) {
+      return {
+        name: c.name, hint: c.hint, exit: 0, ok: true, ms: Date.now() - started,
+        skipped: true, skipReason: 'missing-dependency',
+        next: 'npm install（仓库根）',
+        structured: Boolean(j), findings: [],
+        out: 'SKIPPED: 缺依赖 ' + (missing[1] || '') + ' — 跑 npm install 后重试',
+      };
+    }
     return {
       name: c.name, hint: c.hint, exit: code, ok: false, ms: Date.now() - started,
       timedOut: e.killed === true, structured: Boolean(j), findings: j ? j.findings : [],
-      out: j ? '' : String((e.stdout || '') + (e.stderr || '')),
+      out: j ? '' : text,
     };
   }
 }
@@ -128,6 +141,7 @@ if (!isFlag('--no-report')) {
       runtimeTimeoutMs: timeout,
       checks: results.map((r) => ({
         name: r.name, ok: r.ok, exit: r.exit, ms: r.ms, timedOut: Boolean(r.timedOut),
+        skipped: Boolean(r.skipped), skipReason: r.skipReason || null, next: r.next || null,
         structured: r.structured, findings: r.findings,
         summary: r.structured ? '' : (r.out.trim().split('\n').pop() || '').slice(0, 200),
       })),
@@ -144,6 +158,7 @@ if (isFlag('--json')) {
     timeoutMs: timeout,
     checks: results.map((r) => ({
       name: r.name, ok: r.ok, exit: r.exit, ms: r.ms, timedOut: Boolean(r.timedOut),
+      skipped: Boolean(r.skipped), skipReason: r.skipReason || null, next: r.next || null,
       structured: r.structured, findings: r.findings,
       summary: r.structured ? '' : (r.out.trim().split('\n').pop() || '').slice(0, 200),
     })),

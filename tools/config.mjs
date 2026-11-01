@@ -56,7 +56,13 @@ export function requireDep(name) {
   for (const b of bases) {
     try { return createRequire(b)(name); } catch (e) { lastErr = e; }
   }
-  throw lastErr || new Error('cannot resolve ' + name);
+  // 缺依赖时给可执行的下一步：外部审查在没 npm install 的环境里，只看到一句 profile-yaml FAIL，
+  // 完全不知道是缺包。这条错误消息是给人和 agent 看的，必须能直接照做。
+  const err = new Error('缺少依赖 ' + name + '：在仓库根跑 `npm install`（离线环境可 `npm install --offline`）');
+  err.code = 'MISSING_DEPENDENCY';
+  err.dependency = name;
+  err.cause = lastErr;
+  throw err;
 }
 
 /** js-yaml with a schema that tolerates the harness's !!js expressions. */
