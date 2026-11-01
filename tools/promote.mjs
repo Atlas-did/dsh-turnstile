@@ -1,12 +1,18 @@
 #!/usr/bin/env node
-// Promote lab changes from mini to the main profile - as a readable plan, never by dragging in
-// the live environment. The user reads the list, the agent explains it, then --apply copies it.
+// ⚠️ 与 sandbox-promote.mjs 分工（别再混用）：
+//   promote.mjs         —— **拷文件**：把 mini 里改过的插件文件/目录复制进主 profile。
+//   sandbox-promote.mjs —— **改配置**：只比 dependencies / dsh.profile.bundles / cordis.patch.yml 行，
+//                          用 patch-write 安全写入，默认 dry-run。
+// 常规推送请用 sandbox-promote.mjs；本工具只在「需要原样搬运文件」时用。
 // usage: node tools/promote.mjs --from <miniProfile> --to <desktopProfile> [--apply] [--json]
 import { readFileSync, existsSync, writeFileSync, copyFileSync, cpSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 const argv = process.argv.slice(2);
 const val = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
+if (!process.argv.includes('--json')) {
+  console.error('提示：常规推送请用 sandbox-promote.mjs（比配置，不搬文件）；本工具会把文件原样拷过去。');
+}
 const from = val('--from');
 const to = val('--to');
 const apply = argv.includes('--apply');

@@ -92,6 +92,19 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       res.end(JSON.stringify(r.data || { error: r.reason }));
       return;
     }
+    if (pathname === '/turnstile/run') {
+      // 与控制台插件同一个实现（02 设计 §4.3）：纯函数 + 同一份命令注册表
+      if (req.method !== 'POST') return json(405, { error: 'method' });
+      let body = '';
+      await new Promise((r2) => { req.on('data', (c) => { body += c; if (body.length > 1e6) req.destroy(); }); req.on('end', r2); });
+      let parsed; try { parsed = JSON.parse(body); } catch (e) { return json(400, { error: 'body 不是 JSON' }); }
+      if (parsed && parsed.args && !parsed.args.profile) parsed.args.profile = dir;
+      try {
+        const mod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'run-route.js')).href);
+        const out = await mod.handleRun(parsed, { toolsRoot: join(root, 'tools') });
+        return json(out.status, out.body);
+      } catch (e) { return json(500, { ok: false, verdict: 'unknown', summary: String(e.message).slice(0, 160) }); }
+    }
     if (pathname === '/turnstile/search') {
       // 之前返回两条编造的 hits；现在真搜 launcher 索引，没有索引就如实说。
       const q = new URL(req.url, 'http://x').searchParams.get('q') || '';
@@ -296,11 +309,14 @@ if (isMain) {
   }
   const host = arg('--host', '127.0.0.1');
   const port = Number(arg('--port', '7100'));
-  const server = createConsoleServer({ profileDir });
+  // --fixture：显式用可复现的假数据（e2e/演示用）；默认走真实工具，假数据不会无声出现。
+  const useFixture = process.argv.includes('--fixture');
+  const server = createConsoleServer({ profileDir, fixture: useFixture });
   server.listen(port, host, () => {
     const address = server.address();
     console.log('Turnstile console: http://' + host + ':' + address.port + '/');
     console.log('Profile: ' + profileDir + ' (changes require preview and confirmation)');
+    console.log('Data: ' + (useFixture ? 'FIXTURE（假数据，仅供演示）' : 'real（真跑工具）'));
   });
   const close = () => server.close(() => process.exit(0));
   process.on('SIGINT', close);

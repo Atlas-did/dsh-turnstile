@@ -7,6 +7,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
+import { scanUi } from './lib/ui-scan.mjs';
 silenceWhenJson();
 
 const argv = process.argv.slice(2);
@@ -18,24 +19,15 @@ if (!existsSync(pkgPath)) { console.error('not a profile: ' + dir); process.exit
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 const bundles = (pkg.dsh && pkg.dsh.profile && pkg.dsh.profile.bundles) || Object.keys(pkg.dependencies || {});
 
+// 扫描口径来自 tools/lib/ui-scan.mjs（唯一实现）；这里只做投影：
+// 去掉官方插件、面名缩短、可配性用 lib 已经算好的 configurable。
+const scan = scanUi(dir, { onlyUiSurfaces: true });
 const rows = [];
-for (const name of bundles) {
-  if (name.indexOf('@deepseek-ai/') === 0) continue;
-  const base = join(dir, 'node_modules', name);
-  const pj = join(base, 'package.json');
-  if (!existsSync(pj)) continue;
-  const j = JSON.parse(readFileSync(pj, 'utf8'));
-  const inject = (j.dsh && j.dsh.client && j.dsh.client.inject) || [];
-  const surfaces = inject.filter((s) => /ui-/.test(s)).map((s) => String(s).replace('@deepseek-ai/dsh-client-', ''));
-  let rowText = '';
-  const rel = j.dsh && j.dsh.bundle && j.dsh.bundle.patch;
-  if (rel) {
-    const pf = join(base, String(rel).replace(/^\.\//, ''));
-    if (existsSync(pf)) rowText = readFileSync(pf, 'utf8');
-  }
-  if (!inject.length) continue; // node-side only plugin
-  const declaresPosition = /\b(slot|anchor|order)\s*:/.test(rowText);
-  rows.push({ name, surfaces, declaresPosition, hasClient: true });
+for (const p of scan.plugins) {
+  if (p.name.indexOf('@deepseek-ai/') === 0) continue;
+  if (p.missing || !p.injects.length) continue; // 没装 / 纯 node 侧插件
+  const surfaces = p.injects.filter((s) => /ui-/.test(s)).map((s) => String(s).replace('@deepseek-ai/dsh-client-', ''));
+  rows.push({ name: p.name, surfaces, declaresPosition: Boolean(p.configurable), hasClient: true });
 }
 
 const hardcoded = rows.filter((r) => r.surfaces.length > 0 && !r.declaresPosition);

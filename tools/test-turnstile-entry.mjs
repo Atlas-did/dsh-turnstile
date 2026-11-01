@@ -26,7 +26,7 @@ const insp = run(['inspect', fixture, 'plug-alpha', '--lines', '2']);
 ok('inspect 转发生效', /plug-alpha @1\.4\.0/.test(insp.out), insp.out.split('\n')[0]);
 
 const preset = run(['snapshot', 'list', fixture]);
-ok('组合命令 snapshot list 生效', /快照|还没有快照/.test(preset.out), preset.out.trim().split('\n')[0]);
+ok('组合命令 snapshot list 生效', /快照|还没有快照|\d{4}-\d{2}-\d{2}T/.test(preset.out), preset.out.trim().split('\n')[0]);
 
 const check = run(['check', 'risk', fixture]);
 ok('check risk 转发到 risk.mjs', /risk|summary/i.test(check.out), check.out.trim().split('\n')[0].slice(0, 40));

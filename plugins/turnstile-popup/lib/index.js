@@ -648,6 +648,24 @@ export function apply(ctx, config) {
     },
   }), "turnstile: GET /turnstile/page-model.js");
 
+  // 统一入口：面板按钮全部打这一条（02 设计 §4）。写操作有 dryRun + applyToken 兜底。
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
+    path: "/turnstile/run",
+    handler: async (req, res) => {
+      if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
+      let body = "";
+      await new Promise((resolve) => { req.on("data", (c) => { body += c; if (body.length > 1e6) req.destroy(); }); req.on("end", resolve); });
+      let parsed; try { parsed = JSON.parse(body); } catch { return sendJson(res, 400, { error: "body 不是 JSON" }); }
+      if (parsed && parsed.args && !parsed.args.profile) parsed.args.profile = dir;
+      try {
+        const libDir = dirname(fileURLToPath(import.meta.url));
+        const mod = await import(pathToFileURL(join(libDir, "run-route.js")).href);
+        const out = await mod.handleRun(parsed, { toolsRoot: process.env.DSH_TURNSTILE_HOME });
+        return sendJson(res, out.status, out.body);
+      } catch (e) { return sendJson(res, 500, { ok: false, verdict: "unknown", summary: String(e.message).slice(0, 200) }); }
+    },
+  }), "turnstile: POST /turnstile/run");
   // 运行时 slot 快照：客户端（在 DSH 页面里）观测到的注入记录，POST 到这里存盘，供 ui-atlas 使用。
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",

@@ -70,19 +70,7 @@ for (const [full, plugins] of uiScan.surfaces) {
   const short = String(full).replace('@deepseek-ai/dsh-client-', '');
   for (const name of plugins) addS(short, name, srcOf.get(name) || '');
 }
-if (false) for (const name of bundles) {
-  const d = join(profileDir, 'node_modules', name);
-  const pjF = join(d, 'package.json');
-  if (!existsSync(pjF)) continue;
-  const j = JSON.parse(readFileSync(pjF, 'utf8'));
-  const src = (pjF).replace(/\\\\/g, '/');
-  for (const inj of (j.dsh?.client?.inject || [])) if (/ui-/.test(inj)) addS(inj.replace('@deepseek-ai/dsh-client-', ''), name, src);
-  const patch = j.dsh?.bundle?.patch;
-  if (patch) {
-    const pf = join(d, String(Array.isArray(patch) ? patch[0] : patch).replace(/^\.\//, ''));
-    if (existsSync(pf)) for (const m of readFileSync(pf, 'utf8').matchAll(/^\s*-?\s*id:\s*(ui-[\w-]+)/gm)) addS(m[1], name, pf.replace(/\\\\/g, '/'));
-  }
-}
+
 const surfaceRows = [...surfaces.entries()].map(([ui, list]) => {
   const byWho = new Map();
   for (const it of list) if (!byWho.has(it.who)) byWho.set(it.who, it.src);
