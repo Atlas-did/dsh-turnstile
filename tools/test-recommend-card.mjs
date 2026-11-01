@@ -1,5 +1,5 @@
 // 推荐目录与卡片生成：两者都是「给人看的输出」，必须可解析、不吹牛。
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -34,6 +34,17 @@ ok('根节点是 Page', card.componentName === 'Page');
 ok('带 TinyCard 包裹', card.children[0].componentName === 'TinyCard');
 const grid = card.children[0].children.find((c) => c.componentName === 'TinyGrid');
 ok('表格行数与数据一致', grid.props.data.length === 2);
+
+// 渲染硬规则：颜色会直接导致「显示异常」
+const flat = JSON.stringify(card);
+ok('卡片里没有任何颜色样式', !/(^|\")[^\"]*color\s*:/.test(flat), ((/color\s*:/.exec(flat) || [])[0] || 'none'));
+const vres = (() => {
+  try {
+    const r = spawnSync(process.execPath, [join(root, 'tools', 'card.mjs'), '--kind', 'slots', '--from', slots, '--validate'], { encoding: 'utf8' });
+    return { code: r.status, err: String(r.stderr || '') };
+  } catch (e) { return { code: 1, err: String(e.message) }; }
+})();
+ok('--validate 退出码 0 且报合规', vres.code === 0 && /卡片合规/.test(vres.err), vres.code + ' ' + vres.err.slice(0, 30));
 
 let refused = '';
 try { execFileSync(process.execPath, [join(root, 'tools', 'card.mjs'), '--kind', 'slots', '--from', join(dir, 'nope.json')], { stdio: 'pipe' }); }

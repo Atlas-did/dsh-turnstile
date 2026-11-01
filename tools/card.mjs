@@ -49,6 +49,41 @@ const warned = rows.filter((r) => r.state === 'warn').length;
 const title = kind === 'slots' ? 'UI 位置占用' : '插件体检'
   + (failed ? '：' + failed + ' 项失败' : warned ? '：' + warned + ' 项需注意' : '：通过');
 
+const ALLOWED = new Set(['a','h1','h2','h3','h4','h5','h6','p','ol','ul','li','div','input','video','label','Img','Slot','Text',
+  'TinyForm','TinyFormItem','TinyButton','TinyInput','TinyRadio','TinyRadioGroup','TinySelect','TinySwitch','TinyNumeric',
+  'TinyCheckbox','TinyCheckboxButton','TinyCheckboxGroup','TinyDatePicker','TinyGrid','TinyCard','TinyPager',
+  'TinyHuichartsLine','TinyHuichartsHistogram','TinyHuichartsBar','TinyHuichartsRadar','TinyHuichartsRing','TinyHuichartsPie',
+  'TinyHuichartsFunnel','TinyHuichartsScatter','TinyHuichartsWaterfall','TinyHuichartsGauge','TinyHuichartsGraph','TinyHuichartsProcess']);
+
+export function validateCard(card) {
+  const problems = [];
+  if (!card || card.componentName !== 'Page') problems.push('根节点必须是 Page');
+  const walk = (node, path) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) { node.forEach((n, i) => walk(n, path + '[' + i + ']')); return; }
+    if (node.componentName && !ALLOWED.has(node.componentName)) problems.push(path + ' 组件不在白名单：' + node.componentName);
+    const props = node.props || {};
+    for (const [k, v] of Object.entries(props)) {
+      if (typeof v === 'string' && /(^|;)\s*(background|background-color|color)\s*:/.test(v)) problems.push(path + ' 属性 ' + k + ' 含颜色样式');
+    }
+    if (node.componentName === 'TinyGrid') {
+      const d = props.data;
+      if (!Array.isArray(d)) problems.push(path + ' TinyGrid 缺少 data 数组');
+      else {
+        const ids = new Set();
+        for (const row of d) {
+          if (row && row._RID != null) { if (ids.has(row._RID)) problems.push(path + ' TinyGrid _RID 重复：' + row._RID); ids.add(row._RID); }
+        }
+      }
+      if (!Array.isArray(props.columns)) problems.push(path + ' TinyGrid 缺少 columns 数组');
+    }
+    if (node.children && typeof node.children !== 'string' && !Array.isArray(node.children)) problems.push(path + ' children 必须是数组或字符串');
+    walk(node.children, path + ' > ' + (node.componentName || '?'));
+  };
+  walk(card.children, 'children');
+  return problems;
+}
+
 const card = {
   componentName: 'Page',
   state: { view: kind },
@@ -57,6 +92,7 @@ const card = {
     {
       componentName: 'TinyCard',
       children: [
+        // 只用排版属性，不写任何 color/background —— schemaJson 的硬规则（写了会渲染异常）
         { componentName: 'Text', props: { text: title, style: 'font-size:15px;font-weight:600;display:block;margin-bottom:10px' } },
         {
           componentName: 'TinyGrid',
@@ -71,13 +107,21 @@ const card = {
         },
         rows.length ? {
           componentName: 'Text',
-          props: { text: '来源：' + (from || '(未给文件)') + ' · 由 dsh-turnstile 生成', style: 'color:#8a8f98;font-size:12px;display:block;margin-top:8px' },
-        } : { componentName: 'Text', props: { text: '没有数据：用 --from 指定报告文件。', style: 'color:#8a8f98;display:block' } },
+          props: { text: '来源：' + (from || '(未给文件)') + ' · 由 dsh-turnstile 生成', style: 'font-size:12px;display:block;margin-top:8px' },
+        } : { componentName: 'Text', props: { text: '没有数据：用 --from 指定报告文件。', style: 'display:block' } },
       ],
     },
   ],
 };
 
+
+if (argv.includes('--validate')) {
+  const problems = validateCard(card);
+  if (problems.length) { console.error('卡片不合规：'); for (const p of problems) console.error('  - ' + p); process.exit(1); }
+  console.error('卡片合规（根 Page / 无颜色 / 组件白名单 / TinyGrid 完整）');
+}
 console.log('```schemaJson');
 console.log(JSON.stringify(card));
 console.log('```');
+// 硬规则自检：这些是 schemaJson 的硬约束，写错会渲染异常（[显示异常]）。
+// 规则来自渲染端约定：根必须是 Page；禁止任何颜色；节点必须在白名单内；TinyGrid 行需要唯一 _RID。
