@@ -7,9 +7,18 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 
 // 只解析不执行：取代原来的 new Function 语法探测
-const acorn = createRequire(join(process.cwd(), 'package.json'))('acorn');
+// acorn 可能不在调用方的 cwd 里（宿主/管道调用），依次从仓库根找；都找不到就退化为不检查语法
+const acorn = (() => {
+  const bases = [process.cwd(), process.env.DSH_TURNSTILE_HOME || '', join(dirname(fileURLToPath(import.meta.url)), '..')].filter(Boolean);
+  for (const base of bases) {
+    try { return createRequire(join(base, 'package.json'))('acorn'); } catch {}
+  }
+  return null;
+})();
 
 export const MARKET_PATTERN = /(dsh-?market|dsh-?plugin-?market|plugin-?market|market-?place)$/i;
 
@@ -51,6 +60,7 @@ export function checkClientSource(source) {
     .replace(/\bexport\s+(function|const|let|class|async)\b/g, '$1');
   try {
     // 用 acorn 做语法检查，不构造可执行函数（避免 eval-like 实现）
+    if (!acorn) return { ok: true, error: '', note: 'acorn 不可用，跳过语法检查' };
     acorn.parse(stripped, { ecmaVersion: 'latest', sourceType: 'script' });
     return { ok: true, error: '' };
   } catch (e) {

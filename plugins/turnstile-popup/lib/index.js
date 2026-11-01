@@ -535,58 +535,24 @@ export function apply(ctx, config) {
     path: "/turnstile/health",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
-      const items = [];
+      // 与独立控制台共用同一份采集器（路径/缺包/bridge 规则只有一份）
+      const here = dirname(fileURLToPath(import.meta.url));
       const home = process.env.DSH_HOME || join(process.env.USERPROFILE || "", ".dsh");
-      const credFile = join(home, ".credentials.yaml");
-      const credKeys = existsSync(credFile)
-        ? readFileSync(credFile, "utf8").split(/\r?\n/).map((l) => (/^([A-Za-z0-9._-]+)\s*:/.exec(l) || [])[1]).filter(Boolean)
-        : [];
-      items.push(health.credentialsItem({ exists: existsSync(credFile), keys: credKeys }));
-      // Two layouts exist in the wild: AA desktop writes ~/.agents-anywhere/dsh-bridge/,
-      // while the 2.x DSH plugin writes <DSH_HOME>/agents-anywhere/bridge/.
-      const candidates = [
-        join(process.env.USERPROFILE || "", ".agents-anywhere", "dsh-bridge", "endpoint.json"),
-        join(home, "agents-anywhere", "bridge", "endpoint.json"),
-      ];
-      const endpoint = candidates.find((p) => existsSync(p)) || candidates[0];
-      let endpointMtime = 0;
-      try { if (existsSync(endpoint)) endpointMtime = statSync(endpoint).mtimeMs; } catch {}
-      // B15: only talk about the bridge when this profile actually has a bridge plugin; a clean
-      // profile has no reason to hear about someone else's endpoint file.
-      const bridgeInstalled = existsSync(join(dir, "node_modules", "@agents-anywhere", "dsh-bridge-next"));
-      if (bridgeInstalled || existsSync(endpoint)) {
-        items.push(health.bridgeItem({ exists: existsSync(endpoint), mtimeMs: endpointMtime }));
-      }
-      const prof = { name: profile, dir };
-      // B15: report what this profile actually declares, not a list of the author's plugins.
-      let bundles = [];
-      try { bundles = (JSON.parse(readFileSync(join(prof.dir, "package.json"), "utf8")).dsh || {}).profile?.bundles || []; } catch {}
-      const patchText = existsSync(join(prof.dir, "cordis.patch.yml")) ? readFileSync(join(prof.dir, "cordis.patch.yml"), "utf8") : "";
-      // B16: a bundle the host ships (asar) is not missing just because the profile lacks it.
-      const hostProvided = [];
-      const missingBundles = [];
-      for (const n of bundles) {
-        if (existsSync(join(prof.dir, "node_modules", n))) continue;
-        let hostHas = false;
-        // Resolve from the running host entry: the host ships bundles under runtime/node_modules,
-        // which is not on the profile's resolution chain.
-        for (const base of [process.argv[1], import.meta.url]) {
-          if (hostHas || !base) continue;
-          try { createRequire(base).resolve(n); hostHas = true; } catch {}
-        }
-        if (hostHas) hostProvided.push(n); else missingBundles.push(n);
-      }
-      const disabledCount = (patchText.match(/disabled:\s*true/g) || []).length;
-      items.push(health.bundlesItem({ total: bundles.length, hostProvided, missing: missingBundles }));
-      items.push(health.authItem({ total: null }));
+      const profileName = (config && config.profile) || "mini";
+      const profileDir = join(home, "profiles", profileName);
+      const collectMod = await import(pathToFileURL(join(here, "health-collect.js")).href);
+      const collected = collectMod.collectHealth({ profileDir, hostBases: [process.argv[1], import.meta.url] });
+      const items = collected.items;
+      const healthNotes = collected.notes;
       // 三个坑的检查（双市场 / git 依赖 / client bundle）与 diagnose 同一份实现。
       let pits = [];
       const repoRoot = process.env.DSH_TURNSTILE_HOME || "";
       try {
         const pitsMod = await import(pathToFileURL(join(repoRoot, "tools", "pits.mjs")).href);
-        pits = pitsMod.runPitChecks(prof.dir);
+        pits = pitsMod.runPitChecks(profileDir);
       } catch (e) { pits = [{ id: "pit:unavailable", level: "skip", message: "无法加载 pits 模块：" + String(e && e.message), next: "" }]; }
-      sendJson(res, 200, { items, pits, summary: health.summarize(items), profile: prof.name, at: new Date().toISOString() });
+      const healthMod = await import(pathToFileURL(join(here, "health.js")).href);
+      sendJson(res, 200, { items, pits, notes: healthNotes, summary: healthMod.summarize(items), profile: profileName, fixture: false, at: new Date().toISOString() });
     },
   }), "turnstile: GET /turnstile/health");
   ctx.effect(() => ctx.webServer.register({

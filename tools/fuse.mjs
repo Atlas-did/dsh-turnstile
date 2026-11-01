@@ -4,7 +4,8 @@
 // usage: node tools/fuse.mjs <profileDir> --surface <ui-surface> [--apply] [--json]
 // exit 0 fuse plan ready/applied | 2 usage | 3 cannot fuse by config (see reason) 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { runBatch } from './lib/batch-write.mjs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -68,12 +69,11 @@ for (const p of plan) console.log('  ' + p.plugin.padEnd(34) + (p.from || '(unse
 
 if (!apply) { console.log(''); console.log('DRY RUN - re-run with --apply (each write keeps a .bak).'); process.exit(0); }
 
-let failed = 0;
-for (const p of plan) {
-  try {
-    execFileSync(process.execPath, [join(root, 'tools/anchor.mjs'), dir, '--package', p.plugin, '--anchor', p.to, '--apply'], { stdio: 'inherit' });
-  } catch { failed++; }
-}
-console.log('');
-console.log(failed ? failed + ' write(s) failed' : 'fused; restart DSH to take effect');
+// 整批原子：任一写入失败就把本批文件全部恢复（复审 P2-3），逻辑在 lib/batch-write
+const targets = [join(dir, 'cordis.patch.yml'), join(dir, 'package.json')].filter((f) => existsSync(f));
+const steps = plan.map((p) => () => execFileSync(process.execPath, [join(root, 'tools/anchor.mjs'), dir, '--package', p.plugin, '--anchor', p.to], { stdio: 'ignore' }));
+const batch = runBatch(targets, steps);
+const failed = batch.ok ? 0 : 1;
+const restored = batch.ok ? null : { ok: batch.restored, problems: batch.problems };
+console.log(failed ? failed + ' write(s) failed' + (restored && restored.ok ? '；已恢复本批全部文件' : '；恢复也失败：' + JSON.stringify(restored && restored.problems)) : 'fused; restart DSH to take effect');
 process.exit(failed ? 1 : 0);

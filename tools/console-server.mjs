@@ -165,30 +165,26 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       return json(200, { ok: true, file, slots: parsed.slots.length });
     }
     if (pathname === '/turnstile/health') {
-      const mod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health.js')).href);
-      const items = [];
+      const healthMod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health.js')).href);
+      const collectMod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health-collect.js')).href);
+      let items = [];
+      let notes = [];
       if (fixture) {
-        // 只有 fixture 分支才允许写死演示数据
         const credFile = join(root, 'tests', 'console-fixture', '.credentials.yaml');
-        items.push(mod.credentialsItem({ exists: existsSync(credFile), keys: [] }));
-        items.push(mod.bridgeItem({ exists: false }));
-        items.push(mod.pluginItem({ name: 'dsh-free-search', installed: true, disabled: false }));
-        items.push(mod.authItem({ total: null }));
+        items = [
+          healthMod.credentialsItem({ exists: existsSync(credFile), keys: [] }),
+          healthMod.bridgeItem({ exists: false }),
+          healthMod.pluginItem({ name: 'dsh-free-search', installed: true, disabled: false }),
+          healthMod.authItem({ total: null }),
+        ];
       } else {
-        // 真实模式：只用能读到的真实文件，读不到就 unknown（不再写死包名与 profile）
-        const credFile = join(dir, '.credentials.yaml');
-        const credExists = existsSync(credFile);
-        items.push(mod.credentialsItem({ exists: credExists, keys: [], unknown: !credExists }));
-        const bridgeFile = join(dir, '.dsh-link.json');
-        items.push(mod.bridgeItem({ exists: existsSync(bridgeFile), unknown: !existsSync(bridgeFile) }));
-        // 用真实的 bundles 统计（bundlesItem 只报统计与缺包，不编造具体插件名）
-        const inst = readInstalledPlugins(dir);
-        items.push(mod.bundlesItem({ total: inst.count, hostProvided: [], missing: [] }));
-        items.push(mod.authItem({ total: null }));
+        // 真实模式：与宿主同一份采集器（路径、缺包判定、bridge 安装规则都一致）
+        const hostBases = [pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'index.js')).href];
+        try { const bin = process.env.DSH_BIN; if (bin && existsSync(bin)) hostBases.push(bin); } catch {}
+        const collected = collectMod.collectHealth({ profileDir: dir, hostBases });
+        items = collected.items;
+        notes = collected.notes;
       }
-      res.setHeader('content-type', 'application/json; charset=utf-8');
-      // 真实口径：pits 由 lib/pits.js 算；这里之前是写死的两条。fixture 分支才返回假数据。
-      // 真实口径：pits 由 tools/pits.mjs 的 runPitChecks 算；只有 fixture 分支返回固定体。
       let pits;
       if (fixture) {
         pits = [{ id: 'pit:duplicate-market', level: 'pass', message: '只有 1 个插件市场', next: '' }, { id: 'pit:client-bundle', level: 'pass', message: '2 个 client bundle 都能解析', next: '' }];
@@ -198,7 +194,8 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
           pits = pitsMod.runPitChecks(dir);
         } catch (e) { pits = [{ id: 'pit:unavailable', level: 'warn', message: 'pits 检查跑不动：' + String(e.message).slice(0, 80), next: 'node tools/pits.mjs <profile>' }]; }
       }
-      res.end(JSON.stringify({ items, pits, summary: mod.summarize(items), profile: fixture ? 'console-fixture' : dir, fixture, at: new Date().toISOString() }));
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ items, pits, notes, summary: healthMod.summarize(items), profile: fixture ? 'console-fixture' : dir, fixture: Boolean(fixture), at: new Date().toISOString() }));
       return;
     }
     if (pathname === '/turnstile/hooks') {
