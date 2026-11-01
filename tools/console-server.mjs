@@ -3,7 +3,7 @@
 // npm run dev -- --host 127.0.0.1 --port 7100 --profile tests/console-fixture
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
-import { copyFileSync, existsSync, readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -25,6 +25,14 @@ const designerFile = join(pluginLib, 'console-designer.js');
 // fixture=true 时返回可复现的假数据（仅供 e2e）；默认走真实工具，假数据不再无标注地混进生产路径。
 export function createConsoleServer({ profileDir, stateDir, fixture = false } = {}) {
   const dir = resolve(profileDir || join(root, 'tests', 'console-fixture'));
+  // 页面版本：文件 mtime+size 的哈希，够用来发现「别处改过」，不需要额外存储
+  const pageVersion = (file) => {
+    try {
+      const st = statSync(file);
+      return Number(st.mtimeMs) + Number(st.size);
+    } catch { return 0; }
+  };
+
   const state = stateDir || (dir.includes(join('tests', 'console-fixture')) ? join(dir, '.turnstile') : undefined);
   return createServer(async (req, res) => {
     const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
@@ -288,8 +296,8 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
     }
     if (pathname === '/turnstile/page') {
       if (req.method === 'GET') {
-        if (!existsSync(pageFile)) return json(200, { status: 'not-generated', file: pageFile });
-        try { return json(200, JSON.parse(readFileSync(pageFile, 'utf8'))); }
+        if (!existsSync(pageFile)) return json(200, { status: 'not-generated', file: pageFile, version: 0 });
+        try { return json(200, Object.assign(JSON.parse(readFileSync(pageFile, 'utf8')), { version: pageVersion(pageFile) })); }
         catch (e) { return json(500, { error: '读不出页面文件：' + String(e.message).slice(0, 120) }); }
       }
       if (req.method !== 'POST') return json(405, { error: 'method' });
@@ -300,11 +308,16 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
           if (body.length > 2e6) return json(413, { error: '页面过大' });
         }
         const parsed = JSON.parse(body || '{}');
+        // 多标签页/外部修改保护：客户端回传它读到的版本，不一致就 409，不静默覆盖
+        const currentVersion = pageVersion(pageFile);
+        if (parsed.baseVersion != null && Number(parsed.baseVersion) !== currentVersion) {
+          return json(409, { error: '页面已被其他地方修改（当前版本 ' + currentVersion + '）', version: currentVersion, stale: true });
+        }
         if (parsed.page?.schema !== 'mini/page@1' || !parsed.page.root || typeof parsed.page.root !== 'object') return json(400, { error: '页面缺少 mini/page@1 schema 或有效 root' });
         mkdirSync(dirname(pageFile), { recursive: true });
         if (existsSync(pageFile)) copyFileSync(pageFile, pageFile + '.bak-' + Date.now());
         writeFileSync(pageFile, JSON.stringify(parsed.page, null, 2) + '\n');
-        return json(200, { ok: true, file: pageFile });
+        return json(200, { ok: true, file: pageFile, version: pageVersion(pageFile) });
       } catch (e) { return json(400, { error: String(e?.message || e).slice(0, 160) }); }
     }
     if (pathname === '/turnstile/export') {

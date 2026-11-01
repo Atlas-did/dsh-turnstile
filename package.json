@@ -76,7 +76,7 @@
     "test:ui-scan": "node plugins/turnstile-popup/test/ui-scan.test.mjs",
     "test:semver": "node plugins/turnstile-popup/test/semver-drift.test.mjs",
     "test:card": "node tools/test-recommend-card.mjs",
-    "test:all": "node plugins/turnstile-popup/test/ui-scan.test.mjs && node plugins/turnstile-popup/test/slot-attr.test.mjs && node plugins/turnstile-popup/test/ask.test.mjs && node plugins/turnstile-popup/test/semver-drift.test.mjs && node tools/test-look-tools.mjs && node tools/test-turnstile-entry.mjs && node tools/test-recommend-card.mjs && node tools/test-slot-map-report.mjs && node tools/test-profile-snapshot.mjs && node plugins/turnstile-popup/test/occupancy-parity.test.mjs && node plugins/turnstile-popup/test/run-route.test.mjs && node tools/test-promote-split.mjs && node tools/test-report-contract.mjs && node tools/test-skill-pack.mjs && node tools/test-dependency-diag.mjs && node tools/test-cli-token.mjs && node tools/test-evidence.mjs && node tools/test-verify-live.mjs && node tools/test-trial-wiring.mjs && node tools/test-new-plugin.mjs && node tools/test-lab-reload.mjs && node tools/test-create-loop.mjs && node plugins/turnstile-popup/test/page-model.test.mjs && node plugins/turnstile-popup/test/selection.test.mjs && node plugins/turnstile-popup/test/history-timeline.test.mjs && node tools/test-trial-status.mjs && node tools/test-host-evidence.mjs && node tools/test-host-observe.mjs && node tools/test-check-extensions.mjs && node tools/test-release-check.mjs && node tools/test-acceptance.mjs && node tools/test-evidence-unify.mjs",
+    "test:all": "node plugins/turnstile-popup/test/ui-scan.test.mjs && node plugins/turnstile-popup/test/slot-attr.test.mjs && node plugins/turnstile-popup/test/ask.test.mjs && node plugins/turnstile-popup/test/semver-drift.test.mjs && node tools/test-look-tools.mjs && node tools/test-turnstile-entry.mjs && node tools/test-recommend-card.mjs && node tools/test-slot-map-report.mjs && node tools/test-profile-snapshot.mjs && node plugins/turnstile-popup/test/occupancy-parity.test.mjs && node plugins/turnstile-popup/test/run-route.test.mjs && node tools/test-promote-split.mjs && node tools/test-report-contract.mjs && node tools/test-skill-pack.mjs && node tools/test-dependency-diag.mjs && node tools/test-cli-token.mjs && node tools/test-evidence.mjs && node tools/test-verify-live.mjs && node tools/test-trial-wiring.mjs && node tools/test-new-plugin.mjs && node tools/test-lab-reload.mjs && node tools/test-create-loop.mjs && node plugins/turnstile-popup/test/page-model.test.mjs && node plugins/turnstile-popup/test/selection.test.mjs && node plugins/turnstile-popup/test/history-timeline.test.mjs && node tools/test-trial-status.mjs && node tools/test-host-evidence.mjs && node tools/test-host-observe.mjs && node tools/test-check-extensions.mjs && node tools/test-release-check.mjs && node tools/test-acceptance.mjs && node tools/test-evidence-unify.mjs && node tools/test-page-version.mjs",
     "test:run-route": "node plugins/turnstile-popup/test/run-route.test.mjs",
     "test:promote": "node tools/test-promote-split.mjs",
     "test:report": "node tools/test-report-contract.mjs",
@@ -96,7 +96,8 @@
     "test:create-loop": "node tools/test-create-loop.mjs",
     "acceptance": "node tools/acceptance-mini.mjs",
     "test:acceptance": "node tools/test-acceptance.mjs",
-    "test:evidence-unify": "node tools/test-evidence-unify.mjs"
+    "test:evidence-unify": "node tools/test-evidence-unify.mjs",
+    "test:page-version": "node tools/test-page-version.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",
