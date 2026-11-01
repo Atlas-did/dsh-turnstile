@@ -22,8 +22,12 @@ ok('六层全 pass 但 claim 不是 verified-with-regression → 不通过', !cl
 const missing = judgeVerify({ ok: true, claim: 'verified-with-regression', levels: L({ L0: 'pass', L1: 'pass' }) });
 ok('缺层级 → 不通过', !missing.ok, missing.reason);
 
-ok('整体验收：任一步失败即失败', !judgeAcceptance([{ id: 'a', ok: true }, { id: 'b', ok: false }]).ok);
-ok('整体验收：全通过才算过', judgeAcceptance([{ id: 'a', ok: true }]).ok);
+const REQ = ['create', 'install+verify', 'verify-with-host-evidence', 'uninstall', 'rollback-verified'];
+const full = REQ.map((id) => ({ id, ok: true }));
+ok('整体验收：全通过且必需步骤齐全才算过', judgeAcceptance(full).ok, judgeAcceptance(full).reason);
+ok('整体验收：空步骤数组不算通过（复审 P2-1）', !judgeAcceptance([]).ok, judgeAcceptance([]).reason);
+ok('整体验收：缺必需步骤不算通过', !judgeAcceptance([{ id: 'create', ok: true }]).ok, judgeAcceptance([{ id: 'create', ok: true }]).reason);
+ok('整体验收：任一步失败即失败', !judgeAcceptance(full.map((s) => (s.id === 'uninstall' ? { ...s, ok: false } : s))).ok);
 
 console.log(fail ? 'ACCEPTANCE_JUDGE_FAILED ' + fail : 'ACCEPTANCE_JUDGE_OK');
 process.exitCode = fail ? 1 : 0;

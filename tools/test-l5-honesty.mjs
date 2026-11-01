@@ -70,6 +70,10 @@ srv.close();
 srv = await serve(JSON.stringify({ items: [{ id: 'credentials', level: 'pass' }] }));
 j = await verify(srv.address().port);
 ok('无基线时 claim 停在 verified', j.claim === 'verified', j.claim);
+const l5noBase = j.levels.find((l) => l.level === 'L5');
+ok('无基线时 L5 是 unknown（不是 pass）', l5noBase.status === 'unknown', l5noBase.status);
+ok('无基线时 deepest 停在 L4', j.deepest === 'L4', String(j.deepest));
+ok('字段自洽：deepest 不到 L5 就不该是 ok + next 为空', !(j.deepest === 'L5' && j.next.length === 0));
 ok('无基线时说明没做对比', /基线|未做/.test(j.claimText), j.claimText.slice(0, 34));
 srv.close();
 

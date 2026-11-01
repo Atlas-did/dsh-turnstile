@@ -21,10 +21,17 @@ export function judgeVerify(report) {
   return { ok: true, reason: 'L0–L5 全 pass 且 claim=verified-with-regression' };
 }
 
-/** 整体验收：所有步骤都 ok 才算通过，并指出第一个失败步骤。 */
+// 一次完整验收必须包含这些步骤；缺一步就算没过（防止流程裁剪成「0 步成功」）
+export const REQUIRED_STEPS = ['create', 'install+verify', 'verify-with-host-evidence', 'uninstall', 'rollback-verified'];
+
+/** 整体验收：所有步骤都 ok 且必需步骤齐全才算通过。 */
 export function judgeAcceptance(steps) {
   const list = Array.isArray(steps) ? steps : [];
+  if (!list.length) return { ok: false, reason: '没有任何步骤：不能算通过' };
   const bad = list.filter((s) => !s.ok);
   if (bad.length) return { ok: false, reason: '步骤失败：' + bad.map((s) => s.id).join(',') };
-  return { ok: true, reason: '全部 ' + list.length + ' 步通过' };
+  const ids = new Set(list.map((s) => s.id));
+  const missing = REQUIRED_STEPS.filter((id) => !ids.has(id));
+  if (missing.length) return { ok: false, reason: '缺少必需步骤：' + missing.join(',') };
+  return { ok: true, reason: '全部 ' + list.length + ' 步通过（含必需步骤）' };
 }

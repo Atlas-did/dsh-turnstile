@@ -201,13 +201,20 @@ else {
         const surfBad = surfNote && surfNote.ok === false;
         if (surfNote && surfNote.ok === null) regressionComplete = false;
         const failed = bad.length || pitBad || surfBad;
-        layers.push(level('L5', failed ? STATUS.fail : STATUS.pass,
-          [items.map((i) => i.id + '=' + i.level).join(' '), pitBad ? 'pits 有 fail' : '', surfNote ? surfNote.text : '没有 --surfaces-before：未做装前基线对比']));
+        if (failed) {
+          layers.push(level('L5', STATUS.fail, [items.map((i) => i.id + '=' + i.level).join(' '), pitBad ? 'pits 有 fail' : '', surfNote ? surfNote.text : '']));
+        } else if (!regressionComplete) {
+          // 健康项过了，但没做基线对比 → L5 不能算 pass（复审 P1-3：字段必须自洽）
+          layers.push(level('L5', STATUS.unknown, ['健康检查通过，但缺 --surfaces-before，回归未验证', items.map((i) => i.id + '=' + i.level).join(' ')]));
+        } else {
+          layers.push(level('L5', STATUS.pass, [items.map((i) => i.id + '=' + i.level).join(' '), surfNote ? surfNote.text : '']));
+        }
       }
     }
   } catch (e) { regressionComplete = false; layers.push(level('L5', STATUS.unknown, ['health 读不到：' + String(e.message).slice(0, 50)])); }
 }
 
+// L5 现在自己会因缺基线变 unknown，claim 不再需要额外降级参数（保留参数以兼容旧调用）
 const claim = claimOf(layers, { regressionComplete });
 const report = renderReport({ pkg: pkgName || '(未指定)', profile: profileName, layers, claim, verdict: verdictOf(layers) });
 const shaped = Object.assign({

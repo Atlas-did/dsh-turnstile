@@ -71,16 +71,18 @@ function usage() {
 }
 
 if (process.argv[1] && process.argv[1].endsWith('ask.mjs')) {
-  const argv = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-  // 两种顺序都接受：`ask <profile> "话"` 与 `ask "话" <profile>`。
-  // 判断依据是「哪一个看起来像 profile」（带路径分隔符，或在 DSH_HOME 下存在）。
-  const looksProfile = (s) => Boolean(s) && (/[\\/]/.test(s) || existsSync(joinPath(process.env.DSH_HOME || joinPath(homedir(), '.dsh'), 'profiles', s)));
-  const first = argv[0] || '';
-  const second = argv[1] || '';
-  const profile = looksProfile(first) && !looksProfile(second) ? first : (looksProfile(second) ? second : first);
-  const profileIdx = profile === first ? 0 : 1;
-  const textParts = argv.filter((_, i) => i !== profileIdx);
-  const text = textParts.join(' ');
+  const allArgv = process.argv.slice(2);
+  const argv = allArgv.filter((a, i) => !a.startsWith('--') && allArgv[i - 1] !== '--profile');
+  // 顺序解析不再看文件系统（复审 P1-1）：先试「profile 在前」，再试「话在前」，
+  // 选能解析出**已知意图**的那一种；都解析不出就按正序处理（会走 help）。
+  const explicit = (() => { const i = allArgv.indexOf('--profile'); return i >= 0 ? allArgv[i + 1] : null; })();
+  const parseOf = (s) => { try { return parseIntent(s); } catch { return null; } };
+  const known = (p) => p && p.intent && p.intent !== 'help';
+  let profile = '', text = '';
+  if (explicit) { profile = explicit; text = argv.join(' '); }
+  else if (known(parseOf(argv.slice(1).join(' ')))) { profile = argv[0] || ''; text = argv.slice(1).join(' '); }
+  else if (known(parseOf(argv[0] || ''))) { profile = argv[1] || ''; text = [argv[0], ...argv.slice(2)].join(' '); }
+  else { profile = argv[0] || ''; text = argv.slice(1).join(' '); }
   const allArgs = process.argv.slice(2);
   const asJson = allArgs.includes('--json');
   const apply = allArgs.includes('--apply');

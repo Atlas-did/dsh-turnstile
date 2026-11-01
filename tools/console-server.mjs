@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { copyFileSync, existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { readPage, writePage, pageVersion } from '../plugins/turnstile-popup/lib/page-store.js';
+import { readJsonBody } from './lib/json-body.mjs';
 import { homedir } from 'node:os';
 import { validatePageTree } from '../plugins/turnstile-popup/lib/page-validate.js';
 import { dirname, join, resolve } from 'node:path';
@@ -120,9 +121,12 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
     if (pathname === '/turnstile/run') {
       // 与控制台插件同一个实现（02 设计 §4.3）：纯函数 + 同一份命令注册表
       if (req.method !== 'POST') return json(405, { error: 'method' });
-      let body = '';
-      await new Promise((r2) => { req.on('data', (c) => { body += c; if (body.length > 1e6) req.destroy(); }); req.on('end', r2); });
-      let parsed; try { parsed = JSON.parse(body); } catch (e) { return json(400, { error: 'body 不是 JSON' }); }
+      let parsed;
+      try { parsed = await readJsonBody(req, { maxBytes: 1e6 }); }
+      catch (e) {
+        if (e && e.code === 'BODY_TOO_LARGE') return json(413, { error: '请求体过大（上限 ' + e.limit + ' 字节）' });
+        return json(400, { error: 'body 不是 JSON：' + String(e.message).slice(0, 120) });
+      }
       if (parsed && parsed.args && !parsed.args.profile) parsed.args.profile = dir;
       try {
         const mod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'run-route.js')).href);
