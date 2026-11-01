@@ -62,7 +62,8 @@
     "test:recommend": "node tools/test-recommend-card.mjs",
     "turnstile": "node tools/turnstile.mjs",
     "test:entry": "node tools/test-turnstile-entry.mjs",
-    "test:ui-scan": "node plugins/turnstile-popup/test/ui-scan.test.mjs"
+    "test:ui-scan": "node plugins/turnstile-popup/test/ui-scan.test.mjs",
+    "test:semver": "node plugins/turnstile-popup/test/semver-drift.test.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",
