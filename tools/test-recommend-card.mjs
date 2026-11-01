@@ -14,8 +14,11 @@ const run = (script, args) => execFileSync(process.execPath, [join(root, 'tools'
 const cat = JSON.parse(readFileSync(join(root, 'recommendations', 'plugins.json'), 'utf8'));
 ok('目录有 5 个插件', cat.plugins.length === 5, String(cat.plugins.length));
 ok('每个插件都有接入方式', cat.plugins.every((p) => p.integratesWith && p.integratesWith.length > 5));
-ok('每个插件都有 status', cat.plugins.every((p) => ['installed', 'unverified'].includes(p.status)));
+ok('每个插件都有 status', cat.plugins.every((p) => ['installed', 'verified', 'unverified'].includes(p.status)));
 ok('installed 必须带证据', cat.plugins.filter((p) => p.status === 'installed').every((p) => p.verified && p.verified.length > 10));
+ok('status 只允许三档', cat.plugins.every((p) => ['installed', 'verified', 'unverified'].includes(p.status)));
+ok('每条都必须有 evidence 数组', cat.plugins.every((p) => Array.isArray(p.evidence) && p.evidence.length > 0), cat.plugins.filter((p) => !Array.isArray(p.evidence)).map((p) => p.name).join(','));
+ok('verified 不等于 installed（不许混）', cat.plugins.every((p) => p.status !== 'verified' || p.verified.length > 10));
 
 const all = JSON.parse(run('recommend.mjs', ['--json']));
 ok('recommend --json 输出全部', all.plugins.length === 5);

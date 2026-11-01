@@ -12,6 +12,13 @@ const val = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : nu
 const profile = argv.find((a) => !a.startsWith('--') && a !== val('--only')) || '';
 const catalog = JSON.parse(readFileSync(join(root, 'recommendations', 'plugins.json'), 'utf8'));
 
+// 也认「技能形态」的安装：<DSH_HOME>/skills/<dir>/SKILL.md（profile 在 <DSH_HOME>/profiles/<name>）
+function skillInstalled(dirs) {
+  if (!profile || !dirs || !dirs.length) return false;
+  const base = join(profile, '..', '..', 'skills');
+  return dirs.some(function (d) { return existsSync(join(base, d, 'SKILL.md')); });
+}
+
 function versionOf(name) {
   if (!profile) return null;
   const p = join(profile, 'node_modules', name, 'package.json');
@@ -22,7 +29,11 @@ function versionOf(name) {
 const only = val('--only');
 const rows = catalog.plugins
   .filter((p) => !only || p.name.toLowerCase().includes(only.toLowerCase()))
-  .map((p) => Object.assign({}, p, { installed: Boolean(versionOf(p.name)), version: versionOf(p.name) || '' }));
+  .map(function (p) {
+    var asPlugin = Boolean(versionOf(p.name));
+    var asSkill = skillInstalled(p.detect && p.detect.skills);
+    return Object.assign({}, p, { installed: asPlugin || asSkill, version: versionOf(p.name) || '', kind: asPlugin ? 'plugin' : (asSkill ? 'skill' : '') });
+  });
 
 if (argv.includes('--json')) {
   console.log(JSON.stringify({ profile: profile || null, updatedAt: catalog.updatedAt, plugins: rows }, null, 1));
