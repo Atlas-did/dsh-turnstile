@@ -211,6 +211,37 @@ export function applyCommand(page, cmd) {
       to.children.splice(at, 0, node);
       return { page: next, focus: node.id };
     }
+    case 'pasteMany': {
+      const parent = findNode(next.root, cmd.parentId);
+      if (!parent) throw new Error('粘贴目标不存在');
+      if (!capabilitiesOf(parent.type).acceptsChildren) throw new Error(parent.type + ' 不接受子节点');
+      if (!Array.isArray(cmd.nodes) || !cmd.nodes.length) throw new Error('剪贴板是空的');
+      const cloned = cmd.nodes.map((n) => cloneWithNewIds(n));
+      const at = Number.isInteger(cmd.index) ? Math.max(0, Math.min(cmd.index, parent.children.length)) : parent.children.length;
+      parent.children.splice(at, 0, ...cloned);
+      return { page: next, focus: cloned[0].id };
+    }
+    case 'removeMany': {
+      if (!Array.isArray(cmd.nodeIds) || !cmd.nodeIds.length) throw new Error('批量删除至少选择一个节点');
+      const ids = new Set(cmd.nodeIds);
+      if (ids.has(next.root.id)) throw new Error('根节点不能删除');
+      // 先全部验证：任何一个不存在就整体失败，不留下半删状态
+      for (const id of ids) if (!findNode(next.root, id)) throw new Error('找不到节点 ' + id);
+      // 选中的祖先已包含某个后代时，只删祖先（否则会重复删）
+      const rootsToDelete = new Set([...ids].filter((id) => {
+        let p = findParent(next.root, id);
+        while (p) { if (ids.has(p.id)) return false; p = findParent(next.root, p.id); }
+        return true;
+      }));
+      const strip = (node) => {
+        if (!Array.isArray(node.children)) return node;
+        node.children = node.children.filter((c) => !rootsToDelete.has(c.id));
+        node.children.forEach(strip);
+        return node;
+      };
+      strip(next.root);
+      return { page: next, focus: next.root.id };
+    }
     case 'remove': {
       if (cmd.nodeId === next.root.id) throw new Error('根节点不能删除');
       const parent = findParent(next.root, cmd.nodeId);
@@ -319,6 +350,8 @@ export function labelOf(cmd) {
   if (!cmd) return '未知';
   if (cmd.type === 'add') return '添加 ' + cmd.component;
   if (cmd.type === 'paste') return '粘贴 ' + ((cmd.node || {}).type || '节点');
+  if (cmd.type === 'pasteMany') return '粘贴 ' + ((cmd.nodes || []).length) + ' 个节点';
+  if (cmd.type === 'removeMany') return '删除 ' + ((cmd.nodeIds || []).length) + ' 个节点';
   if (cmd.type === 'move') return '移动节点';
   if (cmd.type === 'remove') return '删除节点';
   if (cmd.type === 'setProp') return '改 ' + cmd.key;

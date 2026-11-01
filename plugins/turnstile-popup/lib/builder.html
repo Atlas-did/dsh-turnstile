@@ -67,7 +67,7 @@ let selectedIds = [selectedId];
 let selectionAnchor = selectedId;
 let dragPayload = null;
 let pendingType = null;
-let clipboardNode = null;
+let clipboardNodes = [];
 
 function setSelection(next, primary) {
   selectedIds = (next.ids || []).filter((id, i, all) => all.indexOf(id) === i);
@@ -348,7 +348,7 @@ function renderInspector() {
   const copyButton = document.createElement('button'); copyButton.textContent = '复制节点'; copyButton.dataset.testid = 'copy-node'; copyButton.title = 'Ctrl／Cmd+C';
   copyButton.disabled = node.id === stack.current.root.id; copyButton.addEventListener('click', copySelected);
   const pasteButton = document.createElement('button'); pasteButton.textContent = '粘贴到此处'; pasteButton.dataset.testid = 'paste-node'; pasteButton.title = 'Ctrl／Cmd+V';
-  pasteButton.disabled = !clipboardNode; pasteButton.addEventListener('click', pasteSelected);
+  pasteButton.disabled = !clipboardNodes.length; pasteButton.addEventListener('click', pasteSelected);
   const del = document.createElement('button'); del.textContent = '删除节点'; del.dataset.testid = 'remove-node';
   del.disabled = node.id === stack.current.root.id;
   del.addEventListener('click', deleteSelected);
@@ -563,40 +563,45 @@ async function restore() {
 }
 
 function copySelected() {
-  if (selectedIds.length !== 1) { status('复制请先单选一个节点'); return false; }
-  const node = M.findNode(stack.current.root, selectedId);
-  if (!node || node.id === stack.current.root.id) { status('根节点不能复制'); return false; }
-  clipboardNode = copy(node);
-  status('已复制 ' + node.type + ' · 选择目标位置后粘贴');
+  const ids = selectedIds.slice();
+  if (!ids.length) { status('请先选中要复制的节点'); return false; }
+  if (ids.includes(stack.current.root.id)) { status('根节点不能复制'); return false; }
+  // 按画布顺序取，父节点已选时排除其后代（否则会重复复制）
+  const order = [];
+  (function walk(n) { order.push(n.id); (n.children || []).forEach(walk); })(stack.current.root);
+  const chosen = new Set(ids);
+  const roots = ids.filter((id) => { let p = M.findParent(stack.current.root, id); while (p) { if (chosen.has(p.id)) return false; p = M.findParent(stack.current.root, p.id); } return true; });
+  const sorted = order.filter((id) => roots.includes(id));
+  clipboardNodes = sorted.map((id) => copy(M.findNode(stack.current.root, id)));
+  status('已复制 ' + clipboardNodes.length + ' 个节点 · 选择目标位置后粘贴');
   render();
   return true;
 }
 function pasteSelected() {
-  if (!clipboardNode) { status('剪贴板为空，请先复制一个节点'); return false; }
+  if (!clipboardNodes.length) { status('剪贴板为空，请先复制节点'); return false; }
   if (selectedIds.length !== 1) { status('粘贴请先单选目标位置'); return false; }
   const selected = M.findNode(stack.current.root, selectedId);
   if (!selected) return false;
   const parent = M.capabilitiesOf(selected.type).acceptsChildren ? selected : M.findParent(stack.current.root, selected.id);
   try {
-    commit({ type: 'paste', parentId: parent.id, node: copy(clipboardNode) });
-    status('已粘贴 ' + clipboardNode.type + ' · 可撤销');
+    commit({ type: 'pasteMany', parentId: parent.id, nodes: clipboardNodes.map((n) => copy(n)) });
+    status('已粘贴 ' + clipboardNodes.length + ' 个节点 · 可撤销');
     render();
     return true;
   } catch (e) { status(e.message); return false; }
 }
 function deleteSelected() {
-  if (selectedIds.length !== 1) { status(selectedIds.length > 1 ? '多选删除尚未支持；请先单选一个节点' : '请先选中一个节点'); return false; }
-  const node = M.findNode(stack.current.root, selectedId);
-  if (!node || node.id === stack.current.root.id) { status('根节点不能删除'); return false; }
+  const ids = selectedIds.slice();
+  if (!ids.length) { status('请先选中要删除的节点'); return false; }
+  if (ids.includes(stack.current.root.id)) { status('根节点不能删除'); return false; }
   try {
-    commit({ type: 'remove', nodeId: node.id });
+    commit({ type: 'removeMany', nodeIds: ids });
     selectSingle(stack.current.root.id);
-    status('已删除 ' + node.type + ' · 可撤销');
+    status('已删除 ' + ids.length + ' 个节点 · 可撤销');
     render();
     return true;
   } catch (e) { status(e.message); return false; }
 }
-
 function render() {
   markDirtyIfNeeded();
   const active = document.activeElement;
