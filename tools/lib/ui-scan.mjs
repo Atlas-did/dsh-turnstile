@@ -55,7 +55,10 @@ export function scanUi(profileDir, { onlyUiSurfaces = false } = {}) {
       if (existsSync(f)) ownText += readFileSync(f, 'utf8');
     }
     const configurable = /\b(slot|anchor|order)\s*:/.test(ownText);
-    plugins.push({ name, version: meta.version || '', missing: false, disabled, injects, patchRows: rows, configurable });
+    plugins.push({
+      name, version: meta.version || '', missing: false, disabled, injects, patchRows: rows, configurable,
+      pkgPath: pj.replace(/\\/g, '/'),
+    });
   }
 
   return { ok: true, profile: profileDir, bundles: bundles.length, surfaces, plugins, profileRows };

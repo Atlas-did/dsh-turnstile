@@ -9,6 +9,7 @@ import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { ROOT as root, DSH_BIN, DSH_HOME, loadYaml } from './config.mjs';
 import { checkCompatibility, runtimeVersion } from './version.mjs';
+import { scanUi } from './lib/ui-scan.mjs';
 const { yaml, schema } = loadYaml();
 const jsType = new yaml.Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: (d) => String(d) });
 
@@ -57,12 +58,19 @@ for (const L of layers) for (const id of L.ids) lastWriter.set(id, L);
 const overlapped = [...lastWriter.entries()].filter(([id]) => layers.filter(L => L.ids.includes(id)).length > 1)
   .map(([id, L]) => ({ id, winner: L.layer, file: L.file, by: layers.filter(x => x.ids.includes(id)).map(x => x.layer) }));
 // UI surfaces: which plugins inject/override each surface
+// 口径来自 tools/lib/ui-scan.mjs（唯一实现）；这里只补「谁声明的」文件位置给自己用。
+const uiScan = scanUi(profileDir, { onlyUiSurfaces: true });
+const srcOf = new Map(uiScan.plugins.map((p) => [p.name, p.pkgPath]));
 const surfaces = new Map();
 const addS = (ui, who, src) => {
   if (!surfaces.has(ui)) surfaces.set(ui, []);
   surfaces.get(ui).push({ who, src });
 };
-for (const name of bundles) {
+for (const [full, plugins] of uiScan.surfaces) {
+  const short = String(full).replace('@deepseek-ai/dsh-client-', '');
+  for (const name of plugins) addS(short, name, srcOf.get(name) || '');
+}
+if (false) for (const name of bundles) {
   const d = join(profileDir, 'node_modules', name);
   const pjF = join(d, 'package.json');
   if (!existsSync(pjF)) continue;

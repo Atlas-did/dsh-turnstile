@@ -49,14 +49,6 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       res.end(JSON.stringify(out));
       return;
     }
-    if (false && pathname === '/turnstile/diagnose-legacy') {
-      res.setHeader('content-type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ verdict: 'failing', files: 2, records: 42, channels: [
-        { id: 'codex', verdict: 'failing', counts: { failures: 3, signals: { 'unknown-variant': 3 } }, evidence: [{ file: 'aa.jsonl', line: 7 }], falsifier: '出现 sync completed 且无 unknown variant' },
-        { id: 'dsh', verdict: 'healthy', counts: { failures: 0, signals: {} }, evidence: [], falsifier: '出现 sync.failed' },
-      ], actions: [{ channel: 'codex', text: '升级 AA 或降级 codex-cli', rollback: '只切版本' }], missing: [] }));
-      return;
-    }
     if (pathname === '/turnstile/profiles' && fixture) {
       res.setHeader('content-type', 'application/json; charset=utf-8');
       res.end(JSON.stringify({ fixture: true, home: root, current: 'console-fixture', lastKnownGood: { name: 'verified-bootable-20261002-1508', at: '2026-10-02T07:08:00.000Z', ageDays: 29 }, profiles: [

@@ -7,6 +7,7 @@ import { readFileSync, existsSync, readdirSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { ROOT as root, DSH_BIN, DSH_HOME, loadYaml } from './config.mjs';
+import { scanUi } from './lib/ui-scan.mjs';
 import { checkCompatibility, runtimeVersion } from './version.mjs';
 import { patchFiles } from './lib/patch-files.mjs';
 const { yaml, schema } = loadYaml();
@@ -86,16 +87,12 @@ const dups = [...own.entries()].filter(([, s]) => s.size > 1);
 for (const r of routes) console.log('   ' + r.route.padEnd(30) + String(r.models.length).padStart(3) + '  ' + r.baseURL);
 console.log('   跨路由重名: ' + dups.length + (dups.length ? '  ' + dups.map(([id]) => id).join(', ') : ''));
 console.log(bar('UI 抢占'));
+// 口径来自 tools/lib/ui-scan.mjs（唯一实现）；doctor 只把面名缩成短名显示。
+const uiScan = scanUi(profileDir, { onlyUiSurfaces: true });
 const surfaces = new Map();
-const addS = (ui, who) => { if (!surfaces.has(ui)) surfaces.set(ui, new Set()); surfaces.get(ui).add(who); };
-for (const name of bundles) {
-  const d = join(profileDir, 'node_modules', name);
-  if (!existsSync(join(d, 'package.json'))) continue;
-  const j = JSON.parse(readFileSync(join(d, 'package.json'), 'utf8'));
-  for (const inj of (j.dsh?.client?.inject || [])) if (/ui-/.test(inj)) addS(inj.replace('@deepseek-ai/dsh-client-', ''), name);
-  for (const pf of patchFiles(d, j.dsh?.bundle?.patch)) {
-    if (existsSync(pf)) for (const m of readFileSync(pf, 'utf8').matchAll(/^\s*-?\s*id:\s*(ui-[\w-]+)/gm)) addS(m[1], name);
-  }
+for (const [full, plugins] of uiScan.surfaces) {
+  const short = String(full).replace('@deepseek-ai/dsh-client-', '');
+  surfaces.set(short, new Set(plugins));
 }
 const srows = [...surfaces.entries()].map(([ui, s]) => [ui, [...s].sort()]).sort((a, b) => b[1].length - a[1].length);
 const hot = srows.filter(([, w]) => w.length >= 3);
