@@ -568,6 +568,31 @@ export function apply(ctx, config) {
   }), "turnstile: GET /turnstile/health");
   ctx.effect(() => ctx.webServer.register({
     kind: "exact",
+    path: "/turnstile/issue-recheck",
+    handler: async (req, res) => {
+      if (req.method !== "POST") return sendJson(res, 405, { error: "method" });
+      if (!requestRejection(req, res)) return;
+      let body;
+      try { body = await readJsonBody(req, { maxBytes: 1e5 }); }
+      catch (e) { return sendJson(res, e && e.code === BODY_TOO_LARGE ? 413 : 400, { error: String(e.message).slice(0, 80) }); }
+      const here2 = dirname(fileURLToPath(import.meta.url));
+      const home2 = process.env.DSH_HOME || join(process.env.USERPROFILE || "", ".dsh");
+      const name2 = (config && config.profile) || "mini";
+      const dir2 = join(home2, "profiles", name2);
+      const collectMod = await import(pathToFileURL(join(here2, "health-collect.js")).href);
+      const issuesMod = await import(pathToFileURL(join(here2, "health-issues.js")).href);
+      const fresh = collectMod.collectHealth({ profileDir: dir2, hostBases: [process.argv[1], import.meta.url] }).items;
+      const issues = issuesMod.issuesFromHealth(fresh, { source: "recheck" });
+      const wantId = String(body.id || "");
+      const wantSubject = body.subject && body.subject.id ? String(body.subject.id) : "";
+      const target = issues.find((x) => x.id === wantId && (!wantSubject || x.subject.id === wantSubject));
+      const base = { schema: "turnstile/health-issue@1", id: wantId, domain: body.domain || "", subject: body.subject || {}, severity: target ? target.severity : "unknown", summary: target ? target.summary : "", impact: target ? target.impact : "", evidence: target ? target.evidence : [], repair: target ? target.repair : { supported: false, command: null }, resolution: "open" };
+      const result = issuesMod.recheckIssue(base, fresh);
+      sendJson(res, 200, { ok: true, resolution: result.resolution, issue: result });
+    },
+  }), "turnstile: POST /turnstile/issue-recheck");
+  ctx.effect(() => ctx.webServer.register({
+    kind: "exact",
     path: "/turnstile/hooks",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });

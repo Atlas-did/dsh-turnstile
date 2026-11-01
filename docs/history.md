@@ -67,6 +67,7 @@
 | [180-annotation-first-batch.md](180-annotation-first-batch.md) | 批注层最小改造：第一批四项（2026-11-02） |
 | [181-health-issues.md](181-health-issues.md) | 方案 02-A：诊断 issue 归一化（2026-11-02） |
 | [182-steward-issue-groups.md](182-steward-issue-groups.md) | 方案 02-B/C：管家三组 + 四段式详情（2026-11-02） |
+| [183-issue-recheck.md](183-issue-recheck.md) | 方案 02-D：复检闭环 + 同步覆盖改成传递闭包（2026-11-02） |
 | [22-gate-report.md](22-gate-report.md) | 闸门报告（自动生成） |
 | [26-provider-map.md](26-provider-map.md) | 26 · 多接口（provider）地图与切换 |
 | [31-plugin-manager.md](31-plugin-manager.md) | 31 · mini 的插件管理界面：现状与两条路 |

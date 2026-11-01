@@ -167,6 +167,21 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       writeFileSync(file, JSON.stringify({ at: new Date().toISOString(), slots: parsed.slots }));
       return json(200, { ok: true, file, slots: parsed.slots.length });
     }
+    if (pathname === '/turnstile/issue-recheck') {
+      if (req.method !== 'POST') return json(405, { error: 'method' });
+      let body; try { body = await readJsonBody(req, { maxBytes: 1e5 }); } catch (e) { return json(e && e.code === 'BODY_TOO_LARGE' ? 413 : 400, { error: String(e.message).slice(0, 80) }); }
+      const collectMod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health-collect.js')).href);
+      const issuesMod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health-issues.js')).href);
+      const hostBases = process.env.DSH_BIN ? [process.env.DSH_BIN] : [];
+      const fresh = collectMod.collectHealth({ profileDir: dir, hostBases }).items;
+      const issues = issuesMod.issuesFromHealth(fresh, { source: 'recheck' });
+      const wantId = String(body.id || '');
+      const wantSubject = body.subject && body.subject.id ? String(body.subject.id) : '';
+      const target = issues.find((x) => x.id === wantId && (!wantSubject || x.subject.id === wantSubject));
+      const base = { schema: 'turnstile/health-issue@1', id: String(body.id || ''), domain: body.domain || '', subject: body.subject || {}, severity: target ? target.severity : 'unknown', summary: target ? target.summary : '', impact: target ? target.impact : '', evidence: target ? target.evidence : [], repair: target ? target.repair : { supported: false, command: null }, resolution: 'open' };
+      const result = issuesMod.recheckIssue(base, fresh);
+      return json(200, { ok: true, resolution: result.resolution, issue: result, fresh: issues.map((x) => x.id) });
+    }
     if (pathname === '/turnstile/health') {
       const healthMod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health.js')).href);
       const collectMod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health-collect.js')).href);

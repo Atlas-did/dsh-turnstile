@@ -282,6 +282,15 @@ try {
     ok('the health scan renders issue rows', issueRowsCount >= 1, String(issueRowsCount));
     const groupCounts = await page.locator('[data-testid^="issues-"]').count();
     ok('issues are split into three groups', groupCounts === 3, String(groupCounts));
+    await page.locator('[data-testid^="issue-"] summary').first().click().catch(() => {});
+    await page.waitForTimeout(250);
+    const recheckBtn = page.locator('[data-testid^="recheck-run-"]').first();
+    if (await recheckBtn.count()) {
+      await recheckBtn.click();
+      await page.waitForTimeout(900);
+      const resultText = await page.locator('[data-testid^="recheck-result-"]').first().innerText().catch(() => '');
+      ok('recheck reports a verdict instead of green-washing', /结论：/.test(resultText) && /(已恢复|仍未解决|取证不足)/.test(resultText), resultText.slice(0, 40));
+    } else ok('recheck button present', false, 'no issue rows');
     const summaryText = await text('[data-testid="health-summary"]').catch(() => '');
     ok('the scan summarises the three issue groups', /需要处理/.test(summaryText) && /尚无结论/.test(summaryText), summaryText);
     ok('the trap checks render next to the health scan', (await text('[data-testid="health-pits"]')).includes('插件市场'));

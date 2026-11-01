@@ -14,7 +14,19 @@ const libFiles = readdirSync(libDir).filter((f) => /\.(js|css|html)$/.test(f));
 
 // 只要求「被 index.js import 的」和 css/html 资源在白名单里
 const index = readFileSync(join(libDir, 'index.js'), 'utf8');
-const imported = [...index.matchAll(/from "\.\/([\w.-]+)"/g)].map((m) => 'lib/' + m[1]);
+function depsOf(file) {
+  const src = readFileSync(join(libDir, file), 'utf8');
+  return [...src.matchAll(/from ['"]\.\/([\w.-]+)['"]/g)].map((m) => m[1]);
+}
+const seen = new Set();
+const queue = ['index.js'];
+while (queue.length) {
+  const file = queue.shift();
+  if (seen.has(file) || !libFiles.includes(file)) continue;
+  seen.add(file);
+  for (const dep of depsOf(file)) if (!seen.has(dep)) queue.push(dep);
+}
+const imported = [...seen].filter((f) => f !== 'index.js').map((f) => 'lib/' + f);
 const required = [...new Set(imported)].filter((f) => libFiles.includes(f.replace('lib/', '')));
 const missing = required.filter((f) => !sync.includes("'" + f + "'"));
 ok('index.js 依赖的 lib 文件都在同步白名单里', missing.length === 0, missing.join(','));

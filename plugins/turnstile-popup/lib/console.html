@@ -175,6 +175,10 @@ function issueRows(group,label,testid){
     det.append(node('small',{text:'影响：'+d.who}));
     det.append(node('small',{text:'凭什么：'+(d.why&&d.why.length?d.why.join(' | '):'本次没有采集到证据')}));
     det.append(node('small',{text:'下一步：'+((d.next||[]).map(x=>x.label).join('、')||'只读查看')}));
+    const rc=node('div',{'data-testid':'recheck-'+issue.id});
+    const btnRc=btn('复检',async()=>{btnRc.disabled=true;rc.replaceChildren(node('small',{text:'复检中…'}));try{const r=await fetch('/turnstile/issue-recheck',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:issue.id,domain:issue.domain,subject:issue.subject})});const j=await r.json();const label={resolved:'复检后已恢复',open:'复检后仍未解决','recheck-required':'复检取证不足，仍需人工确认'}[j.resolution]||j.resolution;rc.replaceChildren(node('small',{'data-testid':'recheck-result-'+issue.id,text:'结论：'+label}));}catch(e){rc.replaceChildren(node('small',{text:'复检失败：'+e.message}));}btnRc.disabled=false;},'recheck-run-'+issue.id);
+    rc.append(btnRc);
+    det.append(rc);
     rows.append(det);
   }
   return rows;

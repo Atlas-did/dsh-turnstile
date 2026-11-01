@@ -1,0 +1,28 @@
+// 复检端点：只有重新采集到 pass 才算 resolved（方案 02-D）。
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { createConsoleServer } from './console-server.mjs';
+let fail = 0;
+const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
+const tmp = mkdtempSync(join(tmpdir(), 'rc-'));
+const profileDir = join(tmp, 'p');
+mkdirSync(join(profileDir, 'node_modules', 'plug-a'), { recursive: true });
+writeFileSync(join(profileDir, 'node_modules', 'plug-a', 'package.json'), JSON.stringify({ name: 'plug-a', version: '1.0.0' }));
+writeFileSync(join(profileDir, 'package.json'), JSON.stringify({ name: 'p', version: '0.0.1', dsh: { profile: { bundles: ['plug-a'] } } }));
+const server = createConsoleServer({ profileDir, stateDir: join(tmp, 's'), fixture: false });
+await new Promise((r) => server.listen(0, '127.0.0.1', r));
+const base = 'http://127.0.0.1:' + server.address().port;
+const health = await (await fetch(base + '/turnstile/health')).json();
+const issue = (health.issues || [])[0];
+ok('健康里有 issue 可复检', Boolean(issue), JSON.stringify((health.issues || []).map((i) => i.id)));
+const res = await fetch(base + '/turnstile/issue-recheck', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: issue.id, subject: issue.subject }) });
+const body = await res.json();
+ok('复检返回 200 与结论', res.status === 200 && typeof body.resolution === 'string', String(body.resolution));
+ok('采集失败/证据不足时不是 resolved', body.resolution !== 'resolved', body.resolution);
+const bad = await fetch(base + '/turnstile/issue-recheck', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{oops' });
+ok('坏 JSON 返回 400', bad.status === 400, String(bad.status));
+server.close();
+rmSync(tmp, { recursive: true, force: true });
+console.log(fail ? 'RECHECK_FAILED ' + fail : 'RECHECK_OK');
+process.exitCode = fail ? 1 : 0;
