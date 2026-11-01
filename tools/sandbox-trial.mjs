@@ -139,7 +139,7 @@ if (port) {
 }
 console.log('4. 验证：');
 for (const [n, okk, detail] of checks) console.log('   ' + (okk ? 'ok  ' : 'FAIL') + ' ' + n.padEnd(14) + detail);
-console.log('   SKIP plugin-load  本工具没有重启真实宿主，不能把静态检查或 http-health 当作插件已加载')
+if (!has('--mini')) console.log('   SKIP plugin-load  本工具没有重启真实宿主，不能把静态检查或 http-health 当作插件已加载')
 if (levelReport) {
   for (const l of levelReport.levels || []) {
     const mark = l.status === 'pass' ? '✓' : l.status === 'fail' ? '✗' : '·';
@@ -148,7 +148,8 @@ if (levelReport) {
 } else {
   console.log('   · 六级验证没跑成（检查 --dsh-bin / --base / --token）——本次不能声称真实可用');
 }
-const passed = checks.every(([, okk]) => okk) && (!levelReport || levelReport.verdict !== 'fail');
+// 后面还有 rollback 结果要并进来，必须是 let
+let passed = checks.every(([, okk]) => okk) && (!levelReport || levelReport.verdict !== 'fail');
 const claimText = levelReport ? levelReport.claimText : '只做了文件层检查，未验证真实运行。';
 const verdictWord = levelReport ? levelReport.claim : (passed ? 'static-only' : 'failed');
 

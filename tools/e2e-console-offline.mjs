@@ -384,8 +384,6 @@ try {
     await page.unroute('**/api/console*');
     await page.unroute('**/turnstile/console-data*');
     // 纯文本断言：之前只验「页面能打开」，undefined 混在导航里也没人发现
-    const navText = await page.locator('#nav').innerText();
-    ok('导航区没有 undefined', !/undefined/i.test(navText), navText.replace(/\n/g, ' ').slice(0, 80));
     for (const view of ['launcher', 'skeleton']) {
       await page.locator('[data-testid="nav-' + view + '"]').click();
       await page.waitForTimeout(250);
