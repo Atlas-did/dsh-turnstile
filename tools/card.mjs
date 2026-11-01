@@ -26,11 +26,30 @@ const data = readJson(from);
 // 统一成「标题 + 若干行状态 + 一个建议动作」，卡片只做这三件事。
 function rowsFor() {
   if (kind === 'health' && data) {
-    const checks = (data.checks || data.findings || []);
+    // preflight 的报告结构：checks[] 里只有 ok/checker，说明文字在 findings[] 里（按 checker 关联）。
+    // 之前只读 check.message → detail 列恒为空（外部审查第 4 条）。
+    const checks = (data.checks || []);
+    const findings = (data.findings || []);
+    const detailFor = (c) => {
+      // 实测结构：checks[i].findings[] 是这条检查自己的发现（不是顶层 findings）
+      const own = [];
+      if (Array.isArray(c.findings)) own.push(...c.findings);
+      for (const f of findings) if (f && (f.checker === (c.checker || c.name) || f.id === (c.checker || c.name))) own.push(f);
+      if (own.length) return own.map((f) => String(f.message || f.summary || '')).join('；').slice(0, 120);
+      return String(c.message || c.summary || c.detail || '').slice(0, 120);
+    };
+    if (!checks.length) {
+      // 没有 checks 时退回 findings 本身
+      return findings.slice(0, 12).map((c) => ({
+        name: String(c.checker || c.id || 'finding'),
+        state: c.level === 'error' || c.level === 'fail' ? 'fail' : c.level === 'warn' ? 'warn' : 'pass',
+        detail: String(c.message || '').slice(0, 120),
+      }));
+    }
     return checks.slice(0, 12).map((c) => ({
       name: String(c.checker || c.id || c.name || 'check'),
       state: c.ok === false || c.status === 'fail' ? 'fail' : c.ok === true || c.status === 'pass' ? 'pass' : 'warn',
-      detail: String(c.message || c.summary || c.detail || '').slice(0, 120),
+      detail: detailFor(c),
     }));
   }
   if (kind === 'slots' && data) {

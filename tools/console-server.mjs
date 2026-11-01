@@ -101,11 +101,20 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       return;
     }
     if (pathname === '/turnstile/search') {
+      // 之前返回两条编造的 hits；现在真搜 launcher 索引，没有索引就如实说。
       const q = new URL(req.url, 'http://x').searchParams.get('q') || '';
-      const hits = q ? [{ path: 'C:/x/tools/launcher.mjs', name: 'launcher.mjs', score: 800 }, { path: 'C:/x/docs/launcher.md', name: 'launcher.md', score: 600 }] : [];
-      res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ query: q, count: hits.length, total: 2, hits }));
-      return;
+      const idxFile = join(state || join(dir, '.turnstile'), 'launcher-index.json');
+      if (!existsSync(idxFile)) {
+        return json(200, { query: q, hits: [], status: 'no-index', hint: 'node tools/launcher.mjs index --root <dir>' });
+      }
+      try {
+        const [{ searchIndex }, idx] = await Promise.all([
+          import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'launcher-index.js')).href),
+          Promise.resolve(JSON.parse(readFileSync(idxFile, 'utf8'))),
+        ]);
+        const hits = searchIndex(idx.entries, q, { limit: 10 });
+        return json(200, { query: q, count: hits.length, total: idx.count, builtAt: idx.builtAt, hits });
+      } catch (e) { return json(500, { error: String(e.message).slice(0, 120) }); }
     }
     if (pathname === '/turnstile/slot-map') {
       const file = join(state || dir, 'slot-map-fixture.json');
@@ -130,7 +139,17 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       items.push(mod.pluginItem({ name: 'dsh-free-search', installed: true, disabled: false }));
       items.push(mod.authItem({ total: null }));
       res.setHeader('content-type', 'application/json; charset=utf-8');
-      const pits = [{ id: 'pit:duplicate-market', level: 'pass', message: '只有 1 个插件市场', next: '' }, { id: 'pit:client-bundle', level: 'pass', message: '2 个 client bundle 都能解析', next: '' }];
+      // 真实口径：pits 由 lib/pits.js 算；这里之前是写死的两条。fixture 分支才返回假数据。
+      // 真实口径：pits 由 tools/pits.mjs 的 runPitChecks 算；只有 fixture 分支返回固定体。
+      let pits;
+      if (fixture) {
+        pits = [{ id: 'pit:duplicate-market', level: 'pass', message: '只有 1 个插件市场', next: '' }, { id: 'pit:client-bundle', level: 'pass', message: '2 个 client bundle 都能解析', next: '' }];
+      } else {
+        try {
+          const pitsMod = await import(pathToFileURL(join(root, 'tools', 'pits.mjs')).href);
+          pits = pitsMod.runPitChecks(dir);
+        } catch (e) { pits = [{ id: 'pit:unavailable', level: 'warn', message: 'pits 检查跑不动：' + String(e.message).slice(0, 80), next: 'node tools/pits.mjs <profile>' }]; }
+      }
       res.end(JSON.stringify({ items, pits, summary: mod.summarize(items), profile: 'console-fixture', at: new Date().toISOString() }));
       return;
     }

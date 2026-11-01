@@ -63,7 +63,9 @@
     "turnstile": "node tools/turnstile.mjs",
     "test:entry": "node tools/test-turnstile-entry.mjs",
     "test:ui-scan": "node plugins/turnstile-popup/test/ui-scan.test.mjs",
-    "test:semver": "node plugins/turnstile-popup/test/semver-drift.test.mjs"
+    "test:semver": "node plugins/turnstile-popup/test/semver-drift.test.mjs",
+    "test:card": "node tools/test-recommend-card.mjs",
+    "test:all": "node plugins/turnstile-popup/test/ui-scan.test.mjs && node plugins/turnstile-popup/test/slot-attr.test.mjs && node plugins/turnstile-popup/test/ask.test.mjs && node plugins/turnstile-popup/test/semver-drift.test.mjs && node tools/test-look-tools.mjs && node tools/test-turnstile-entry.mjs && node tools/test-recommend-card.mjs && node tools/test-slot-map-report.mjs && node tools/test-profile-snapshot.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",
@@ -88,9 +90,14 @@
   },
   "files": [
     "tools",
+    "plugins",
+    "skills",
+    "recommendations",
     "tests",
     "docs",
     "README.md",
+    "README.en.md",
+    "INSTALL.md",
     "LICENSE"
   ]
 }

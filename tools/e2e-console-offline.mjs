@@ -32,7 +32,17 @@ const ok = (name, pass, detail = '') => {
 
 try {
   // e2e 用可复现的 fixture 数据（明确选入，不是默认）；真实数据路径由 fixture:false 覆盖
-  server = createConsoleServer({ profileDir, stateDir: join(profileDir, '.turnstile'), fixture: true });
+  const stateDir = join(profileDir, '.turnstile');
+  // 启动器搜索现在是真索引：给 e2e 造一个小索引，否则「搜不到」是对的、但测不了渲染
+  mkdirSync(stateDir, { recursive: true });
+  writeFileSync(join(stateDir, 'launcher-index.json'), JSON.stringify({
+    root: 'fixture', builtAt: 'T', count: 2,
+    entries: [
+      { path: 'C:/x/tools/launcher.mjs', name: 'launcher.mjs', size: 100, mtime: 1 },
+      { path: 'C:/x/docs/launcher.md', name: 'launcher.md', size: 50, mtime: 1 },
+    ],
+  }));
+  server = createConsoleServer({ profileDir, stateDir, fixture: true });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = 'http://127.0.0.1:' + server.address().port;
   const launchErrors = [];

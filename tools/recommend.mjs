@@ -38,6 +38,8 @@ for (const p of rows) {
   console.log('  是什么：' + p.what);
   console.log('  怎么接：' + p.integratesWith);
   if (p.tryIt) console.log('  试一下：' + p.tryIt);
+  // 三种情况都要说清，否则读者会以为「目录里写 installed」= 本机实测过
+  if (p.status === 'installed' && !p.installed) console.log('  注意：目录标记为已装（当初在某处验过），但**这个 profile 里没有**；接入方式那行仍是实测结论，安装状态不是');
   if (!p.installed && p.status === 'unverified') console.log('  注意：本机没装也没读源码，接入方式是基于公开描述的推断（未验证）');
   console.log('');
 }

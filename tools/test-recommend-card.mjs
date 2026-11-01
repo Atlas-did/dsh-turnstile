@@ -46,6 +46,22 @@ const vres = (() => {
 })();
 ok('--validate 退出码 0 且报合规', vres.code === 0 && /卡片合规/.test(vres.err), vres.code + ' ' + vres.err.slice(0, 30));
 
+// health 卡片：detail 必须来自 checks[i].findings[]（外部审查说这里恒为空）
+const report = join(dir, 'report.json');
+writeFileSync(report, JSON.stringify({
+  profile: 'p', result: 'blocking', blocking: 1,
+  checks: [
+    { name: 'prompt-vars', ok: false, findings: [{ severity: 'error', message: 'unsupported variable ${X}' }] },
+    { name: 'profile-yaml', ok: true, findings: [] },
+  ],
+}));
+const healthOut = run('card.mjs', ['--kind', 'health', '--from', report]);
+const healthCard = JSON.parse(healthOut.split('```schemaJson')[1].split('```')[0].trim());
+const hgrid = healthCard.children[0].children.find((c) => c.componentName === 'TinyGrid');
+ok('health 卡片有 2 行', hgrid.props.data.length === 2);
+ok('fail 行的 detail 来自 findings', hgrid.props.data[0].detail.includes('${X}'), hgrid.props.data[0].detail);
+ok('状态映射正确', hgrid.props.data[0].state === 'fail' && hgrid.props.data[1].state === 'pass');
+
 let refused = '';
 try { execFileSync(process.execPath, [join(root, 'tools', 'card.mjs'), '--kind', 'slots', '--from', join(dir, 'nope.json')], { stdio: 'pipe' }); }
 catch (e) { refused = String(e.stderr || ''); }
