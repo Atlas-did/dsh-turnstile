@@ -4,7 +4,7 @@
   "description": "Install-time gate and sandbox for DeepSeek Harness plugins — catch a plugin before it breaks your environment.",
   "type": "module",
   "bin": {
-    "dsh-turnstile": "./tools/preflight.mjs",
+    "dsh-turnstile": "tools/turnstile.mjs",
     "turnstile-doctor": "./tools/doctor.mjs",
     "turnstile-map": "./tools/gate-map.mjs",
     "turnstile-ui": "./tools/ui-surfaces.mjs"
@@ -59,7 +59,10 @@
     "test:slot-attr": "node plugins/turnstile-popup/test/slot-attr.test.mjs",
     "recommend": "node tools/recommend.mjs",
     "card": "node tools/card.mjs",
-    "test:recommend": "node tools/test-recommend-card.mjs"
+    "test:recommend": "node tools/test-recommend-card.mjs",
+    "turnstile": "node tools/turnstile.mjs",
+    "test:entry": "node tools/test-turnstile-entry.mjs",
+    "test:ui-scan": "node plugins/turnstile-popup/test/ui-scan.test.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",
