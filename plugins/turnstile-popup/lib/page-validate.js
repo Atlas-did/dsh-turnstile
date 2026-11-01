@@ -1,6 +1,6 @@
 // 页面树的严格校验与 schema 迁移（handoff P0：恢复时只查 schema/root 不够）。
 // 目的：坏页面在进入渲染器之前就被拦住，并给出人能看懂的错。
-import { COMPONENTS, PAGE_SCHEMA } from './page-model.js';
+import { COMPONENTS, STYLE_SCHEMA, PAGE_SCHEMA, coerce } from './page-model.js';
 
 export const MAX_NODES = 2000;
 export const MAX_DEPTH = 32;
@@ -26,6 +26,22 @@ function checkNode(node, path, errors, seen, depth) {
   const spec = COMPONENTS[node.type];
   if (!spec) { errors.push(path + '：未知组件类型 ' + String(node.type)); return; }
   if (node.props != null && (typeof node.props !== 'object' || Array.isArray(node.props))) errors.push(path + '：props 必须是对象');
+  else if (node.props && spec.propsSchema) {
+    // 属性也要按声明校验（复审 P2-1）：未知属性、枚举外、超范围都算不合法
+    for (const [key, value] of Object.entries(node.props)) {
+      const pSpec = spec.propsSchema[key];
+      if (!pSpec) { errors.push(path + '：' + node.type + ' 没有属性 ' + key); continue; }
+      try { coerce(pSpec, value); } catch (e) { errors.push(path + '：属性 ' + key + ' 不合法（' + String(e.message).slice(0, 40) + '）'); }
+    }
+  }
+  if (node.style != null && (typeof node.style !== 'object' || Array.isArray(node.style))) errors.push(path + '：style 必须是对象');
+  else if (node.style) {
+    for (const [key, value] of Object.entries(node.style)) {
+      const sSpec = STYLE_SCHEMA[key];
+      if (!sSpec) { errors.push(path + '：没有样式项 ' + key); continue; }
+      try { coerce(sSpec, value); } catch (e) { errors.push(path + '：样式 ' + key + ' 不合法（' + String(e.message).slice(0, 40) + '）'); }
+    }
+  }
   const kids = node.children;
   if (kids != null && !Array.isArray(kids)) { errors.push(path + '：children 必须是数组'); return; }
   if (Array.isArray(kids) && kids.length && !spec.capabilities.acceptsChildren) {

@@ -57,6 +57,7 @@
 | [170-audit-p0-fixes.md](170-audit-p0-fixes.md) | 代码质量审查的 P0 处置（2026-11-01） |
 | [171-audit-p1-fixes.md](171-audit-p1-fixes.md) | 审查 P1-1 / P1-2 处置（2026-11-01） |
 | [172-reaudit-fixes.md](172-reaudit-fixes.md) | 复审三个新问题的处置（2026-11-01） |
+| [173-reaudit-ci-and-validation.md](173-reaudit-ci-and-validation.md) | 复审 P1-6 / P1-5 / P2-1 / P2-2 处置（2026-11-01） |
 | [22-gate-report.md](22-gate-report.md) | 闸门报告（自动生成） |
 | [26-provider-map.md](26-provider-map.md) | 26 · 多接口（provider）地图与切换 |
 | [31-plugin-manager.md](31-plugin-manager.md) | 31 · mini 的插件管理界面：现状与两条路 |

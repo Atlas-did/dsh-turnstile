@@ -209,6 +209,9 @@ export function applyCommand(page, cmd) {
       for (const id of ids) {
         const p = findParent(next.root, id);
         if (!p || p.id !== parent.id) throw new Error('只支持同一父级下的批量移动');
+        // 与单节点 move 一致：不可拖拽的组件不允许被批量搬动（复审 P2-2）
+        const n = findNode(next.root, id);
+        if (!capabilitiesOf(n.type).draggable) throw new Error(n.type + ' 声明为不可拖拽，不能批量移动');
       }
       const idxs = parent.children.map((c, i) => (ids.has(c.id) ? i : -1)).filter((i) => i >= 0).sort((a, b) => a - b);
       const edge = dir < 0 ? idxs[0] === 0 : idxs[idxs.length - 1] === parent.children.length - 1;

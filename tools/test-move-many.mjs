@@ -1,4 +1,4 @@
-import { applyCommand, newPage, findParent } from '../plugins/turnstile-popup/lib/page-model.js';
+import { applyCommand, newPage, createStack, run } from '../plugins/turnstile-popup/lib/page-model.js';
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
 
@@ -17,7 +17,13 @@ for (const t of ['A', 'B', 'C']) p = applyCommand(p, { type: 'add', parentId: p.
 const ids = p.root.children.map((x) => x.id);
 const down = applyCommand(p, { type: 'moveMany', nodeIds: [ids[0], ids[1]], direction: 'down' });
 ok('两个节点整体下移一格', types(down.page).join('') === 'CAB', types(down.page).join(''));
-ok('批量移动是一次命令（一个历史步）', true);
+// 真的走一次命令栈：批量移动只应产生一个历史步（原来的断言恒真，等于没测）
+let stack = createStack(p);
+const before = stack.past.length;
+stack = run(stack, { type: 'moveMany', nodeIds: [ids[0], ids[1]], direction: 'down' });
+ok('批量移动是一次命令（一个历史步）', stack.past.length === before + 1, before + ' → ' + stack.past.length);
+const undoOnce = (s) => { const last = s.past[s.past.length - 1]; return { ...s, current: last.page, past: s.past.slice(0, -1) }; };
+ok('撤销一步复原整个批量移动', undoOnce(stack).current.root.children.map((c) => c.props.text).join('') === 'ABC', undoOnce(stack).current.root.children.map((c) => c.props.text).join(''));
 
 const up = applyCommand(down.page, { type: 'moveMany', nodeIds: [ids[0], ids[1]], direction: 'up' });
 ok('再上移回到 ABC', types(up.page).join('') === 'ABC', types(up.page).join(''));

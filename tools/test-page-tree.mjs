@@ -35,6 +35,17 @@ ok('旧 schema 明确拒绝并说明', oldRes.status === 400 && /版本/.test(JS
 const noSchema = { root: { id: 'r', type: 'stack', children: [] } };
 ok('缺 schema 被拒', (await post({ page: noSchema })).status === 400);
 
+// 复审 P2-1：属性/样式也必须按声明校验
+const badProps = { schema: 'mini/page@1', root: { id: 'r', type: 'stack', props: { direction: 'nope' }, children: [] } };
+const badPropsRes = await post({ page: badProps });
+ok('非法枚举属性被拒', badPropsRes.status === 400 && /direction/.test(JSON.stringify(badPropsRes.body)), String(badPropsRes.status));
+
+const badStyle = { schema: 'mini/page@1', root: { id: 'r', type: 'stack', style: { fontSize: 9999 }, children: [] } };
+ok('超范围样式被拒', (await post({ page: badStyle })).status === 400);
+
+const unknownProp = { schema: 'mini/page@1', root: { id: 'r', type: 'stack', props: { nonsense: 1 }, children: [] } };
+ok('未知属性被拒', (await post({ page: unknownProp })).status === 400);
+
 server.close();
 rmSync(tmp, { recursive: true, force: true });
 console.log(fail ? 'PAGE_TREE_FAILED ' + fail : 'PAGE_TREE_OK');

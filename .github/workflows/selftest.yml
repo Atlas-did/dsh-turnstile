@@ -68,3 +68,14 @@ jobs:
       # 发布一致性：文档链接、命令注册表、npm 包内容
       - name: release check
         run: node tools/release-check.mjs --pack --json
+
+      # 完整回归：CI 不能只跑零散步骤（复审 P1-6）。这一步失败就说明本地绿是假象。
+      - name: full test suite
+        run: npm run test:all --silent
+
+      # 测试不许改写仓库：以前 docs-smoke 会在根目录写出一个名为 `#` 的文件
+      - name: tests must not modify the worktree
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo '测试改动了工作区：'; git status --porcelain; git diff --stat; exit 1;
+          fi
