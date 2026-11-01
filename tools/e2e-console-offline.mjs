@@ -390,6 +390,22 @@ try {
       const body = await page.locator('main').innerText();
       ok('视图 ' + view + ' 没有 undefined', !/undefined/i.test(body), body.replace(/\n/g, ' ').slice(0, 60));
     }
+    // 窄屏：侧栏与检查器不能直接藏没，要有抽屉入口
+    await page.setViewportSize({ width: 390, height: 760 });
+    await page.waitForTimeout(250);
+    ok('narrow console hides nav and inspector by default', !(await page.locator('.sidebar').isVisible()) && !(await page.locator('#inspector').isVisible()));
+    await page.locator('[data-testid="toggle-nav"]').click();
+    await page.waitForTimeout(200);
+    ok('nav drawer opens from the topbar', await page.locator('.sidebar').isVisible());
+    await page.locator('[data-testid="toggle-inspector"]').click();
+    await page.waitForTimeout(200);
+    ok('inspector sheet opens and closes the nav drawer', await page.locator('#inspector').isVisible() && !(await page.locator('.sidebar').isVisible()));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(150);
+    ok('Escape closes console drawers', !(await page.locator('#inspector').isVisible()));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.waitForTimeout(200);
+    ok('wide console shows nav and inspector again', await page.locator('.sidebar').isVisible() && await page.locator('#inspector').isVisible());
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {
