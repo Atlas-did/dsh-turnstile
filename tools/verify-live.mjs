@@ -127,15 +127,36 @@ else {
     [ok.length ? ok[0].route + ' 含「' + expect + '」' : '所有路由页面都不含「' + expect + '」']));
 }
 
-if (!live) layers.push(level('L5', STATUS.unknown, ['未连活宿主，回归未测']));
+// L5 回归：health + UI 面差异（给了 --surfaces-before 才比，没给就明说没比）
+const beforeFile = val('--surfaces-before');
+let surfNote = null;
+if (beforeFile && existsSync(beforeFile)) {
+  try {
+    const { scanUi, surfaceCounts } = await import('./lib/ui-scan.mjs');
+    const rawBefore = JSON.parse(readFileSync(beforeFile, 'utf8'));
+    // baseline 允许两种形状：[{surface,plugins}] 或 {surface:[plugins]}
+    const beforeMap = Array.isArray(rawBefore)
+      ? rawBefore.map((x) => [x.surface, x.plugins || []])
+      : Object.entries(rawBefore);
+    const afterMap = new Map(surfaceCounts(scanUi(profileDir)).map((x) => [x.surface, x.plugins || []]));
+    const lost = [];
+    for (const [face, list] of beforeMap) {
+      const nowSet = new Set(afterMap.get(face) || []);
+      for (const p of list) if (!nowSet.has(p)) lost.push(face + '←' + p);
+    }
+    surfNote = lost.length ? { ok: false, text: '原有插件从 UI 面消失：' + lost.slice(0, 3).join(', ') } : { ok: true, text: 'UI 面回归：无插件消失' };
+  } catch (e) { surfNote = { ok: null, text: 'UI 面基线读不了：' + String(e.message).slice(0, 40) }; }
+}
+if (!live) layers.push(level('L5', STATUS.unknown, ['未连活宿主，回归未测', surfNote && surfNote.text]));
 else {
   try {
     const h = await get('/turnstile/health');
     const j = JSON.parse(h.text);
     const items = j.items || [];
     const bad = items.filter((i) => i.level === 'fail');
-    layers.push(level('L5', bad.length ? STATUS.fail : STATUS.pass,
-      items.map((i) => i.id + '=' + i.level)));
+    const surfBad = surfNote && surfNote.ok === false;
+    layers.push(level('L5', bad.length || surfBad ? STATUS.fail : STATUS.pass,
+      [items.map((i) => i.id + '=' + i.level).join(' '), surfNote && surfNote.text]));
   } catch (e) { layers.push(level('L5', STATUS.unknown, ['health 读不到：' + String(e.message).slice(0, 50)])); }
 }
 

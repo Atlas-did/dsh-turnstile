@@ -24,6 +24,7 @@ if (!profileDir || !pluginDir) { console.error('usage: node tools/sandbox-trial.
 if (!existsSync(join(profileDir, 'package.json'))) { console.error('not a profile: ' + profileDir); process.exit(2); }
 if (!existsSync(join(pluginDir, 'package.json'))) { console.error('not a plugin: ' + pluginDir); process.exit(2); }
 
+const here = dirname(fileURLToPath(import.meta.url));
 const state = val('--state') || process.env.DSH_TURNSTILE_STATE || join(profileDir, '..', '..', 'turnstile-state');
 const env = { ...process.env, DSH_TURNSTILE_STATE: state };
 const run = (script, extra) => {
@@ -68,6 +69,26 @@ writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 console.log('3. 已装进 node_modules 并写进 bundles');
 
 // 4. 验证
+// 4a. 真机六级验证：这是「试装通过」的新定义（P1.1）。没有证据就记 unknown，不补绿。
+const verifyArgs = [join(here, 'verify-live.mjs'), profileDir, '--pkg', name, '--json'];
+for (const [flag, key] of [['--dsh-bin', 'dsh-bin'], ['--base', 'base'], ['--token', 'token'], ['--expect', 'expect'], ['--routes', 'routes'], ['--surfaces-before', 'surfaces-before']]) {
+  const v = val(flag);
+  if (v) verifyArgs.push(flag, v);
+}
+if (has('--restart-cmd')) {
+  const rc = val('--restart-cmd');
+  try { execFileSync(process.platform === 'win32' ? 'cmd' : 'sh', process.platform === 'win32' ? ['/c', rc] : ['-c', rc], { stdio: 'inherit', timeout: 180000 }); }
+  catch (e) { console.log('   ⚠ 重启命令失败：' + String(e.message).slice(0, 60)); }
+}
+let levelReport = null;
+try {
+  const vout = execFileSync(process.execPath, verifyArgs, { encoding: 'utf8', timeout: 300000 });
+  levelReport = JSON.parse(vout.slice(vout.indexOf('{'), vout.lastIndexOf('}') + 1));
+} catch (e) {
+  const s = String((e.stdout || '') + (e.stderr || ''));
+  try { levelReport = JSON.parse(s.slice(s.indexOf('{'), s.lastIndexOf('}') + 1)); } catch { levelReport = null; }
+}
+
 const checks = [];
 const py = run('profile-yaml.mjs', [profileDir]);
 checks.push(['profile-yaml', py.code === 0, py.out.trim().split('\n')[0]]);
@@ -88,7 +109,18 @@ if (port) {
 }
 console.log('4. 验证：');
 for (const [n, okk, detail] of checks) console.log('   ' + (okk ? 'ok  ' : 'FAIL') + ' ' + n.padEnd(14) + detail);
-const passed = checks.every(([, okk]) => okk);
+if (levelReport) {
+  for (const l of levelReport.levels || []) {
+    const mark = l.status === 'pass' ? '✓' : l.status === 'fail' ? '✗' : '·';
+    console.log('   ' + mark + ' ' + l.level + ' ' + l.status + (l.evidence && l.evidence.length ? '  ' + String(l.evidence[0]).slice(0, 60) : ''));
+  }
+} else {
+  console.log('   · 六级验证没跑成（检查 --dsh-bin / --base / --token）——本次不能声称真实可用');
+}
+// 结论以六级验证为准：只过静态两层就绝不说「可用」
+const passed = checks.every(([, okk]) => okk) && (!levelReport || levelReport.verdict !== 'fail');
+const claimText = levelReport ? levelReport.claimText : '只做了文件层检查，未验证真实运行。';
+const verdictWord = levelReport ? levelReport.claim : (passed ? 'static-only' : 'failed');
 
 journal(['--kind', 'trial', '--target', name, '--verdict', passed ? 'pass' : 'fail', '--note', checks.map(([n, okk]) => n + '=' + (okk ? 'ok' : 'fail')).join(' ')]);
 
@@ -98,5 +130,6 @@ if (!has('--keep')) {
   console.log('5. 已回滚（--keep 可保留）');
 } else console.log('5. 保留安装（--keep）');
 
-console.log(passed ? '结论：通过' : '结论：有问题，见上面的 FAIL');
+console.log('结论（' + verdictWord + '）：' + claimText);
+if (has('--json')) console.log(JSON.stringify({ ok: passed, claim: verdictWord, claimText, levels: levelReport ? levelReport.levels : null, checks: checks.map(([n, okk, d]) => ({ name: n, ok: okk, detail: d })) }, null, 2));
 process.exitCode = passed ? 0 : 1;
