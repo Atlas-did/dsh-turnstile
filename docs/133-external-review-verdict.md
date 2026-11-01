@@ -11,7 +11,7 @@
 | README 提到不存在的 `quicktest.mjs` | **真** | `ls tools/quicktest.mjs` → MISSING；而 README/我新写的 README 都列了它 |
 | INSTALL 写 Node 20+，package.json 要 ^22.19 | **真** | `INSTALL.md:9` vs `package.json:75` |
 | 仓库根有调试残留 `_m.mjs/_rw.mjs/_shot3.mjs`（硬编码作者路径） | **真** | 三个文件都在，且已被 git 跟踪 |
-| `test-arch-graph.mjs` 硬编码作者机器路径 | **真** | 原来写死 `C:/Users/finef/.../profiles/mini` |
+| `test-arch-graph.mjs` 硬编码作者机器路径 | **真** | 原来写死 `<home>/.../profiles/mini` |
 | `sandbox-trial.mjs` 用相对 `join('tools', script)` | **真** | 不在仓库根跑就挂（已在 /tmp 复现） |
 | `mini-ctl.mjs` 硬编码 `~/Desktop/mini-harness` 与 `oss/dsh-turnstile` 布局 | **真** | 新用户 `status` 必 exit 2 |
 | `console-server.mjs` 返回编造数据（`records:42`、假 profile 名） | **真** | 就是无标注假数据，违背本项目自己的纪律 |

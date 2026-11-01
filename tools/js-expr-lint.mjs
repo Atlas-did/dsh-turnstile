@@ -9,6 +9,10 @@
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { homedir } from 'node:os';
+import { createRequire } from 'node:module';
+
+// 用 acorn 解析表达式，而不是 new Function：只做语法检查，绝不构造可执行代码
+const acorn = createRequire(join(process.cwd(), 'package.json'))('acorn');
 
 const argv = process.argv.slice(2);
 const flag = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
@@ -39,7 +43,7 @@ for (const f of files) {
     if (!m) return;
     total++;
     const expr = m[1].trim();
-    try { new Function('return (' + expr + '\n)'); }
+    try { acorn.parseExpressionAt(expr, 0, { ecmaVersion: 'latest' }); }
     catch (e) { bad.push({ file: f, line: i + 1, expr, error: String(e.message || e).slice(0, 120) }); }
   });
 }

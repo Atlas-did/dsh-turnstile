@@ -13,7 +13,7 @@
 |---|---|---|
 | `https://…` | 外链图片 | CDN、图床 |
 | `/turnstile/…` | 站内资源 | 面板自带的图 |
-| **`asset:<绝对路径>`** | **本地文件**（白名单目录） | `asset:C:/Users/finef/Desktop/mini-harness/state/page-with-image.png` |
+| **`asset:<绝对路径>`** | **本地文件**（白名单目录） | `asset:<home>/Desktop/mini-harness/state/page-with-image.png` |
 
 新增路由 `GET /turnstile/asset?path=…`：
 

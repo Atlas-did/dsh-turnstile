@@ -14,8 +14,8 @@ $ git status --porcelain | wc -l → 0
 
 **dsh-turnstile 这个仓库是同步的**：381 个文件、91 篇文档、85 个工具、52 个插件文件、140 个测试。
 
-**但有一半东西根本没上传**：`C:/Users/finef/Desktop/mini-harness` 是平台本体（三档 profile、启动器、
-`home/`、`vendor/`、`docs/01-10`、截图、state 产物）。它的 git 根是 `C:/Users/finef`，**没有 remote、0 个跟踪文件**。
+**但有一半东西根本没上传**：`<home>/Desktop/mini-harness` 是平台本体（三档 profile、启动器、
+`home/`、`vendor/`、`docs/01-10`、截图、state 产物）。它的 git 根是 `<home>`，**没有 remote、0 个跟踪文件**。
 也就是说：**工具在 GitHub，跑工具的机器不在 GitHub**。别人 clone 下来没有 mini 可用——这正是「只会只读用」的物理原因。
 
 ## 二、机制落地到底有几成？（按代码审计，不按文档）

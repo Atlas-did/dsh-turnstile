@@ -22,7 +22,7 @@ node tools/create-loop.mjs <name> [--dir <parent>] [--template ui-page|route] \
 
 ```
 $ node oss/dsh-turnstile/tools/create-loop.mjs demo-two --dir %TEMP% --mini <mini> --keep
-  ✓ create   pass  C:\Users\...\Temp\demo-two
+  ✓ create   pass  <home>\Temp\demo-two
   ✓ trial    pass  verified-with-regression
 结论（verified-with-regression）：六层全部通过：加载、路由、界面可见，且原有功能未回归。
 ```

@@ -1,6 +1,6 @@
 # 一个 B 站视频里的三个 DSH 故障，对着我们的工具逐条查
 
-来源：`C:\Users\finef\Videos\bilibili\43191699963`，`BV1rNxB6CE4G`，125 秒，
+来源：`<home>\Videos\bilibili\43191699963`，`BV1rNxB6CE4G`，125 秒，
 标题《DeepSeek Harness 打不开（Web authentication failed）、插件更新报错、插件装不上怎么修》。
 文字取自 B 站字幕接口（84 段），不是听写猜的。
 

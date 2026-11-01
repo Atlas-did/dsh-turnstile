@@ -1,0 +1,31 @@
+// 隐私与安全回归：文档不含本机绝对路径；不出现 eval-like 代码；服务器默认只听本机。
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const root = join(here, '..');
+let fail = 0;
+const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
+
+const HOME = /(?:[A-Za-z]:[\\/]Users|[\\/][a-z][\\/]Users)[\\/][^\\/\s`'"]+/;
+const docsDir = join(root, 'docs');
+const dirty = readdirSync(docsDir).filter((f) => f.endsWith('.md') && HOME.test(readFileSync(join(docsDir, f), 'utf8')));
+ok('docs 里没有本机绝对路径', dirty.length === 0, dirty.slice(0, 3).join(','));
+
+const exprLint = readFileSync(join(root, 'tools', 'js-expr-lint.mjs'), 'utf8');
+const pits = readFileSync(join(root, 'tools', 'pits.mjs'), 'utf8');
+// 注释里会提到旧实现的名字，所以只检查「可执行代码里」是否还有
+const stripComments = (s) => s.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+ok('js-expr-lint 代码里没有 new Function', !/new Function/.test(stripComments(exprLint)) && /acorn/.test(exprLint));
+ok('pits 代码里没有 new Function', !/new Function/.test(stripComments(pits)) && /acorn\.parse/.test(pits));
+
+const server = readFileSync(join(root, 'tools', 'console-server.mjs'), 'utf8');
+ok('console-server 默认只监听 127.0.0.1', /arg\('--host', '127\.0\.0\.1'\)/.test(server));
+ok('console-server 没有 0.0.0.0 默认值', !/0\.0\.0\.0/.test(server));
+
+const plugin = readFileSync(join(root, 'plugins', 'turnstile-popup', 'lib', 'index.js'), 'utf8');
+ok('令牌也可以用请求头传（不必留在 URL）', /x-turnstile-token/.test(plugin));
+
+console.log(fail ? 'PRIVACY_FAILED ' + fail : 'PRIVACY_OK');
+process.exitCode = fail ? 1 : 0;

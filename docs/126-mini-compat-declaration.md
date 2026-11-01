@@ -34,8 +34,8 @@
 ## 三、装进 mini 之前必跑的四步
 
 ```bash
-cd /c/Users/finef/Desktop/mini-harness/oss/dsh-turnstile
-PROFILE=C:/Users/finef/Desktop/mini-harness/home/profiles/mini
+cd <home>/Desktop/mini-harness/oss/dsh-turnstile
+PROFILE=<home>/Desktop/mini-harness/home/profiles/mini
 
 node tools/risk.mjs $PROFILE          # peer-only scope / 装不活的风险
 node tools/conflict.mjs $PROFILE      # ctx 服务名冲突、版本分叉
@@ -47,7 +47,7 @@ node tools/preinstall.mjs $PROFILE dsh-xxx   # 预检：能不能装、缺什么
 
 ```bash
 node tools/mini-ctl.mjs stop && node tools/mini-ctl.mjs start
-node tools/quicktest.mjs mini 18770 C:/Users/finef/Desktop/mini-harness/logs/mini.log
+node tools/quicktest.mjs mini 18770 <home>/Desktop/mini-harness/logs/mini.log
 ```
 
 ## 四、哪些插件「天然适合 mini」

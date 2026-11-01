@@ -3,19 +3,19 @@
 ## 1. `mini-ctl`：命令行的总开关
 
 ```bash
-cd /c/Users/finef/Desktop/mini-harness/oss/dsh-turnstile
+cd <home>/Desktop/mini-harness/oss/dsh-turnstile
 node tools/mini-ctl.mjs status     # 运行中？端口？日志？
 node tools/mini-ctl.mjs url        # 带 token 的地址（真机实测可点）
 node tools/mini-ctl.mjs start      # 后台起，等到就绪才返回
 node tools/mini-ctl.mjs stop
-node tools/mini-ctl.mjs cmd "node tools/ui-atlas.mjs C:/Users/finef/Desktop/mini-harness/home/profiles/mini --csv C:/tmp/a.csv"
+node tools/mini-ctl.mjs cmd "node tools/ui-atlas.mjs <home>/Desktop/mini-harness/home/profiles/mini --csv C:/tmp/a.csv"
 ```
 
 实测：
 
 ```
 $ node tools/mini-ctl.mjs status
-mini 运行中 · C:\Users\finef\Desktop\mini-harness
+mini 运行中 · <home>\Desktop\mini-harness
   url  http://127.0.0.1:18770/?token=…
   port 18770  日志 …/logs/mini.log
 

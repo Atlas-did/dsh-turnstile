@@ -6,6 +6,10 @@
 // 三条都返回 { id, level, message, next }，非通过项必须带 next。
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
+import { createRequire } from 'node:module';
+
+// 只解析不执行：取代原来的 new Function 语法探测
+const acorn = createRequire(join(process.cwd(), 'package.json'))('acorn');
 
 export const MARKET_PATTERN = /(dsh-?market|dsh-?plugin-?market|plugin-?market|market-?place)$/i;
 
@@ -46,8 +50,8 @@ export function checkClientSource(source) {
     .replace(/\bexport\s+default\s+/g, 'const __default = ')
     .replace(/\bexport\s+(function|const|let|class|async)\b/g, '$1');
   try {
-    // 包成函数体，模拟宿主注入；语法错误会在构造时抛出。
-    new Function(stripped);
+    // 用 acorn 做语法检查，不构造可执行函数（避免 eval-like 实现）
+    acorn.parse(stripped, { ecmaVersion: 'latest', sourceType: 'script' });
     return { ok: true, error: '' };
   } catch (e) {
     return { ok: false, error: String(e && e.message || e) };

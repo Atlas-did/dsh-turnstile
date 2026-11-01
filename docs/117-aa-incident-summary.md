@@ -20,11 +20,11 @@
 | 2.0.x | 2.0.2 | 无 | **不适用**：双方都是 v1，正常握手 |
 | 2.0.x | 2.0.2 | 坏 | 只有故障二 |
 
-反例（2026-10-31，另一台机器 `C:\Users\星`）：AA `2.0.3.0`、插件 2.0.2、无任何 `*_PROXY`、无 7897 监听；`PARSE_ERROR = 0`、`backend ingest request failed = 0`、`sync.ack` 10319 次、`throughSeq` 最高 2671，AA 显示「运行中」。它那 10 次告警是 `resubscribing for history calibration`，属于流断开后的重新订阅，和本文两条不是同一件事。→ 本文**不适用于它**，也不需要改任何配置。
+反例（2026-10-31，另一台机器 `<home>`）：AA `2.0.3.0`、插件 2.0.2、无任何 `*_PROXY`、无 7897 监听；`PARSE_ERROR = 0`、`backend ingest request failed = 0`、`sync.ack` 10319 次、`throughSeq` 最高 2671，AA 显示「运行中」。它那 10 次告警是 `resubscribing for history calibration`，属于流断开后的重新订阅，和本文两条不是同一件事。→ 本文**不适用于它**，也不需要改任何配置。
 
 ## 症状
 
-> 以下证据都来自本机 `C:\Users\finef`（AA 2.1.0 + `ALL_PROXY=http://127.0.0.1:7897`），不是通用现象。
+> 以下证据都来自本机 `<home>`（AA 2.1.0 + `ALL_PROXY=http://127.0.0.1:7897`），不是通用现象。
 
 - AA 设备页：DSH「启动中 · DSH 会话同步中断，正在重试」
 - 插件日志：`bridge.connected` → `PARSE_ERROR` ×5 → `ERR_STREAM_WRITE_AFTER_END` → `disconnected initialized=false`
@@ -122,9 +122,9 @@ aa.dsh.v2.Sync.ingestBatch
 
 ## 附注：`desktop.executablePath` 的 GBK 乱码（仅另一台机器）
 
-`C:\Users\星` 那台的 `connector-runtime.json` 里 `desktop.executablePath` 是 `C:\Users\鏄焅\...`（「星」被 GBK 化，即 `星` 的 UTF-8 字节按 GBK 读回去）。它不影响同步，只在 AA 按记录路径重启自身时可能踩空。
+`<home>` 那台的 `connector-runtime.json` 里 `desktop.executablePath` 是 `<home>\...`（「星」被 GBK 化，即 `星` 的 UTF-8 字节按 GBK 读回去）。它不影响同步，只在 AA 按记录路径重启自身时可能踩空。
 
-修复（在**那台机器**上做，先完全退出 AA）：备份 `connector-runtime.json`，把 `desktop.executablePath` 改成真实路径，或删掉该字段让 AA 下次启动重写。本机（finef）该字段是正常的 `D:\Software_download_link\Agents Anywhere\Agents Anywhere.exe`。
+修复（在**那台机器**上做，先完全退出 AA）：备份 `connector-runtime.json`，把 `desktop.executablePath` 改成真实路径，或删掉该字段让 AA 下次启动重写。本机该字段是正常的 `D:\Software_download_link\Agents Anywhere\Agents Anywhere.exe`。
 
 ## 证据与相关文档
 

@@ -13,7 +13,7 @@ node:fs:436
 
 Error: ENOENT: no such file or directory, open 'C:\nonexistent\profiles\desktop\package.json'
     at readFileSync (node:fs:436:20)
-    at file:///C:/Users/finef/Desktop/mini-harness/oss/dsh-turnstile/tools/registry.mjs:12:24
+    at file:///<home>/Desktop/mini-harness/oss/dsh-turnstile/tools/registry.mjs:12:24
     at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
     at async node:internal/modules/esm/loader:639:26
     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
@@ -35,7 +35,7 @@ node:fs:436
 
 Error: ENOENT: no such file or directory, open 'C:\nonexistent\profiles\desktop\package.json'
     at readFileSync (node:fs:436:20)
-    at file:///C:/Users/finef/Desktop/mini-harness/oss/dsh-turnstile/tools/conflict.mjs:15:24 {
+    at file:///<home>/Desktop/mini-harness/oss/dsh-turnstile/tools/conflict.mjs:15:24 {
   errno: -4058,
   code: 'ENOENT',
   syscall: 'open',
@@ -64,7 +64,7 @@ node:fs:436
 
 Error: ENOENT: no such file or directory, open 'C:\nonexistent\profiles\desktop\package.json'
     at readFileSync (node:fs:436:20)
-    at file:///C:/Users/finef/Desktop/mini-harness/oss/dsh-turnstile/tools/prompt-vars.mjs:12:24
+    at file:///<home>/Desktop/mini-harness/oss/dsh-turnstile/tools/prompt-vars.mjs:12:24
     at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
     at async node:internal/modules/esm/loader:639:26
     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {

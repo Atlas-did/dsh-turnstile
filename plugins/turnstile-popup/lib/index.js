@@ -34,7 +34,7 @@ function requestRejection(req, res) {
     return false;
   }
   const url = String(req.url || "");
-  if (url.indexOf("token=") === -1 && !req.headers["x-dsh-token"]) {
+  if (url.indexOf("token=") === -1 && !req.headers["x-dsh-token"] && !req.headers["x-turnstile-token"]) {
     sendJson(res, 401, { error: "unauthenticated" });
     return false;
   }
@@ -131,7 +131,8 @@ pre{font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap;wor
 const TOKEN = new URLSearchParams(location.search).get('token') || '';
 const PAGES = ['概览','架构图','占用','插件','控制台'];
 let page = '概览', D = { rows: [], occ: null, act: null, delta: null }, Q = '';
-const api = (p) => fetch('/turnstile/' + p + (p.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(TOKEN)).then(r => r.json());
+const authHeaders = TOKEN ? { 'x-turnstile-token': TOKEN } : {};
+const api = (p) => fetch('/turnstile/' + p + (TOKEN ? (p.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(TOKEN) : ''), { headers: authHeaders }).then(r => r.json());
 const hit = (t) => !Q || String(t || '').toLowerCase().includes(Q.toLowerCase());
 function el(tag, attrs, html) { const e = document.createElement(tag); if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]); if (html != null) e.innerHTML = html; return e; }
 async function load(update) {

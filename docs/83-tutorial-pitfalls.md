@@ -25,7 +25,7 @@
 
 ```
 $ node tools/setup-check.mjs
-setup check · desktop  (C:\Users\finef\.dsh\profiles\desktop)
+setup check · desktop  (<home>\.dsh\profiles\desktop)
   WARN  缺少凭据键：agnes-api-key（生图/生视频会失败）
         → 把 key 写进 DSH 凭据（键名 agnes-api-key）或 .env，然后重启客户端
   FAIL  AA 一直显示“等待本地 bridge”：endpoint.json 不存在

@@ -14,7 +14,7 @@ node tools/acceptance-mini.mjs <name> --mini <mini-root> [--json] [--out <file>]
 实测（mini 18770）：
 
 ```
-  ✓ create            pass  C:\Users\...\Temp\acc-demo
+  ✓ create            pass  <home>\Temp\acc-demo
   ✓ install+verify    pass  verified-with-regression（L0–L5 全过）
   ✓ uninstall         pass  bundles 32→31，node_modules/acc-demo 已删
   ✓ rollback-verified pass  路由 404，dump-config 里 已无

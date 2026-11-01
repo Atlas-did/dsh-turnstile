@@ -41,7 +41,7 @@ e2e-builder-console BUILDER_CONSOLE_E2E_OK
 
 ```
 $ node tools/create-loop.mjs merge-two --dir %TEMP% --mini <mini> --keep
-  ✓ create   pass  C:\Users\...\Temp\merge-two
+  ✓ create   pass  <home>\Temp\merge-two
   ✓ trial    pass  verified-with-regression
   ✓ L0/L1/L2/L3/L4/L5 全部 pass（/merge-two → 200，页面含 merge-two）
 结论（verified-with-regression）：六层全部通过：加载、路由、界面可见，且原有功能未回归。
