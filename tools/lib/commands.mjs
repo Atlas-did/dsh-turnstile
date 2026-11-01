@@ -3,6 +3,7 @@
 // 每个命令声明：脚本、是否写操作、参数 schema（极简）、超时。
 // handler 只做「spawn 既有 CLI + 解析 JSON」，不在这里重写业务逻辑。
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -58,7 +59,11 @@ export function runCommand(command, args, { toolsRoot } = {}) {
   const v = validate(command, args);
   if (!v.ok) return { ok: false, verdict: 'unknown', exitCode: v.code, summary: v.error, findings: [], evidence: [], next: [] };
   const spec = v.spec;
-  const base = toolsRoot || toolsDir;
+  // toolsRoot 可能被传成「仓库根」也可能是「tools 目录」：按是否存在脚本判断，别猜。
+  let base = toolsDir;
+  if (toolsRoot) {
+    base = existsSync(join(toolsRoot, spec.script)) ? toolsRoot : join(toolsRoot, 'tools');
+  }
   const started = Date.now();
   const res = spawnSync(process.execPath, [join(base, spec.script), ...argvFor(command, args)], { encoding: 'utf8', timeout: spec.timeout });
   const durationMs = Date.now() - started;

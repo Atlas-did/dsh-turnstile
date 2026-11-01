@@ -131,6 +131,8 @@ window.__ModuleLoader__.load({
         var sx = React.useState({ list: true, checks: false, topology: false, occupancy: false, slots: false }), secs = sx[0], setSecs = sx[1];
         var qs = React.useState(""), query = qs[0], setQuery = qs[1];
         var ns = React.useState(null), notice = ns[0], setNotice = ns[1];
+        var rr = React.useState(null), runResult = rr[0], setRunResult = rr[1];
+        var rb = React.useState(""), runBusy = rb[0], setRunBusy = rb[1];
         var im = React.useState(false), inspectMode = im[0], setInspectMode = im[1];
         var ir = React.useState(null), inspectResult = ir[0], setInspectResult = ir[1];
         var ih = React.useState(null), inspectRect = ih[0], setInspectRect = ih[1];
@@ -228,6 +230,53 @@ window.__ModuleLoader__.load({
           postPlan("anchor", { package: row.name, anchor: anchor })
             .catch(function (e) { setNotice({ kind: "error", text: "位置更新失败：" + errorText(e) }); })
             .then(function () { setBusy(""); });
+        }
+        // 统一入口：面板按钮全部打 /turnstile/run（02 设计 §4）。
+        // 读操作直跑；写操作先 dryRun 拿 applyToken，面板上出「确认执行」。
+        function runCommandViaRun(name, args, dryRun) {
+          setRunBusy(name);
+          return api("run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ command: name, args: args || {}, dryRun: dryRun === true }) })
+            .then(function (r) { setRunResult({ name: name, result: r }); return r; })
+            .catch(function (e) { setRunResult({ name: name, error: errorText(e) }); })
+            .then(function (x) { setRunBusy(""); return x; });
+        }
+        function runLight(result) {
+          if (!result) return C.muted;
+          var v = result.verdict;
+          if (v === "ok") return "#3fb950";
+          if (v === "warn") return "#d29922";
+          if (v === "fail") return "#f85149";
+          return "#8b949e";
+        }
+        function runStrip() {
+          var buttons = [
+            ["doctor", "体检"], ["surfaces", "三查"], ["diagnose", "诊断"], ["slot-report", "槽位"],
+          ];
+          return h("div", { "data-testid": "run-strip", style: { marginTop: "8px" } },
+            h("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" } },
+              buttons.map(function (b) {
+                return h("button", { key: b[0], type: "button", "data-testid": "run-" + b[0], disabled: !!runBusy,
+                  onClick: function () { runCommandViaRun(b[0]); }, style: S.button }, runBusy === b[0] ? "…" : b[1]);
+              }),
+              h("button", { type: "button", "data-testid": "run-snapshot", disabled: !!runBusy,
+                onClick: function () { runCommandViaRun("snapshot-take", {}, true); }, style: S.button },
+                runBusy === "snapshot-take" ? "…" : "快照")
+            ),
+            runResult ? h("div", { "data-testid": "run-result", style: { marginTop: "6px", display: "flex", gap: "6px", alignItems: "center", fontSize: "11.5px" } },
+              h("span", { style: { width: "8px", height: "8px", borderRadius: "50%", background: runLight(runResult.result) } }),
+              h("span", { style: { flex: 1, color: C.muted } }, (runResult.error || (runResult.result && (runResult.result.summary || runResult.result.verdict))) + ""),
+              runResult.result && runResult.result.applyToken
+                ? h("button", { type: "button", "data-testid": "run-apply", style: S.button,
+                    onClick: function () {
+                      setRunBusy("apply");
+                      api("run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ command: runResult.name, args: {}, applyToken: runResult.result.applyToken }) })
+                        .then(function (r) { setRunResult({ name: runResult.name, result: r }); })
+                        .catch(function (e) { setRunResult({ name: runResult.name, error: errorText(e) }); })
+                        .then(function () { setRunBusy(""); });
+                    } }, "确认执行")
+                : null
+            ) : null
+          );
         }
         // Every write is two-step: the host answers with a plan and a confirmation token; nothing is
         // written until that token comes back. The panel shows the diff instead of writing silently.
@@ -364,6 +413,8 @@ window.__ModuleLoader__.load({
               return h("div", { key: m[1], style: { padding: "8px 4px", textAlign: "center", borderRadius: "8px", background: C.panel, border: "1px solid " + C.line } },
                 h("div", { style: { fontSize: "16px", fontWeight: 650 } }, m[0]), h("div", { style: { color: C.muted, fontSize: "10px", marginTop: "2px" } }, m[1]));
             })),
+
+          runStrip(),
 
           pending ? h("div", { "data-testid": "confirm", style: { marginTop: "8px", padding: "8px 10px", borderRadius: "8px", border: "1px solid " + C.amber, background: C.panel, fontSize: "11px", lineHeight: 1.5 } },
             h("div", { style: { color: C.muted } }, "将写入 " + String(pending.plan.file || "").split(/[\\/]/).pop() + " · " + String(pending.plan.beforeSha || "新建").slice(0, 8) + " → " + String(pending.plan.afterSha || "").slice(0, 8)),

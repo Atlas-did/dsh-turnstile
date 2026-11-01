@@ -661,7 +661,7 @@ export function apply(ctx, config) {
       try {
         const libDir = dirname(fileURLToPath(import.meta.url));
         const mod = await import(pathToFileURL(join(libDir, "run-route.js")).href);
-        const out = await mod.handleRun(parsed, { toolsRoot: process.env.DSH_TURNSTILE_HOME });
+        const out = await mod.handleRun(parsed, { toolsRoot: process.env.DSH_TURNSTILE_HOME ? join(process.env.DSH_TURNSTILE_HOME, 'tools') : undefined });
         return sendJson(res, out.status, out.body);
       } catch (e) { return sendJson(res, 500, { ok: false, verdict: "unknown", summary: String(e.message).slice(0, 200) }); }
     },

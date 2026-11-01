@@ -306,6 +306,13 @@ try {
     await page.waitForTimeout(300);
     ok('fullscreen mode can exit', await page.evaluate(() => !document.fullscreenElement));
 
+    // 统一入口：面板按钮打 /turnstile/run（02 设计 §4）。
+    // 离线 server 没有 run 路由时按钮会报错——所以这里只断言按钮存在且可点，不断言结果内容。
+    ok("panel exposes the run strip", (await page.locator('[data-testid="run-strip"]').count()) === 1);
+    for (const id of ['run-doctor', 'run-surfaces', 'run-diagnose', 'run-slot-report', 'run-snapshot']) {
+      ok('panel has ' + id, (await page.locator('[data-testid="' + id + '"]').count()) === 1);
+    }
+
     ok("no uncaught browser errors", pageErrors.length === 0, pageErrors.join(" | ").slice(0, 100));
   }
 } catch (error) {
