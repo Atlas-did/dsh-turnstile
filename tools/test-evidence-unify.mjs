@@ -22,6 +22,9 @@ const adp = readFileSync(join(here, '..', 'tools', 'lib', 'mini-host-adapter.mjs
 ok('采集器抓正文摘录（L4 判据）', /bodyExcerpt/.test(col) && /bodyExcerpt/.test(adp));
 ok('摘录截断，不把整页塞进证据', /slice\(0, 800\)/.test(adp));
 ok('L4 可用摘录判定', /host-evidence 正文摘录含/.test(vl));
+ok('验收器采 L5 基线（UI 面）', /l5-baseline/.test(acc) && /surfaceCounts/.test(acc));
+ok('验收器复判时传 --surfaces-before', /--surfaces-before'/.test(acc));
+ok('复判用不重启的 token（否则会把宿主再重启一次）', /--no-restart/.test(acc));
 ok('trial-status 输出 claim 字段', /claim,/.test(ts));
 ok('trial-status 的 claim 只用阶梯词', ['static-only', 'verified-with-regression', 'failed', 'unknown'].every((w) => ts.includes("'" + w + "'")));
 ok('两边没有第二套成功词（loaded/pass/ok 之外的）', !/claim\s*=\s*'pass'/.test(ts) && !/claim\s*=\s*'loaded'/.test(ts));

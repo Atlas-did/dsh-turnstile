@@ -34,6 +34,16 @@ if (!existsSync(outDir)) {
   step('create', made.code === 0, made.code === 0 ? outDir : (made.out.trim().split('\n').pop() || ''));
 } else step('create', true, '复用已有目录 ' + outDir);
 
+// 1.4) L5 基线：装前 UI 面 + health（回归对比用）
+const surfBefore = join(parent, '.' + name + '-surfaces-before.json');
+let l5Ready = false;
+try {
+  const { scanUi, surfaceCounts } = await import('./lib/ui-scan.mjs');
+  writeFileSync(surfBefore, JSON.stringify(surfaceCounts(scanUi(profileDir))));
+  l5Ready = true;
+} catch (e) { l5Ready = false; }
+step('l5-baseline', l5Ready, l5Ready ? surfBefore : 'UI 面基线采集失败');
+
 // 1.5) 真实宿主证据 before（宿主观察，不重启）
 const obsFile = join(parent, '.' + name + '-observation.json');
 const evFile = join(parent, '.' + name + '-host-evidence.json');
@@ -54,7 +64,13 @@ step('host-observe-after', afterObs.code === 0, afterObs.code === 0 ? evFile : (
 // 2.7) 用真实宿主证据再判一次 L2/L3（claim 应升级或至少证据来源变成 host）
 let hostClaim = null;
 if (afterObs.code === 0) {
-  const rv = runNode('verify-live.mjs', [profileDir, '--pkg', name, '--host-evidence', evFile, '--expect', name, '--json'], 300000);
+  // 取一个不重启的 token，这样 L3/L4/L5 都能连活宿主判；L2 由宿主证据判
+  const tokenReload = runNode('lab-reload.mjs', ['--no-restart', '--json'], 180000);
+  const live = jsonOf(tokenReload.out);
+  const vlArgs = [profileDir, '--pkg', name, '--host-evidence', evFile, '--expect', name, '--json'];
+  if (live && live.ok) vlArgs.push('--base', 'http://127.0.0.1:' + live.port, '--token', live.token);
+  if (l5Ready) vlArgs.push('--surfaces-before', surfBefore);
+  const rv = runNode('verify-live.mjs', vlArgs, 300000);
   const rj = jsonOf(rv.out);
   hostClaim = rj && rj.claim;
   const l2 = rj && (rj.levels || []).find((l) => l.level === 'L2');
