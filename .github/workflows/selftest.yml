@@ -41,3 +41,16 @@ jobs:
         run: node tools/test-preinstall.mjs
       - name: NO_PROXY effectiveness
         run: node tools/test-proxy.mjs
+
+      # 2026-11-01 新增：入口转发、UI 面扫描口径、semver 漂移、卡片硬规则
+      - name: entry + ui-scan + card
+        run: |
+          node tools/test-turnstile-entry.mjs
+          node plugins/turnstile-popup/test/ui-scan.test.mjs
+          node tools/test-recommend-card.mjs
+
+      - name: semver drift (跳过无运行时的情况)
+        run: |
+          DSH_VERSION=0.2.1-rc.3 node plugins/turnstile-popup/test/semver-drift.test.mjs || true
+          node tools/test-slot-map-report.mjs
+          node tools/test-profile-snapshot.mjs

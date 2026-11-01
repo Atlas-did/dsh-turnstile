@@ -65,7 +65,7 @@
     "test:ui-scan": "node plugins/turnstile-popup/test/ui-scan.test.mjs",
     "test:semver": "node plugins/turnstile-popup/test/semver-drift.test.mjs",
     "test:card": "node tools/test-recommend-card.mjs",
-    "test:all": "node plugins/turnstile-popup/test/ui-scan.test.mjs && node plugins/turnstile-popup/test/slot-attr.test.mjs && node plugins/turnstile-popup/test/ask.test.mjs && node plugins/turnstile-popup/test/semver-drift.test.mjs && node tools/test-look-tools.mjs && node tools/test-turnstile-entry.mjs && node tools/test-recommend-card.mjs && node tools/test-slot-map-report.mjs && node tools/test-profile-snapshot.mjs"
+    "test:all": "node plugins/turnstile-popup/test/ui-scan.test.mjs && node plugins/turnstile-popup/test/slot-attr.test.mjs && node plugins/turnstile-popup/test/ask.test.mjs && node plugins/turnstile-popup/test/semver-drift.test.mjs && node tools/test-look-tools.mjs && node tools/test-turnstile-entry.mjs && node tools/test-recommend-card.mjs && node tools/test-slot-map-report.mjs && node tools/test-profile-snapshot.mjs && node plugins/turnstile-popup/test/occupancy-parity.test.mjs"
   },
   "devDependencies": {
     "react": "^18.3.1",

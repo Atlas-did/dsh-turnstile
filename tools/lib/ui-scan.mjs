@@ -49,7 +49,13 @@ export function scanUi(profileDir, { onlyUiSurfaces = false } = {}) {
       }
     }
     const disabled = new RegExp('id:\\s*' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\n\\s*disabled:\\s*true').test(patchText);
-    plugins.push({ name, version: meta.version || '', missing: false, disabled, injects, patchRows: rows });
+    // 位置可配性：patch 里出现 slot/anchor/order 之一即认为可配（occupancy 的口径）
+    let ownText = '';
+    for (const f of patchFiles(dir, dsh.bundle && dsh.bundle.patch)) {
+      if (existsSync(f)) ownText += readFileSync(f, 'utf8');
+    }
+    const configurable = /\b(slot|anchor|order)\s*:/.test(ownText);
+    plugins.push({ name, version: meta.version || '', missing: false, disabled, injects, patchRows: rows, configurable });
   }
 
   return { ok: true, profile: profileDir, bundles: bundles.length, surfaces, plugins, profileRows };

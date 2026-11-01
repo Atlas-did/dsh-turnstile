@@ -4,6 +4,7 @@
 // and (when present) the runtime slot snapshot from the probe.
 // usage: node tools/occupancy.mjs <profileDir> [--json]
 // exit 0 always: this is a map, not a gate. The gate lives in ui-placement/ui-surface.
+import { scanUi } from './lib/ui-scan.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
@@ -18,26 +19,17 @@ if (!existsSync(pkgPath)) { console.error('not a profile: ' + dir); process.exit
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 const bundles = (pkg.dsh && pkg.dsh.profile && pkg.dsh.profile.bundles) || Object.keys(pkg.dependencies || {});
 
+// 扫描口径来自 tools/lib/ui-scan.mjs（唯一实现）；occupancy 只做自己的投影：
+// 去掉官方 @deepseek-ai/* 插件、面名缩短、带上可配性。
+const scan = scanUi(dir, { onlyUiSurfaces: true });
+const configurableOf = new Map(scan.plugins.map((p) => [p.name, Boolean(p.configurable)]));
 const surfaces = new Map(); // surface -> [{plugin, configurable}]
-for (const name of bundles) {
-  if (name.indexOf('@deepseek-ai/') === 0) continue;
-  const base = join(dir, 'node_modules', name);
-  const pj = join(base, 'package.json');
-  if (!existsSync(pj)) continue;
-  const j = JSON.parse(readFileSync(pj, 'utf8'));
-  const inject = (j.dsh && j.dsh.client && j.dsh.client.inject) || [];
-  const ui = inject.filter((s) => s.indexOf('ui-') !== -1).map((s) => String(s).replace('@deepseek-ai/dsh-client-', ''));
-  if (!ui.length) continue;
-  let rowText = '';
-  const rel = j.dsh && j.dsh.bundle && j.dsh.bundle.patch;
-  if (rel) {
-    const pf = join(base, String(rel).replace(/^\.\//, ''));
-    if (existsSync(pf)) rowText = readFileSync(pf, 'utf8');
-  }
-  const configurable = /\b(slot|anchor|order)\s*:/.test(rowText);
-  for (const s of ui) {
-    if (!surfaces.has(s)) surfaces.set(s, []);
-    surfaces.get(s).push({ plugin: name, configurable });
+for (const [full, plugins] of scan.surfaces) {
+  const short = String(full).replace('@deepseek-ai/dsh-client-', '');
+  for (const name of plugins) {
+    if (name.indexOf('@deepseek-ai/') === 0) continue;
+    if (!surfaces.has(short)) surfaces.set(short, []);
+    surfaces.get(short).push({ plugin: name, configurable: Boolean(configurableOf.get(name)) });
   }
 }
 
