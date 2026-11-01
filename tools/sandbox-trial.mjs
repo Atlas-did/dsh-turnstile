@@ -10,7 +10,8 @@
 //
 // usage: node tools/sandbox-trial.mjs <profileDir> <pluginDir> [--keep] [--port 18770] [--state <dir>]
 import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync, rmSync, cpSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join, basename, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { loadYaml } from './config.mjs';
 
@@ -26,7 +27,9 @@ if (!existsSync(join(pluginDir, 'package.json'))) { console.error('not a plugin:
 const state = val('--state') || process.env.DSH_TURNSTILE_STATE || join(profileDir, '..', '..', 'turnstile-state');
 const env = { ...process.env, DSH_TURNSTILE_STATE: state };
 const run = (script, extra) => {
-  try { return { code: 0, out: execFileSync(process.execPath, [join('tools', script), ...extra], { encoding: 'utf8', env, timeout: 120000 }) }; }
+  // 用相对本文件的路径：之前是 join('tools', script)，不在仓库根目录跑就必挂（外部调研 #4）
+  const here = dirname(fileURLToPath(import.meta.url));
+  try { return { code: 0, out: execFileSync(process.execPath, [join(here, script), ...extra], { encoding: 'utf8', env, timeout: 120000 }) }; }
   catch (e) { return { code: e.status === undefined ? 1 : e.status, out: String((e.stdout || '') + (e.stderr || '')) }; }
 };
 const journal = (fields) => run('lab-journal.mjs', ['--add', ...fields]);

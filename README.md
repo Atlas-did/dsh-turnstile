@@ -58,7 +58,7 @@ node tools/sandbox-promote.mjs --dry-run              # 推主环境前先干跑
 | preflight.mjs <profile> | 12 项并行检查，每项独立超时 |
 | risk / conflict / engines | 三查：装不活的风险 / 服务名冲突 / 版本闸门 |
 | preinstall.mjs <profile> <pkg> | 装前预检 |
-| quicktest.mjs <profile> <port> <log> | 七项体检 |
+| selftest.mjs | 闸门自检：每个扫描器必须抓住自己的「必须报错」夹具 |
 | diagnose.mjs --live | 从日志判「能不能连、能不能用、什么能证伪它」 |
 | profile-snapshot.mjs --take/--diff | 装前装后对比 |
 

@@ -11,16 +11,31 @@
 // 约定：mini 的根目录由 MINI_HOME 指定，默认 C:/Users/<you>/Desktop/mini-harness。
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 
 const argv = process.argv.slice(2);
 const cmd = argv[0] || 'status';
 const val = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
-const MINI = process.env.MINI_HOME || join(homedir(), 'Desktop', 'mini-harness');
+// MINI 目录：显式 --mini / MINI_HOME，否则依次试几个常见位置（不再硬编码某台机器的布局）
+function guessMini() {
+  const explicit = val('--mini') || process.env.MINI_HOME;
+  if (explicit) return explicit;
+  const candidates = [
+    join(homedir(), 'Desktop', 'mini-harness'),
+    join(homedir(), 'mini-harness'),
+    join(process.cwd(), 'mini-harness'),
+    process.cwd(),
+  ];
+  return candidates.find((c) => existsSync(join(c, 'runtime'))) || candidates[0];
+}
+const MINI = guessMini();
 const PORT = Number(val('--port') || process.env.MINI_PORT || 18770);
 const LOG = join(MINI, 'logs', 'mini.log');
-const REPO = join(MINI, 'oss', 'dsh-turnstile');
+// 仓库位置：优先本文件所在仓库（tools/ 的上一级），不再假定 <MINI>/oss/dsh-turnstile
+const REPO = process.env.TURNSTILE_REPO
+  || (existsSync(join(MINI, 'oss', 'dsh-turnstile', 'tools')) ? join(MINI, 'oss', 'dsh-turnstile') : dirname(dirname(fileURLToPath(import.meta.url))));
 
 if (!existsSync(MINI)) { console.error('找不到 mini 目录：' + MINI + '（用 MINI_HOME 指定）'); process.exit(2); }
 

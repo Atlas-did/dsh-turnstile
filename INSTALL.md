@@ -6,7 +6,7 @@ unless it is explicitly asked to (`--apply`, `--yes`).
 
 ## Requirements
 
-- Node.js 20 or newer (developed and tested on Node 24/25);
+- Node.js 22.19+ or 24+ (matches package.json engines; developed on 24/25);
 - a DeepSeek Harness installation, for the version-compatibility check to be authoritative;
 - optional: `playwright-core` plus Microsoft Edge (or Chrome) for the screenshots and the
   browser end-to-end test. Everything else works without a browser.

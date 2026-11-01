@@ -31,7 +31,8 @@ const ok = (name, pass, detail = '') => {
 };
 
 try {
-  server = createConsoleServer({ profileDir, stateDir: join(profileDir, '.turnstile') });
+  // e2e 用可复现的 fixture 数据（明确选入，不是默认）；真实数据路径由 fixture:false 覆盖
+  server = createConsoleServer({ profileDir, stateDir: join(profileDir, '.turnstile'), fixture: true });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = 'http://127.0.0.1:' + server.address().port;
   const launchErrors = [];

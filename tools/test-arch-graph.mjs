@@ -7,12 +7,13 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const profile = join(here, '..', 'tests', 'console-fixture');
+// 不写死作者机器路径：优先 ARCHGRAPH_PROFILE，其次仓库夹具
+const profile = process.env.ARCHGRAPH_PROFILE || join(here, '..', 'tests', 'console-fixture');
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
 
 const out = mkdtempSync(join(tmpdir(), 'arch-')) + '/x';
-execFileSync(process.execPath, [join(here, 'arch-graph.mjs'), 'C:/Users/finef/Desktop/mini-harness/home/profiles/mini', '--out-dir', out], { encoding: 'utf8', timeout: 120000 });
+execFileSync(process.execPath, [join(here, 'arch-graph.mjs'), profile, '--out-dir', out], { encoding: 'utf8', timeout: 120000 });
 const doc = JSON.parse(readFileSync(join(out, 'candidate.json'), 'utf8'));
 
 ok('candidate.json 存在且有组件', Array.isArray(doc.components) && doc.components.length > 0);

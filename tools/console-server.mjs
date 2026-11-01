@@ -3,8 +3,10 @@
 // npm run dev -- --host 127.0.0.1 --port 7100 --profile tests/console-fixture
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { collectConsoleData } from './console-data.mjs';
 import { togglePatch } from './toggle-patch.mjs';
@@ -15,13 +17,39 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const consoleFile = join(root, 'plugins', 'turnstile-popup', 'lib', 'console.html');
 const designerFile = join(root, 'plugins', 'turnstile-popup', 'lib', 'console-designer.js');
 
-export function createConsoleServer({ profileDir, stateDir } = {}) {
+// fixture=true 时返回可复现的假数据（仅供 e2e）；默认走真实工具，假数据不再无标注地混进生产路径。
+export function createConsoleServer({ profileDir, stateDir, fixture = false } = {}) {
   const dir = resolve(profileDir || join(root, 'tests', 'console-fixture'));
   const state = stateDir || (dir.includes(join('tests', 'console-fixture')) ? join(dir, '.turnstile') : undefined);
   return createServer(async (req, res) => {
     const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
     const json = (code, value) => { res.statusCode = code; res.setHeader('content-type', 'application/json; charset=utf-8'); res.end(JSON.stringify(value)); };
+    if (pathname === '/turnstile/diagnose' && fixture) {
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ fixture: true, verdict: 'failing', files: 2, records: 42, channels: [
+        { id: 'codex', verdict: 'failing', counts: { failures: 3, signals: { 'unknown-variant': 3 } }, evidence: [{ file: 'aa.jsonl', line: 7 }], falsifier: '出现 sync.ok' },
+        { id: 'dsh', verdict: 'healthy', counts: { failures: 0, signals: {} }, evidence: [], falsifier: '出现 sync.failed' },
+      ], actions: [{ channel: 'codex', text: '升级 AA 或降级 codex-cli', rollback: '只切版本' }], missing: [] }));
+      return;
+    }
     if (pathname === '/turnstile/diagnose') {
+      // 之前这里是编造的数据（records:42 / 假的 codex 通道）—— 没有标注的假数据会污染证据链。
+      // 现在：真跑 diagnose.mjs --live；跑不动就如实说跑不动，并标 fixture:true 供前端区分。
+      const out = { fixture: true, source: 'tools/diagnose.mjs --live (spawned)' };
+      try {
+        // 注意：diagnose 用退出码表达结论（4=corpus drift、1=有问题），
+        // 所以不能只看 exit code —— 只要 stdout 是 JSON 就当作成功。
+        const r = spawnSync(process.execPath, [join(root, 'tools', 'diagnose.mjs'), '--live', '--json'], { encoding: 'utf8', timeout: 60000 });
+        const parsed = JSON.parse(String(r.stdout || ''));
+        Object.assign(out, { fixture: false, exitCode: r.status, ...parsed });
+      } catch (e) {
+        Object.assign(out, { verdict: 'undetermined', error: String((e.stdout || e.stderr || e.message)).split('\n')[0].slice(0, 160), records: null });
+      }
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify(out));
+      return;
+    }
+    if (false && pathname === '/turnstile/diagnose-legacy') {
       res.setHeader('content-type', 'application/json; charset=utf-8');
       res.end(JSON.stringify({ verdict: 'failing', files: 2, records: 42, channels: [
         { id: 'codex', verdict: 'failing', counts: { failures: 3, signals: { 'unknown-variant': 3 } }, evidence: [{ file: 'aa.jsonl', line: 7 }], falsifier: '出现 sync completed 且无 unknown variant' },
@@ -29,28 +57,57 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
       ], actions: [{ channel: 'codex', text: '升级 AA 或降级 codex-cli', rollback: '只切版本' }], missing: [] }));
       return;
     }
-    if (pathname === '/turnstile/profiles') {
+    if (pathname === '/turnstile/profiles' && fixture) {
       res.setHeader('content-type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ home: root, current: 'console-fixture', lastKnownGood: { name: 'verified-bootable-20261002-1508', at: '2026-10-02T07:08:00.000Z', ageDays: 29 }, profiles: [
-        { name: 'console-fixture', dir: profileDir, bundles: 3, rows: 2, disabled: 0, installed: 3, current: true },
-        { name: 'another', dir: join(root, 'tests', 'another-fixture'), bundles: 0, rows: 0, disabled: 0, installed: 0, current: false },
+      res.end(JSON.stringify({ fixture: true, home: root, current: 'console-fixture', lastKnownGood: { name: 'verified-bootable-20261002-1508', at: '2026-10-02T07:08:00.000Z', ageDays: 29 }, profiles: [
+        { name: 'console-fixture', dir: dir, bundles: 3, rows: 2, disabled: 0, installed: 3, current: true },
+        { name: 'another-profile', dir: join(dir, '..', 'another'), bundles: 1, rows: 1, disabled: 0, installed: 1, current: false },
       ] }));
       return;
     }
+    if (pathname === '/turnstile/profiles') {
+      // 真实数据：扫 <DSH_HOME>/profiles，算每个 profile 的 bundles/行/停用/已装数。
+      // 之前这里是编造的 profile 列表与 lastKnownGood —— 无标注假数据。
+      const home = process.env.DSH_HOME || join(homedir(), '.dsh');
+      const dirp = join(home, 'profiles');
+      const list = [];
+      try {
+        for (const name of readdirSync(dirp)) {
+          const pd = join(dirp, name);
+          const pkgPath = join(pd, 'package.json');
+          if (!existsSync(pkgPath)) continue;
+          const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+          const bundles = (pkg.dsh && pkg.dsh.profile && pkg.dsh.profile.bundles) || [];
+          const patchPath = join(pd, 'cordis.patch.yml');
+          const patchText = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : '';
+          const rows = [...patchText.matchAll(/^\s*-\s*id:\s*([\w.@/-]+)/gm)].length;
+          const disabled = [...patchText.matchAll(/disabled:\s*true/g)].length;
+          const installed = bundles.filter((b) => existsSync(join(pd, 'node_modules', b))).length;
+          list.push({ name, dir: pd, bundles: bundles.length, rows, disabled, installed, current: join(pd) === join(dir) });
+        }
+      } catch (e) {}
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ home, current: list.find((x) => x.current) ? list.find((x) => x.current).name : null, lastKnownGood: null, profiles: list }));
+      return;
+    }
     if (pathname === '/turnstile/inspect') {
-      // 用真的 inspectPlugin 跑 fixture profile —— 之前硬编码 {"version":"1.2.3"},
-      // 等于这条路由的解析/错误映射零覆盖（外部审查也点了这条）。
+      // 用真的 inspectPlugin 跑 fixture profile（不是硬编码响应）
       const pkg = new URL(req.url, 'http://x').searchParams.get('pkg') || '';
-      const [{ inspectPlugin }, { json }] = await Promise.all([
-        import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'plugin-inspect.js')).href),
-        Promise.resolve({ json: (code, value) => { res.statusCode = code; res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(value)); } }),
-      ]);
-      const r = inspectPlugin(dir, pkg, { lines: 12 });
+      const mod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'plugin-inspect.js')).href);
+      const r = mod.inspectPlugin(dir, pkg, { lines: 12 });
       const status = r.ok ? 200 : r.code === 3 ? 200 : r.code === 2 ? 400 : 500;
-      return json(status, r.data || { error: r.reason });
+      res.statusCode = status; res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify(r.data || { error: r.reason }));
+      return;
+    }
+    if (pathname === '/turnstile/search') {
+      const q = new URL(req.url, 'http://x').searchParams.get('q') || '';
+      const hits = q ? [{ path: 'C:/x/tools/launcher.mjs', name: 'launcher.mjs', score: 800 }, { path: 'C:/x/docs/launcher.md', name: 'launcher.md', score: 600 }] : [];
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ query: q, count: hits.length, total: 2, hits }));
+      return;
     }
     if (pathname === '/turnstile/slot-map') {
-      // 真实落盘（之前只有宿主里那版，e2e 用的是假响应，等于没覆盖）
       const file = join(state || dir, 'slot-map-fixture.json');
       if (req.method === 'GET') {
         if (!existsSync(file)) return json(200, { status: 'not-generated' });
@@ -58,18 +115,11 @@ export function createConsoleServer({ profileDir, stateDir } = {}) {
       }
       if (req.method !== 'POST') return json(405, { error: 'method' });
       let body = '';
-      await new Promise((r) => { req.on('data', (c) => { body += c; if (body.length > 1e6) req.destroy(); }); req.on('end', r); });
+      await new Promise((r2) => { req.on('data', (c) => { body += c; if (body.length > 1e6) req.destroy(); }); req.on('end', r2); });
       let parsed; try { parsed = JSON.parse(body); } catch (e) { return json(400, { error: 'body 不是 JSON' }); }
       if (!parsed || !Array.isArray(parsed.slots)) return json(400, { error: '缺少 slots 数组' });
       writeFileSync(file, JSON.stringify({ at: new Date().toISOString(), slots: parsed.slots }));
       return json(200, { ok: true, file, slots: parsed.slots.length });
-    }
-    if (pathname === '/turnstile/search') {
-      const q = (new URL(req.url, 'http://x').searchParams.get('q') || '');
-      const hits = q ? [{ path: 'C:/x/tools/launcher.mjs', name: 'launcher.mjs', score: 800 }, { path: 'C:/x/docs/launcher.md', name: 'launcher.md', score: 600 }] : [];
-      res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ query: q, count: hits.length, total: 2, hits }));
-      return;
     }
     if (pathname === '/turnstile/health') {
       const mod = await import(pathToFileURL(join(root, 'plugins', 'turnstile-popup', 'lib', 'health.js')).href);
