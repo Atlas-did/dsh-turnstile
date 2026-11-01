@@ -10,6 +10,8 @@ import { ROOT as root, DSH_BIN, DSH_HOME, loadYaml } from './config.mjs';
 import { scanUi } from './lib/ui-scan.mjs';
 import { checkCompatibility, runtimeVersion } from './version.mjs';
 import { patchFiles } from './lib/patch-files.mjs';
+import { collectHealth } from '../plugins/turnstile-popup/lib/health-collect.js';
+import { issuesFromHealth, groupIssues, issueDetail } from '../plugins/turnstile-popup/lib/health-issues.js';
 // 缺依赖时不能顶层崩（外部审查：那会让「环境问题」冒充 verdict:fail + 一行文件路径）
 let yaml, schema;
 try {
@@ -142,8 +144,15 @@ if (process.argv.includes('--json')) {
   for (const d of dups) findings.push({ checker: 'providers', severity: 'warn', id: 'route-dup-' + d[0], title: '模型 id ' + d[0] + ' 在 ' + d[1].size + ' 个路由重复', evidence: [...d[1]], falsifier: '只保留一个路由里的该模型即为误报' });
   for (const h of hot) findings.push({ checker: 'ui-surface', severity: 'warn', id: 'ui-hot-' + h[0], title: h[0] + ' 被 ' + h[1] + ' 个插件注入', evidence: ['ui-scan surfaces'], falsifier: '把其中一个插件换到别的面后，本条消失' });
   for (const off of userOff) findings.push({ checker: 'manage', severity: 'warn', id: 'disabled-' + off, title: off + ' 被手动停用', evidence: ['cordis.patch.yml disabled:true'], falsifier: '启用后本条消失' });
+  // 与宿主/独立控制台同一份 issue（方案 02 验收：CLI 与 UI 产生同一 issue ID）
+  let healthIssues = [];
+  try {
+    const items = collectHealth({ profileDir, hostBases: [DSH_BIN].filter(Boolean) }).items;
+    healthIssues = issuesFromHealth(items, { source: 'doctor' }).map((x) => Object.assign({}, x, { detail: issueDetail(x) }));
+  } catch (e) { healthIssues = []; if (process.env.TS_DEBUG) console.error('health issues failed: ' + (e && e.message)); }
   realLog(JSON.stringify({
     profile: profileName, runtime: hostVer,
+    issues: healthIssues, issueGroups: groupIssues(healthIssues),
     verdict: warn === 0 ? 'ok' : (skipped.length ? 'fail' : 'warn'),
     summary: warn === 0 ? '干净' : warn + ' 处需要看一眼（停用 ' + userOff.length + ' / 路由重名 ' + dups.length + ' / UI 抢占 ' + hot.length + ' / 引擎跳过 ' + skipped.length + '）',
     findings, next: warn === 0 ? [] : [{ label: '看完整闸门', command: 'node tools/turnstile.mjs gate <profile> --json', mutating: false, reason: 'doctor 是概览，gate 有逐项检查' }],
