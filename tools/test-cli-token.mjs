@@ -19,7 +19,10 @@ const run = (args) => {
 };
 
 // 先把目标恢复成启用态，保证 dry-run 走「会改动」的分支
-run(['manage-enable', fixture, 'plug-beta', '--apply', '--token', JSON.parse(run(['manage-enable', fixture, 'plug-beta', '--dry-run']).out).applyToken]);
+// C-09：初始化写入必须检查返回码——它失败时后面的断言会「因为状态本来就是对的」而假绿
+const initDry = run(['manage-enable', fixture, 'plug-beta', '--dry-run']);
+const initApply = initDry.code === 0 ? run(['manage-enable', fixture, 'plug-beta', '--apply', '--token', JSON.parse(initDry.out).applyToken]) : { code: -1, out: 'dry-run 就没成功' };
+ok('前置：目标确实恢复成启用态（初始化写入检查返回码）', initDry.code === 0 && initApply.code === 0, ('dry=' + initDry.code + ' apply=' + initApply.code + ' ' + String(initApply.out || '').trim()).slice(0, 90));
 const noToken = run(['manage-disable', fixture, 'plug-beta', '--apply']);
 ok('写操作无 token → exit 2', noToken.code === 2, String(noToken.code));
 ok('拒绝原因指向 --dry-run', /--dry-run/.test(noToken.out), noToken.out.trim().slice(0, 30));
