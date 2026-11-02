@@ -58,6 +58,26 @@ ok('--write 写出机器与卡片两个文件', wrote.code === 0 && files.length
 const check = await run([profileDir, '--state', stateDir, '--check']);
 ok('--check 报 current', check.code === 0 && /"current"/.test(check.out), check.out.slice(0, 60));
 
+
+// 采纳流：--plan 出计划+token，--apply 必须带 token，且机器/卡片 digest 变了就拒绝
+const stateDir2 = join(tmp, 'state2');
+const planOut = await run([profileDir, '--state', stateDir2, '--plan']);
+let plan2 = null;
+try { plan2 = JSON.parse(planOut.out.slice(planOut.out.indexOf('{'), planOut.out.lastIndexOf('}') + 1)); } catch {}
+ok('--plan 给出计划与 token', planOut.code === 0 && plan2 && plan2.token && plan2.plan.cardDigest, String(planOut.code));
+ok('--plan 不落盘', !existsSync(join(stateDir2, 'provision')));
+const noToken = await run([profileDir, '--state', stateDir2, '--apply']);
+ok('--apply 不带 token 被拒', noToken.code === 2, String(noToken.code));
+const withToken = await run([profileDir, '--state', stateDir2, '--apply', '--token', plan2.token]);
+ok('带正确 token 的 apply 成功', withToken.code === 0 && existsSync(join(stateDir2, 'provision')), String(withToken.code));
+const reuse = await run([profileDir, '--state', stateDir2, '--apply', '--token', plan2.token]);
+ok('token 只能消费一次', reuse.code !== 0, String(reuse.code));
+const plan3 = await run([profileDir, '--state', stateDir2, '--plan']);
+const p3 = JSON.parse(plan3.out.slice(plan3.out.indexOf('{'), plan3.out.lastIndexOf('}') + 1));
+writeFileSync(join(profileDir, 'package.json'), JSON.stringify({ name: 'p', version: '0.0.2', dsh: { profile: { bundles: ['plug-a'] } } }));
+const changed = await run([profileDir, '--state', stateDir2, '--apply', '--token', p3.token]);
+ok('计划后卡片内容变化 → token 不匹配被拒', changed.code !== 0 && /不匹配|无效/.test(changed.out), changed.out.slice(0, 60));
+rmSync(stateDir2, { recursive: true, force: true });
 rmSync(tmp, { recursive: true, force: true });
 console.log(fail ? 'PROVISION_FAILED ' + fail : 'PROVISION_OK');
 process.exitCode = fail ? 1 : 0;

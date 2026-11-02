@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { issue, verify } from './lib/apply-token.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -125,9 +126,25 @@ if (isMain) {
     process.exit(stale.isStale ? 1 : 0);
   }
 
-  if (has('--write')) {
+  // 采纳也进确认流：--plan 出计划并发一次性 token；--apply 必须带 token 且环境未变
+  const plan = { action: 'provision-write', profile: card.profile, machineDigest: machine.probeDigest, cardDigest: card.cardDigest, runtimeFingerprint: card.runtimeFingerprint, stateDir };
+  if (has('--plan')) {
+    const issued = issue('provision', plan);
+    console.log(JSON.stringify({ ok: true, dryRun: true, plan, token: issued.token, expiresAt: issued.expiresAt, ttlMs: issued.ttlMs }, null, 2));
+    process.exit(0);
+  }
+
+  if (has('--apply') || has('--write')) {
+    const token = val('--token');
+    if (token) {
+      const checked = verify(token, 'provision', plan);
+      if (!checked.ok) { console.error(checked.reason); process.exit(1); }
+    } else if (!has('--write')) {
+      console.error('--apply 需要 --token（先跑 --plan）');
+      process.exit(2);
+    }
     const files = writeCards(machine, card, stateDir);
-    console.log(JSON.stringify({ ok: true, wrote: files, machineDigest: machine.probeDigest, cardDigest: card.cardDigest }, null, 2));
+    console.log(JSON.stringify({ ok: true, wrote: files, machineDigest: machine.probeDigest, cardDigest: card.cardDigest, confirmed: Boolean(token) }, null, 2));
     process.exit(0);
   }
 
