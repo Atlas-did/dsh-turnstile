@@ -22,6 +22,7 @@ for (const [name, path, w, h] of [
   ['builder-narrow', '/turnstile/builder', 390, 760],
 ]) {
   const page = await browser.newPage({ viewport: { width: w, height: h } });
+  await page.setExtraHTTPHeaders({ 'x-turnstile-token': server.turnstileToken });
   await page.goto(base + path, { waitUntil: 'networkidle' }).catch(() => {});
   await page.waitForTimeout(700);
   const file = join(outDir, name + '.png');
