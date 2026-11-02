@@ -94,6 +94,19 @@ function table(headers,rows){const t=node('table',{class:'data-table'});t.append
 function row(cells,onClick,testid,className='',onContext=null){const tr=node('tr',{class:className,'data-testid':testid,tabindex:'0',onclick:e=>onClick(e),oncontextmenu:onContext,onkeydown:e=>{if(e.key==='Enter')onClick();}});cells.forEach(c=>tr.append(node('td',{},[c??'—'])));return tr;}
 function deltaStrip(){const d=state.delta;if(!d)return null;const parts=[];if(d.added.length)parts.push('＋'+d.added.length+' 新增');if(d.removed.length)parts.push('－'+d.removed.length+' 消失');if(d.toggled.length)parts.push('⟳'+d.toggled.length+' 状态变化');if(d.moved.length)parts.push('↔'+d.moved.length+' 位置变化');return node('div',{class:'delta-strip','data-testid':'delta-strip',text:d.firstRun?'首次采样：已建立本地基线；下次刷新开始比较。':'自上次快照：'+(parts.join(' · ')||'无变化')+(d.at?'（'+new Date(d.at).toLocaleTimeString()+'）':'')});}
 function pluginDeltaClass(name){const d=state.delta;if(!d||d.firstRun)return'';if(d.added.includes(name))return'delta-added';if(d.toggled.some(x=>x.name===name))return'delta-toggled';if(d.moved.some(x=>x.name===name))return'delta-moved';return'';}
+
+// ── 公共列表状态条（方案 01-C） ──
+// kind: data | no-match | failed | unknown
+function listStatus(view,{shown,total,selected,kind}){
+  const parts=['筛选后 '+shown+' / 共 '+total];
+  if(selected!=null) parts.push('已选 '+selected+' 个');
+  const bar=node('div',{class:'list-status','data-testid':'list-status-'+view,text:parts.join(' · ')});
+  const clear=btn('清除筛选',()=>{state.query='';state.pluginStatus='all';$('global-search').value='';render();},'list-clear-'+view);
+  bar.append(clear);
+  bar.append(node('span',{class:'hint','data-testid':'selection-summary',text:'已选 '+(selected==null?0:selected)+' 个'}));
+  if(kind&&kind!=='data') bar.append(node('span',{class:'hint','data-testid':'list-empty-kind-'+view,text:({ 'no-match':'没有匹配项', failed:'读取失败', unknown:'数据未知' })[kind]||kind}));
+  return bar;
+}
 function empty(text){return node('div',{class:'empty','data-testid':'empty',text});}
 function setStatus(shown,total){$('counts').textContent=shown+' / '+total+' 项';$('generated').textContent=state.data?'快照 '+new Date(state.data.generatedAt).toLocaleTimeString():'';}
 
@@ -312,7 +325,9 @@ function plugins(){
   const selectEl=node('select',{class:'select','data-testid':'plugin-status',onchange:e=>{state.pluginStatus=e.target.value;render();}},[['all','全部状态'],['enabled','配置启用'],['disabled','已停用'],['missing','未安装']].map(([v,t])=>node('option',{value:v,text:t,selected:state.pluginStatus===v?'selected':null})));
   $('main').append(node('div',{class:'toolbar'},[selectEl,node('span',{class:'hint',text:'青色=新增；黄色=状态变化；蓝色=位置变化。'})]));
   const headers=[{label:'插件',key:'name'},{label:'版本',key:'version'},{label:'状态',key:'status'},{label:'配置行',key:'rows'},{label:'UI 面',key:'ui'}];
-  $('main').append(node('p',{class:'hint','data-testid':'selection-summary',text:selectionText()}));
+  const selCount=(state.multi&&state.multi.size)||(state.selected?1:0);
+  const kind=all.length? (state.data.plugins.length?'data':'unknown') : 'no-match';
+  $('main').append(listStatus('plugins',{shown:all.length,total:state.data.plugins.length,selected:selCount,kind}));
   $('main').append(panel('插件清单 · '+all.length+' / '+state.data.plugins.length,all.length?table(headers,all.map(p=>row([node('span',{class:'mono','data-testid':'plugin-name-'+p.name,style:'cursor:pointer;text-decoration:underline dotted',title:'点击看实现骨架',text:p.name,onclick:()=>openSkeleton(p.name)}),p.version||'—',chip(p.missing?'未安装':p.disabled?'停用':'启用',p.missing||p.disabled?'bad':'good'),String(p.rows.length),String(p.ui.length)],(ev)=>{pickPlugin(p,ev);select(selectionForPlugin(p));},'plugin-'+p.name,pluginDeltaClass(p.name)+(state.selected?.title===p.name?' selected':''),e=>{e.preventDefault();select(selectionForPlugin(p));state.context={x:Math.min(e.clientX,innerWidth-200),y:Math.min(e.clientY,innerHeight-160),plugin:p};renderOverlays();}))):empty('没有匹配的插件。')));
   setStatus(all.length,state.data.plugins.length);
 }

@@ -452,6 +452,7 @@ try {
       const noticeText = await page.locator('body').innerText();
       ok('点击动作只提示不写入', /只生成计划/.test(noticeText), noticeText.slice(0, 60));
     }
+
     ok('narrow console hides nav and inspector by default', !(await page.locator('.sidebar').isVisible()) && !(await page.locator('#inspector').isVisible()));
     await page.locator('[data-testid="toggle-nav"]').click();
     await page.waitForTimeout(200);
@@ -465,6 +466,20 @@ try {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.waitForTimeout(200);
     ok('wide console shows nav and inspector again', await page.locator('.sidebar').isVisible() && await page.locator('#inspector').isVisible());
+    // 列表状态条（方案 01-C）：筛选后/总数、清除筛选、无匹配态
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.waitForTimeout(300);
+    await click('[data-testid="nav-plugins"]');
+    await page.waitForTimeout(300);
+    const statusText = await text('[data-testid="list-status-plugins"]');
+    ok('插件页有统一状态条', /筛选后 \d+ \/ 共 \d+/.test(statusText), statusText.slice(0, 40));
+    await page.locator('[data-testid="global-search"]').fill('zzz-no-such-plugin');
+    await page.waitForTimeout(400);
+    const emptyKind = await text('[data-testid="list-empty-kind-plugins"]').catch(() => '');
+    ok('无匹配时状态条说明原因', /没有匹配项/.test(emptyKind), emptyKind);
+    await page.locator('[data-testid="list-clear-plugins"]').click();
+    await page.waitForTimeout(400);
+    ok('清除筛选后回到全量', /筛选后 \d+ \/ 共 \d+/.test(await text('[data-testid="list-status-plugins"]')));
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {
