@@ -24,8 +24,9 @@ const ok = (name, condition, detail = '') => {
 try {
   browser = await chromium.launch({ channel: 'msedge', headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  // 令牌挂在 context 上：预览会新开一个 page，page 级头带不过去
+  await context.setExtraHTTPHeaders({ 'x-turnstile-token': server.turnstileToken });
   const page = await context.newPage();
-  await page.setExtraHTTPHeaders({ 'x-turnstile-token': server.turnstileToken });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(base + '/', { waitUntil: 'domcontentloaded' });

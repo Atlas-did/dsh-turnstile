@@ -26,7 +26,7 @@ writeFileSync(join(stateDir, 'hooks.json'), JSON.stringify({ rules: [
 const server = createConsoleServer({ profileDir, stateDir });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = 'http://127.0.0.1:' + server.address().port;
-const hooksRes = await fetch(base + '/turnstile/hooks');
+const hooksRes = await fetch(base + '/turnstile/hooks', { headers: { 'x-turnstile-token': server.turnstileToken } });
 const hooksJson = await hooksRes.json();
 console.log('rules source:', hooksJson.source, 'count:', hooksJson.rules.length);
 

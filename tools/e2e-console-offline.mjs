@@ -102,7 +102,7 @@ try {
     ok('active navigation exposes its page to assistive technology', await page.locator('[data-testid="nav-overview"]').getAttribute('aria-current') === 'page');
     ok('the product shell has a visible identity', await page.locator('.brand-mark').isVisible());
     ok('plugin action is disabled without a selection', await page.locator('[data-testid="toggle-plugin"]').isDisabled());
-    const snapshot = await (await page.request.get(base + '/api/console')).json();
+    const snapshot = await (await page.request.get(base + '/api/console', { headers: { 'x-turnstile-token': server.turnstileToken } })).json();
     ok('arbitrary config fields become drillable nodes', ['density', 'route'].every((key) => snapshot.architecture.nodes.some((n) => n.id.endsWith(':config:' + key))));
     const slotSource = snapshot.architecture.nodes.find((n) => n.id === 'plugin:0:client:surface:0:row:0:config:slot:source');
     ok('config source points to its exact YAML line', slotSource?.source?.line === 5, JSON.stringify(slotSource?.source));
@@ -273,7 +273,7 @@ try {
     ok('view change is persisted', Boolean(saved) && saved.view === 'plugins', saved ? saved.view : 'not written');
 
     rmSync(patchPath);
-    const noPatchResponse = await page.request.post(base + '/turnstile/toggle', { data: { package: 'plug-alpha', disable: true, dryRun: false } });
+    const noPatchResponse = await page.request.post(base + '/turnstile/toggle', { headers: { 'x-turnstile-token': server.turnstileToken }, data: { package: 'plug-alpha', disable: true, dryRun: false } });
     ok('first disable creates a missing patch without a backup error', noPatchResponse.ok() && /disabled: true/.test(readFileSync(patchPath, 'utf8')));
     // A plugin with no config row cannot be patched: the action must be disabled and say why.
     await click('[data-testid="nav-plugins"]');
