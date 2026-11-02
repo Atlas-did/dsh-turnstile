@@ -375,7 +375,17 @@ function inspectorEntries(s){const model=(window.TurnstileInspector?window.Turns
 
 function inspectorFindings(s){if(!s.findings)return null;const items=s.findings.length?s.findings.map(f=>node('div',{class:'finding'},[node('div',{text:f.message||'未提供描述'}),findingLinkNode(f),node('pre',{text:JSON.stringify(f.evidence||{},null,2)}),f.fix?.snippet?node('pre',{text:f.fix.snippet}):null])):[node('p',{class:'hint',text:'没有发现。'})];return node('div',{class:'prop-group'},[node('div',{class:'prop-title',text:'发现 · '+s.findings.length}),...items]);}
 
-function inspectorProperties(s,box){const entries=inspectorEntries(s);const list=entries.length?entries.flatMap(([k,v])=>[node('div',{class:'prop'},[node('dt',{text:k}),node('dd',{text:String(v)})])]):[node('p',{class:'hint',text:'没有额外属性。'})];box.append(node('div',{class:'prop-group'},[node('div',{class:'prop-title',text:'值 / 状态 / 位置'}),node('dl',{},list)]));const findings=inspectorFindings(s);if(findings)box.append(findings);}
+// 安装后状态（只读）：三态必须能区分，unknown 不能画成正常。
+function inspectorInstall(s,box){
+  const inst=state.data&&state.data.install;
+  if(!inst||!s||!s.plugin)return;
+  const verdict=inst.pendingRestart===true?'已写入，等待重启':inst.pendingRestart===false?'宿主已重启，写入已生效':'无法判断';
+  const rows=[['状态',verdict],['依据',inst.reason||'未提供']];
+  if(inst.at)rows.push(['最后一次写入',String(inst.at)]);
+  box.append(node('div',{class:'prop-group','data-testid':'install-state'},[node('div',{class:'prop-title',text:'安装后状态（只读）'}),node('dl',{},rows.flatMap(([k,v])=>[node('div',{class:'prop'},[node('dt',{text:k}),node('dd',{text:String(v)})])]))]));
+}
+
+function inspectorProperties(s,box){const entries=inspectorEntries(s);const list=entries.length?entries.flatMap(([k,v])=>[node('div',{class:'prop'},[node('dt',{text:k}),node('dd',{text:String(v)})])]):[node('p',{class:'hint',text:'没有额外属性。'})];box.append(node('div',{class:'prop-group'},[node('div',{class:'prop-title',text:'值 / 状态 / 位置'}),node('dl',{},list)]));const findings=inspectorFindings(s);if(findings)box.append(findings);inspectorInstall(s,box);}
 
 function inspectorToggleAction(s){const acts=(window.TurnstileInspector?window.TurnstileInspector.buildInspector(s,state.data).actions:[]);const pick=(id)=>acts.find(a=>a.id===id);const cap=pick('toggle')||{enabled:(s.plugin.rows||[]).length>0,reason:(s.plugin.rows||[]).length?'':'该插件没有 profile 行'};const b=btn(s.plugin.disabled?'预览启用 patch':'预览停用 patch',()=>previewToggle(s.plugin),'action-toggle','btn'+(s.plugin.disabled?'':' danger'));if(!cap.enabled){b.disabled=true;b.dataset.reason=cap.reason;}return{button:b,reason:cap.enabled?null:cap.reason};}
 
