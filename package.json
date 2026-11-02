@@ -163,7 +163,7 @@
     "plugins",
     "skills",
     "recommendations",
-    "tests",
+    "tests/console-fixture",
     "docs",
     "README.md",
     "README.en.md",

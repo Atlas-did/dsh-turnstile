@@ -14,15 +14,25 @@ export const PACK_NAME_RULES = [
   { id: 'debug-script', re: /(^|\/)_[a-z0-9]+\.mjs$/, why: '根目录调试脚本' },
 ];
 
+// 占位符不是泄漏：文档与脚本里写 <user>/<you>/example/$HOME 是刻意的示例。
+const PLACEHOLDER = /<[^>]*>|\bexample\b|\$\{?[A-Z_]+\}?/i;
+const isPlaceholder = (s) => PLACEHOLDER.test(String(s));
+
+// 二进制文件不参与正文规则：PNG 本来就含 NUL，按文本读只会产生假阳性。
+const BINARY_FILE = /\.(png|jpe?g|gif|webp|ico|woff2?|zip|pdf|mp4|zip)$/i;
+
 export function scanPack({ files, readText = () => '' }) {
   const findings = [];
   for (const file of files || []) {
     for (const rule of PACK_NAME_RULES) if (rule.re.test(file)) findings.push({ file, rule: rule.id, why: rule.why });
+    if (BINARY_FILE.test(file)) continue; // 只做文件名规则
     let text = '';
     try { text = String(readText(file) || ''); } catch { findings.push({ file, rule: 'unreadable', why: '清单里有但读不到' }); continue; }
     for (const rule of PACK_RULES) {
       const m = text.match(rule.re);
-      if (m) findings.push({ file, rule: rule.id, why: rule.why, excerpt: String(m[0]).slice(0, 60) });
+      if (!m) continue;
+      if (rule.id === 'personal-path' && isPlaceholder(m[0])) continue; // 占位符跳过
+      findings.push({ file, rule: rule.id, why: rule.why, excerpt: String(m[0]).slice(0, 60) });
     }
   }
   return { ok: findings.length === 0, findings, scanned: (files || []).length };

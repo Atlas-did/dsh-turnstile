@@ -27,5 +27,7 @@ ok('备份/临时/调试脚本按文件名被抓', ['backup-file', 'debug-script
 ok('有问题就不算通过', dirty.ok === false);
 const unreadable = scanPack({ files: ['gone.js'], readText: () => { throw new Error('nope'); } });
 ok('清单里有但读不到 → 也算问题（不静默跳过）', unreadable.ok === false && unreadable.findings[0].rule === 'unreadable');
+ok('占位符不算泄漏', scanPack({ files: ['a.js'], readText: () => 'C:/Users/<user>/x' }).ok === true);
+ok('二进制文件不做正文扫描（PNG 不是泄漏）', scanPack({ files: ['docs/img/a.png'], readText: () => '\u0000PNG' }).ok === true);
 console.log(fail ? 'PACK_PRIVACY_FAILED ' + fail : 'PACK_PRIVACY_RULES_OK');
 process.exitCode = fail ? 1 : 0;
