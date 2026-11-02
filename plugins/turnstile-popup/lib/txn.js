@@ -67,6 +67,14 @@ export function applyPlan(plan, { confirm, healthCheck } = {}) {
   if (existsSync(lock)) return fail('another mutation holds the lock');
   try { writeFileSync(lock, String(process.pid)); } catch (e) { return fail('cannot take lock: ' + e.message); }
   evidence.steps.push({ step: 'lock', ok: true, lock });
+  // 拿到锁之后再验一次：从上面那次读到拿锁之间有窗口，别人可能已经改过文件（C-03）
+  const lockedText = existsSync(plan.file) ? readFileSync(plan.file, 'utf8') : null;
+  const lockedSha = lockedText === null ? null : sha(lockedText);
+  if (lockedSha !== plan.beforeSha) {
+    releaseLock(plan.file);
+    return fail('precondition changed while waiting for the lock');
+  }
+  evidence.steps.push({ step: 'precondition-after-lock', ok: true, beforeSha: plan.beforeSha });
 
   const backup = plan.file + '.bak-' + Date.now();
   const tmp = plan.file + '.tmp-' + process.pid;
@@ -106,7 +114,8 @@ export function applyPlan(plan, { confirm, healthCheck } = {}) {
       return fail('health check failed');
     }
   } else {
-    evidence.steps.push({ step: 'health', ok: true, detail: 'no health check supplied' });
+    // 没有健康检查就是「没做」，不能记成通过（C-03）
+    evidence.steps.push({ step: 'health', ok: null, detail: 'not-run: no health check supplied' });
   }
 
   evidence.applied = true;
