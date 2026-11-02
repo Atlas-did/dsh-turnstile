@@ -42,6 +42,13 @@ export function stateFromLayer(status) {
   return 'not-run';
 }
 
+// 验证层级 → 处理阶段：L0 静态、L1 写入、L2-L4 运行态、L5 写后回归。
+// 未知层级落到 discover，不静默接受，也不猜成某个具体阶段。
+export const PHASE_BY_LEVEL = { L0: 'static', L1: 'manifest', L2: 'runtime', L3: 'runtime', L4: 'runtime', L5: 'post-change' };
+export function phaseForLevel(level) {
+  return PHASE_BY_LEVEL[String(level || '')] || 'discover';
+}
+
 // 汇总：任何一个 state 都不能被压缩成"通过"
 export function summarizePhases(results = []) {
   const counts = Object.fromEntries(STATES.map((s) => [s, 0]));
