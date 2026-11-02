@@ -61,17 +61,17 @@ function tokenSuffix(){const t=new URLSearchParams(location.search).get('token')
 function snapshotOf(d){const out={};const positions={};(d.occupancy?.surfaces||[]).forEach(s=>Object.entries(s.anchors||{}).forEach(([name,anchor])=>{if(anchor)positions[name]=anchor;}));d.plugins.forEach(p=>{out[p.name]={state:p.missing?'missing':p.disabled?'off':'on',position:positions[p.name]||''};});return out;}
 function deltaOf(current,previous){const delta={firstRun:!previous,at:previous?.at||null,added:[],removed:[],toggled:[],moved:[]};if(!previous?.rows)return delta;for(const [name,row] of Object.entries(current)){const old=previous.rows[name];if(!old)delta.added.push(name);else{if(old.state!==row.state)delta.toggled.push({name,from:old.state,to:row.state});if(old.position!==row.position)delta.moved.push({name,from:old.position||'未设置',to:row.position||'未设置'});}}for(const name of Object.keys(previous.rows))if(!current[name])delta.removed.push(name);return delta;}
 function selectionForPlugin(p){return{title:p.name,kind:'plugin',plugin:p,properties:{名称:p.name,版本:p.version||'未安装',状态:p.missing?'未安装':p.disabled?'已停用':'配置启用',行ID:p.rows.join(', ')||'无',UI面:p.ui.join(', ')||'无',引擎范围:p.engineRange||'未声明'},source:{file:p.manifest,line:1},archId:p.architectureId};}
-async function load(){state.busy=true;renderTop();try{const r=await fetch(apiUrl()+tokenSuffix(),{credentials:'include'});if(!r.ok)throw new Error('HTTP '+r.status);const next=await r.json();const key='turnstile.console.seen.'+next.profile.name;let previous=null;try{previous=JSON.parse(localStorage.getItem(key)||'null');}catch{}const rows=snapshotOf(next);state.delta=deltaOf(rows,previous);try{localStorage.setItem(key,JSON.stringify({at:new Date().toISOString(),rows}));}catch{}state.data=next;if(!next.architecture.nodes.some(n=>n.id===state.archId))state.archId=next.architecture.rootId;if(state.selected?.kind==='plugin'){const p=next.plugins.find(x=>x.name===state.selected.title);state.selected=p?selectionForPlugin(p):null;}else if(state.selected?.archId){const n=next.architecture.nodes.find(x=>x.id===state.selected.archId);state.selected=n?selectionForNode(n):null;}$('connection').textContent='数据已读取';document.body.dataset.health='ok';}catch(e){$('connection').textContent='读取失败：'+(e.message||e);document.body.dataset.health='failed';state.notice=String(e.message||e);$('counts').textContent='读取失败';}finally{state.busy=false;render();}}
+async function load(){state.busy=true;renderTop();try{const r=await fetch(apiUrl()+tokenSuffix(),{credentials:'include'});if(!r.ok)throw new Error('HTTP '+r.status);const next=await r.json();const key='turnstile.console.seen.'+next.profile.name;let previous=null;try{previous=JSON.parse(localStorage.getItem(key)||'null');}catch{}const rows=snapshotOf(next);state.delta=deltaOf(rows,previous);try{localStorage.setItem(key,JSON.stringify({at:new Date().toISOString(),rows}));}catch{}state.data=next;if(!next.architecture.nodes.some(n=>n.id===state.archId))state.archId=next.architecture.rootId;if(state.selected?.kind==='plugin'){const p=next.plugins.find(x=>x.name===state.selected.title);state.selected=p?selectionForPlugin(p):null;}else if(state.selected?.archId){const n=next.architecture.nodes.find(x=>x.id===state.selected.archId);state.selected=n?selectionForNode(n):null;}$('connection').textContent='数据已读取';document.body.dataset.health='ok';}catch(e){$('connection').textContent='读取失败：'+(e.message||e);document.body.dataset.health='failed';state.notice=String(e.message||e);$('counts').textContent='读取失败';}finally{state.busy=false;applyNavHash();render();syncNavHash();}}
 async function toggleRequest(plugin,dryRun){const r=await fetch('/turnstile/toggle'+tokenSuffix(),{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({package:plugin.name,disable:!plugin.disabled,dryRun})});const d=await r.json();if(!r.ok)throw new Error(d.error||'HTTP '+r.status);return d;}
 async function previewToggle(plugin){if(!plugin||plugin.missing||!plugin.row)return;state.busy=true;state.context=null;renderTop();try{const result=await toggleRequest(plugin,true);state.patchPreview={plugin,disable:!plugin.disabled,before:result.before,after:result.after};}catch(e){state.notice='生成 patch 预览失败：'+e.message;}finally{state.busy=false;render();}}
 async function applyToggle(){const preview=state.patchPreview;if(!preview)return;state.busy=true;try{await toggleRequest(preview.plugin,false);state.notice=(preview.disable?'已停用 ':'已启用 ')+preview.plugin.name+'；已留备份，重启 mini 后生效。';state.patchPreview=null;await load();}catch(e){state.notice='应用失败：'+e.message;}finally{state.busy=false;render();}}
 function persistView(){try{clearTimeout(window.__viewTimer);window.__viewTimer=setTimeout(()=>{fetch('/turnstile/view-state'+tokenSuffix(),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({view:state.view,query:state.query,status:state.pluginStatus,sortKey:state.sort.key,sortDir:state.sort.dir})}).catch(()=>{});},400);}catch(e){}}
 async function restoreView(){try{const r=await fetch('/turnstile/view-state'+tokenSuffix());if(!r.ok)return;const j=await r.json();const s=j&&j.state;if(!s)return;state.view=s.view||state.view;state.query=s.query||'';state.pluginStatus=s.status||state.pluginStatus;state.sort={key:s.sortKey||state.sort.key,dir:s.sortDir||state.sort.dir};const box=$('global-search');if(box)box.value=state.query;}catch(e){}}
-function setView(view){state.view=view;state.query='';$('global-search').value='';persistView();render();}
+function setView(view){state.view=view;state.query='';$('global-search').value='';persistView();render();syncNavHash();}
 function selectionForNode(n){return{title:n.label,kind:n.kind,properties:n.properties,source:n.source,archId:n.id};}
 function selectionText(){const S=window.TurnstileSelection;const pick=state.picked||{ids:[]};if(!S||pick.ids.length<2)return '';return S.describe(pick,state.data.plugins);}
 function pickPlugin(p,ev){const S=window.TurnstileSelection;if(!S)return;const order=state.data.plugins.map(x=>x.name);state.picked=S.select(state.picked||S.EMPTY,p.name,{ctrl:Boolean(ev&&(ev.ctrlKey||ev.metaKey)),shift:Boolean(ev&&ev.shiftKey),order});const el=document.querySelector('[data-testid="selection-summary"]');if(el)el.textContent=selectionText();}
-function select(item){state.selected=item;state.inspectorTab='properties';state.context=null;renderTop();renderInspector();document.querySelectorAll('tr.selected').forEach(x=>x.classList.remove('selected'));}
+function select(item){state.selected=item;state.inspectorTab='properties';state.context=null;syncNavHash();renderTop();renderInspector();document.querySelectorAll('tr.selected').forEach(x=>x.classList.remove('selected'));}
 function locate(id){if(!id)return;state.archId=id;state.view='architecture';const n=state.data.architecture.nodes.find(x=>x.id===id);state.selected=n?selectionForNode(n):null;state.query='';$('global-search').value='';render();}
 function renderTop(){const b=$('refresh');b.disabled=state.busy;b.textContent=state.busy?'读取中…':'↻ 刷新';document.body.classList.toggle('focus',state.focus);document.body.classList.toggle('hide-inspector',state.hideInspector);const p=state.selected?.kind==='plugin'?state.selected.plugin:null;const t=$('toggle-plugin');t.disabled=!p||p.missing||!p.row||state.busy;t.textContent=p?(p.disabled?'启用插件':'停用插件'):'停用插件';t.title=p?'生成 cordis.patch.yml 预览，确认后才写入 (Del)':'先选中一个插件';}
 function renderNav(){
@@ -98,6 +98,33 @@ function empty(text){return node('div',{class:'empty','data-testid':'empty',text
 function setStatus(shown,total){$('counts').textContent=shown+' / '+total+' 项';$('generated').textContent=state.data?'快照 '+new Date(state.data.generatedAt).toLocaleTimeString():'';}
 
 // ── 定位框（方案 01-A）与 URL 片段（01-B） ──
+
+// ── URL 定位：kind/id 恢复与回写（方案 01-B） ──
+function findNavObject(kind,id){
+  const d=state.data; if(!d) return null;
+  if(kind==='plugin'){const p=(d.plugins||[]).find(x=>x.name===id); return p?selectionForPlugin(p):null;}
+  if(kind==='surface'){const s=(d.surfaces||[]).find(x=>(x.surface||x)===id); return s?{title:s.surface,kind:'surface',properties:{UI面:s.surface,插件数:s.count}}:null;}
+  if(kind==='check'){const c=((d.report&&d.report.checks)||[]).find(x=>x.name===id); return c?{title:c.name,kind:'check',properties:{检查:c.name,结果:c.ok?'通过':'需检查'}}:null;}
+  return null;
+}
+function applyNavHash(){
+  const N=window.TurnstileConsoleNav; if(!N||!state.data) return;
+  const sel=N.parseHash(location.hash);
+  if(sel.view) state.view=sel.view;
+  if(sel.kind&&sel.id){
+    const obj=findNavObject(sel.kind,sel.id);
+    if(obj) state.selected=obj;
+    else state.notice='该对象已变化或不在本次数据中：'+sel.id;
+  }
+}
+function syncNavHash(){
+  const N=window.TurnstileConsoleNav; if(!N) return;
+  const s=state.selected||{};
+  const kind=s.kind||'';
+  const id=kind==='plugin'?(s.plugin&&s.plugin.name)||'':(kind?String(s.title||''):'');
+  const next=N.buildHash({view:state.view,kind,id});
+  try{ if(next&&next!==location.hash) window.history.replaceState(null,'',next); }catch(e){}
+}
 function navIndex(){
   const N=window.TurnstileConsoleNav; if(!N||!state.data) return [];
   const d=state.data;

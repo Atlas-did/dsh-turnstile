@@ -416,6 +416,25 @@ try {
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
     ok('Esc 关闭定位框', !(await page.locator('[data-testid="nav-palette"]').isVisible()));
+
+    // URL 定位恢复：直接带 hash 打开，应恢复到对应视图与对象
+    const u = new URL(page.url());
+    await page.evaluate(() => { location.hash = '#view=plugins&kind=plugin&id=dsh-free-search'; });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#connection')?.textContent === '数据已读取', null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+    const restoredView = await page.evaluate(() => document.querySelector('[data-testid="nav-plugins"]')?.getAttribute('aria-current') || '');
+    const restoredText = await page.locator('main').innerText();
+    ok('hash 恢复视图与选中对象', /dsh-free-search/.test(restoredText), restoredText.slice(0, 40));
+    await page.evaluate(() => { location.hash = '#view=plugins&kind=plugin&id=no-such-plugin-xyz'; });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#connection')?.textContent === '数据已读取', null, { timeout: 15000 });
+    await page.waitForTimeout(500);
+    const notice = await page.locator('body').innerText();
+    ok('对象不存在时明确提示而不是乱选', /该对象已变化或不在本次数据中/.test(notice), notice.slice(0, 60));
+    await page.evaluate(() => { location.hash = ''; });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#connection')?.textContent === '数据已读取', null, { timeout: 15000 });
     ok('narrow console hides nav and inspector by default', !(await page.locator('.sidebar').isVisible()) && !(await page.locator('#inspector').isVisible()));
     await page.locator('[data-testid="toggle-nav"]').click();
     await page.waitForTimeout(200);
