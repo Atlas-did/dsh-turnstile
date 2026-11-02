@@ -236,6 +236,19 @@ try {
     await click('[data-testid="nav-checks"]');
     await click('[data-testid="check-prompt-vars"]');
     ok('check row exposes finding evidence and fix', (await text('#inspector')).includes('unsupported variable') && (await text('#inspector')).includes('replace'));
+    ok('check states are shown per check, not as one pass', await page.evaluate(() => {
+      const saved = state.data.report;
+      state.data.report = { checks: [
+        { name: 'a', ok: true, state: 'unchanged', findings: [] },
+        { name: 'b', ok: false, state: 'not-run', findings: [] },
+        { name: 'c', ok: false, state: 'checker-error', findings: [] },
+      ] };
+      render();
+      const read = (n) => (document.querySelector('[data-testid="check-state-' + n + '"]') || {}).textContent || '';
+      const out = read('a').includes('无变化') && read('b').includes('未执行') && read('c').includes('检查器失败');
+      state.data.report = saved; render();
+      return out;
+    }));
     ok('checks view says there is no risk scan yet', await page.evaluate(() => !!document.querySelector('[data-testid="risk-empty"]')));
     ok('risk panel renders findings, delta and a locator link', await page.evaluate(() => {
       const saved = state.data.risk;
