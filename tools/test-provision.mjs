@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdi
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { probeMachine, probeProfile, staleness, digestOf, CAPABILITY_STATES } from './provision.mjs';
+import { probeMachine, probeProfile, staleness, digestOf, CAPABILITY_STATES, rollbackStaleCard } from './provision.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
@@ -84,6 +84,17 @@ const p3 = JSON.parse(plan3.out.slice(plan3.out.indexOf('{'), plan3.out.lastInde
 writeFileSync(join(profileDir, 'package.json'), JSON.stringify({ name: 'p', version: '0.0.2', dsh: { profile: { bundles: ['plug-a'] } } }));
 const changed = await run([profileDir, '--state', stateDir2, '--apply', '--token', p3.token]);
 ok('计划后卡片内容变化 → token 不匹配被拒', changed.code !== 0 && /不匹配|无效/.test(changed.out), changed.out.slice(0, 60));
+// C-05：复探不一致时必须回滚卡片，不能留一张看起来仍有效的卡
+const staleDir = mkdtempSync(join(tmpdir(), 'prov-stale-'));
+const staleCard = join(staleDir, 'profile-x.json');
+writeFileSync(staleCard, '{"profile":"x"}');
+const machineKeep = join(staleDir, 'machine-x.json');
+writeFileSync(machineKeep, '{"probeDigest":"d"}');
+const removed = rollbackStaleCard({ cardFile: staleCard, machineFile: machineKeep });
+ok('回滚删掉卡片', removed.cardFile === staleCard && !existsSync(staleCard));
+ok('机器快照保留（事实不删）', existsSync(machineKeep));
+rmSync(staleDir, { recursive: true, force: true });
+
 rmSync(stateDir2, { recursive: true, force: true });
 rmSync(tmp, { recursive: true, force: true });
 console.log(fail ? 'PROVISION_FAILED ' + fail : 'PROVISION_OK');

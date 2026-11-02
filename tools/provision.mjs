@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Provision：只读探测 → 机器快照 + profile 适配卡（方案 docs/186）。
-// 约束：探测不调用任何宿主副作用接口；不传 --write 时一个字节都不写。
+// 约束：探测不调用任何宿主副作用接口；只有 --apply --token 才写卡片。
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { issue, verify } from './lib/apply-token.mjs';
@@ -92,7 +92,16 @@ export function staleness(card, machine) {
   return { isStale: false, reason: '' };
 }
 
-/** 写卡片：只有显式 --write 才落盘；先打印摘要再写。 */
+/** 复探不一致时回滚：删掉卡片，保留机器快照（事实不必删除），返回删掉了什么。 */
+export function rollbackStaleCard(files) {
+  const out = { cardFile: null };
+  try {
+    if (files && files.cardFile && existsSync(files.cardFile)) { unlinkSync(files.cardFile); out.cardFile = files.cardFile; }
+  } catch { /* 删不掉就如实返回 null，调用方按失败处理 */ }
+  return out;
+}
+
+/** 写卡片：只有显式 --apply --token 才落盘；先打印摘要再写。 */
 export function writeCards(machine, card, stateDir) {
   const dir = join(stateDir, 'provision');
   mkdirSync(dir, { recursive: true });
@@ -154,7 +163,13 @@ if (isMain) {
     const recheck = staleness(JSON.parse(readFileSync(files.cardFile, 'utf8')), again);
     const verdict = recheck.isStale ? 'stale' : 'current';
     console.log(JSON.stringify({ ok: !recheck.isStale, wrote: files, machineDigest: machine.probeDigest, cardDigest: card.cardDigest, confirmed: Boolean(token), recheck: { verdict, reason: recheck.reason } }, null, 2));
-    if (recheck.isStale) { console.error('写后复探不一致：' + recheck.reason + '（卡片已写入，但请重新 provision）'); process.exit(1); }
+    if (recheck.isStale) {
+      // C-05：复探不一致时不能留一张「看起来仍有效」的卡。删掉卡片文件（机器快照是事实，保留），
+      // 让磁盘状态与结论一致：要么 current，要么没有卡。
+      const removed = rollbackStaleCard(files);
+      console.error('写后复探不一致：' + recheck.reason + '（已回滚卡片：' + (removed.cardFile || '无') + '；请重新 provision）');
+      process.exit(1);
+    }
     process.exit(0);
   }
 
