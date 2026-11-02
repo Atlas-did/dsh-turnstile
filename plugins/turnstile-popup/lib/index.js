@@ -10,6 +10,7 @@ import { validatePageTree } from "./page-validate.js";
 import { readPage, writePage } from "./page-store.js";
 import { readJsonBody, readJsonText, BODY_TOO_LARGE } from "./body.js";
 import { resolveAsset } from "./asset-path.js";
+import { resolveEnvironment, environmentForDir, defaultMiniHome } from "./environments.js";
 import { collectConsoleData } from "./console-data.js";
 import { readViewState, writeViewState } from "./view-state.js";
 import { toggleText } from "./toggle-text.js";
@@ -268,6 +269,20 @@ export function apply(ctx, config) {
   const home = process.env.DSH_HOME || join(process.env.USERPROFILE || "", ".dsh");
   const profile = (config && config.profile) || "mini";
   const dir = join(home, "profiles", profile);
+  // 环境选择（合并自 source-current）：?env= 只能选枚举里的 ID；非法即 400，不回退、不回传路径。
+  const miniHome = process.env.MINI_HOME || defaultMiniHome({ homeDir: process.env.USERPROFILE || process.cwd() });
+  const environmentOptions = { home, miniHome, currentDir: dir };
+  const defaultEnvironment = environmentForDir(dir, environmentOptions);
+  function target(req, res) {
+    const id = new URL(String(req.url || ""), "http://localhost").searchParams.get("env");
+    if (!id) return defaultEnvironment;
+    const found = resolveEnvironment(id, environmentOptions);
+    if (!found) { sendJson(res, 400, { error: "unknown-environment", env: id }); return null; }
+    return found;
+  }
+  function targetState(row) {
+    return row && row.kind === "mini" ? join(miniHome, "state") : STATE_DIR();
+  }
   // A leftover lock or temp file means the previous process died mid-write: surface it, do not retry.
   const recovery = recoverJournal(STATE_DIR(), [dir]);
   if (recovery.recoveryRequired || (recovery.leftovers || []).length) {
@@ -312,7 +327,7 @@ export function apply(ctx, config) {
 
   // Model modules are ESM files the page loads as classic scripts: strip `export`, keep the window
   // attach. One helper for all of them, so a new module is one list entry instead of a copied block.
-  const MODULES = ["capabilities.js", "selection.js", "history-timeline.js", "field-schema.js", "hooks.js", "virtual-window.js", "hook-rules.js", "health.js", "annotations.js"];
+  const MODULES = ["capabilities.js", "selection.js", "history-timeline.js", "field-schema.js", "hooks.js", "virtual-window.js", "hook-rules.js", "health.js", "annotations.js", "locator.js"];
   for (const file of MODULES) {
     ctx.effect(() => ctx.webServer.register({
       kind: "exact",
