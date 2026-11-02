@@ -211,8 +211,11 @@ function environmentPanel(){
   const cur=state.data&&state.data.currentEnvironment;
   const rows=list.length?list.map(e=>node('div',{class:'prop'},[node('dt',{text:e.kind==='mini'?'mini':'主 DSH'}),node('dd',{},[node('span',{class:'mono','data-testid':'env-'+e.id,text:e.name+(e.current?'（当前）':'')}),btn(e.current?'当前':'切换',()=>setEnvironment(e.id),'select-env-'+e.id,e.current?'btn plain':'btn')])])):[node('p',{class:'hint','data-testid':'env-empty',text:'未发现可用环境（没有读到任何 profile）'})];
   const mini=list.filter(e=>e.kind==='mini');
+  const mainCount=list.filter(e=>e.kind==='main').length;
+  // 数量分开写：把「环境数」和「profile 数」混在一句里，读者会以为少了一个
+  const counts=node('p',{class:'hint','data-testid':'env-counts',text:'环境 '+list.length+' 个（主 DSH '+mainCount+' · mini '+mini.length+'）；只列出 DSH_HOME / MINI_HOME 下确实有 profiles 目录的那些。'});
   const cmdBoxes=(cur?[commandBlock('体检（终端）','node tools/doctor.mjs --dir "'+cur.dir+'"'),commandBlock('实装预检','node tools/preflight.mjs "'+cur.dir+'"')]:[]).concat([node('p',{class:'hint','data-testid':'mini-absence',text:mini.length?'mini 环境：'+mini.map(e=>e.name).join('、'):'未发现 mini 环境'})]);
-  return panel('环境管理'+(cur?' · 当前 '+cur.name:''),node('div',{'data-testid':'environment-list'},[node('dl',{},rows),...cmdBoxes]));
+  return panel('环境管理'+(cur?' · 当前 '+cur.name:''),node('div',{'data-testid':'environment-list'},[counts,node('dl',{},rows),...cmdBoxes]));
 }
 function steward(){
   const d=state.data,main=$('main');

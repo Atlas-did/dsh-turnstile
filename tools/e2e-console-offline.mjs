@@ -148,7 +148,9 @@ try {
       // 长路径必须换行而不是把面板撑出横向滚动
       const noOverflow = panel ? panel.scrollWidth <= panel.clientWidth + 1 : false;
       const wrap = blocks.length > 0 && blocks.every((b) => getComputedStyle(b).whiteSpace === 'pre-wrap');
-      const out = blocks.length === 2 && /doctor\.mjs/.test(blocks[0].textContent) && Boolean(copy) && wrap && noOverflow;
+      const counts = document.querySelector('[data-testid="env-counts"]');
+      const countsOk = !!counts && /环境 1 个（主 DSH 1 · mini 0）/.test(counts.textContent || '');
+      const out = blocks.length === 2 && /doctor\.mjs/.test(blocks[0].textContent) && Boolean(copy) && wrap && noOverflow && countsOk;
       state.view = saved; render();
       return out;
     }));
