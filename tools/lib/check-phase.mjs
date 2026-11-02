@@ -32,6 +32,16 @@ export function normalizeCheckResult(input = {}) {
   return { ...base, state: 'unchanged', findings: 0 };
 }
 
+// 把旧的四态层结果（pass/fail/skip/unknown）翻译成六态，1:1 不重新解释：
+//   pass→unchanged（没发现问题不等于证明通过）  fail→target-failed
+//   skip→skipped（明确跳过）                    unknown→not-run（有证据缺口，没真正跑出结论）
+export function stateFromLayer(status) {
+  if (status === 'pass') return 'unchanged';
+  if (status === 'fail') return 'target-failed';
+  if (status === 'skip') return 'skipped';
+  return 'not-run';
+}
+
 // 汇总：任何一个 state 都不能被压缩成"通过"
 export function summarizePhases(results = []) {
   const counts = Object.fromEntries(STATES.map((s) => [s, 0]));

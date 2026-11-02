@@ -1,4 +1,5 @@
 'use strict';
+import { stateFromLayer } from './check-phase.mjs';
 // 验证分级（P1.0）：把「试装通过」拆成六层，谁都不能再拿 L0 冒充「可用」。
 //   L0 静态检查   清单/依赖/配置/源码
 //   L1 文件层     预期文件与配置确实写入
@@ -18,9 +19,10 @@ export const LEVELS = [
 
 export const STATUS = { pass: 'pass', fail: 'fail', skip: 'skip', unknown: 'unknown' };
 
+
 /** 每一层的结果：{level,status,evidence[],note} */
 export function layer(id, status, evidence, note) {
-  return { level: id, status, evidence: (evidence || []).filter(Boolean).slice(0, 6), note: note || '' };
+  return { level: id, status, state: stateFromLayer(status), evidence: (evidence || []).filter(Boolean).slice(0, 6), note: note || '' };
 }
 
 /** 只认「连续通过的最高层」：中间断了，后面再绿也不算数。 */

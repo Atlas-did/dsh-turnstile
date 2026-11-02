@@ -1,5 +1,5 @@
 // 检查阶段契约：六种状态各有名字，检查器自身失败不能冒充目标未通过。
-import { normalizeCheckResult, summarizePhases, PHASES, STATES } from './lib/check-phase.mjs';
+import { normalizeCheckResult, summarizePhases, stateFromLayer, PHASES, STATES } from './lib/check-phase.mjs';
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
 
@@ -33,6 +33,11 @@ const s3 = summarizePhases([clean, err]);
 ok('有 checker-error → failing，不被当成目标问题', s3.verdict === 'failing' && s3.counts['checker-error'] === 1);
 const s4 = summarizePhases([]);
 ok('空结果 → pass 但 counts 全零（由调用方决定是否可信）', s4.verdict === 'pass' && Object.values(s4.counts).every((n) => n === 0));
+
+// 旧四态 → 六态：不重新解释语义
+ok('pass 不升级成“通过”，只记 unchanged', stateFromLayer('pass') === 'unchanged');
+ok('skip/unknown 分开：明确跳过 vs 没跑出结论', stateFromLayer('skip') === 'skipped' && stateFromLayer('unknown') === 'not-run');
+ok('fail → target-failed', stateFromLayer('fail') === 'target-failed');
 
 console.log(fail ? 'CHECK_PHASE_FAILED ' + fail : 'CHECK_PHASE_OK');
 process.exitCode = fail ? 1 : 0;
