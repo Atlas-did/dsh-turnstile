@@ -405,7 +405,9 @@ export function apply(ctx, config) {
     path: "/turnstile/console-data",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
-      try { sendJson(res, 200, collectConsoleData(dir)); }
+      const selected = target(req, res);
+      if (!selected) return;
+      try { sendJson(res, 200, collectConsoleData(selected.dir, { stateDir: targetState(selected) })); }
       catch (e) { sendJson(res, 500, { error: String((e && e.message) || e).slice(0, 160) }); }
     },
   }), "turnstile: GET /turnstile/console-data");
