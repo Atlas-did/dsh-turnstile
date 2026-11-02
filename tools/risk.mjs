@@ -34,10 +34,12 @@ function scopes(text) {
   }
   return out;
 }
+// 覆盖范围（C-14）：扫描有深度/文件数截断，必须如实报告，不能让「没报到」被当成「全量没有」。
+let truncatedScan = false;
 function jsText(d) {
   const out = [];
   const walk = (p, depth) => {
-    if (depth > 2 || out.length > 8) return;
+    if (depth > 2 || out.length > 8) { truncatedScan = true; return; }
     let st; try { st = statSync(p); } catch { return; }
     if (st.isDirectory()) { for (const e of readdirSync(p)) walk(join(p, e), depth + 1); }
     else if (p.endsWith('.js') && st.size > 40) out.push(readFileSync(p, 'utf8'));
@@ -55,6 +57,7 @@ for (const name of deps) {
   const declared = new Set(Object.keys(j.dependencies || {}).filter(x => x.startsWith('@')));
   const peers = new Set(Object.keys(j.peerDependencies || {}).filter(x => x.startsWith('@')));
   const imported = scopes((existsSync(join(d, 'lib')) ? jsText(join(d, 'lib')) : '') + jsText(d));
+  // 每个插件的正文都过了同一个 jsText，truncatedScan 在超限时置位
   const missing = [...imported].filter(s => !declared.has(s));
   const peerOnly = [...imported].filter(s => peers.has(s) && !declared.has(s));
   let level = 'GREEN', why = 'only official/public packages';
@@ -130,7 +133,13 @@ if (wantsJson()) {
   }
   if (saveFlag) { try { writeFileSync(saveFlag, JSON.stringify({ at: new Date().toISOString(), findings: findings.map((f) => ({ ruleId: f.ruleId, subject: f.subject, plugin: f.plugin })) }, null, 2) + '\n'); console.log('基线已写 ' + saveFlag); } catch (e) { console.log('WARNING: 基线写不出：' + e.message); } }
   if (saveReport) { try { writeFileSync(saveReport, JSON.stringify({ at: new Date().toISOString(), profile: dir, counts, findings, delta }, null, 2) + '\n'); console.log('扫描结果已写 ' + saveReport); } catch (e) { console.log('WARNING: 结果写不出：' + e.message); } }
-  emitJson('risk', findings, counts.RED ? 6 : 0, delta ? { delta } : {});
+  const coverage = {
+    plugins: deps.length,
+    notInstalled: rows.filter((r) => r.level === '?').length,
+    truncated: truncatedScan,
+    note: truncatedScan ? '有插件目录超出深度/文件数上限，扫描不完整' : '全部插件的 lib 与顶层 js 都已读取',
+  };
+  emitJson('risk', findings, counts.RED ? 6 : 0, Object.assign({ coverage }, delta ? { delta } : {}));
   process.exit(counts.RED ? 6 : 0);
 }
 process.exitCode = counts.RED ? 6 : 0;

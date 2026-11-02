@@ -19,6 +19,10 @@ ok('locator 不编造行号', f.locator && f.locator.line === null, String(f.loc
 ok('finding 标明证据强度', f.strength === 'static-ast', String(f.strength));
 ok('finding 给了推翻条件', typeof f.falsifier === 'string' && f.falsifier.length > 8, String(f.falsifier).slice(0, 30));
 ok('severity 用 error/warning 而不是内部色阶', ['error', 'warning'].includes(f.severity), String(f.severity));
+// C-14：报告必须带覆盖范围，否则「没报到」会被读成「全量没有」
+const cov = red.j && red.j.coverage;
+ok('报告带 coverage（插件数/未安装/是否截断）', Boolean(cov) && typeof cov.plugins === 'number' && typeof cov.truncated === 'boolean', JSON.stringify(cov));
+ok('coverage 写明扫描是否完整', typeof cov.note === 'string' && cov.note.length > 0, cov && cov.note);
 // 成对夹具：同一条规则在「声明了依赖」的插件上必须是绿的（否则规则只会报警）
 const clean = await run([join(here, '..', 'tests', 'risk-fixture-clean')]);
 ok('负夹具：声明了官方 scope 的插件不报警', clean.j && clean.j.status === 'pass' && (clean.j.findings || []).length === 0, JSON.stringify(clean.j && clean.j.findings));
