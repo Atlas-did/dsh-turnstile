@@ -1,7 +1,7 @@
 // 装前/装后对比：两张快照的差异必须可复算。
 import assert from 'node:assert';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -20,8 +20,15 @@ writeFileSync(join(prof, 'node_modules', 'a', 'package.json'), JSON.stringify({ 
 
 const run = (...args) => execFileSync(process.execPath, [join(here, 'profile-snapshot.mjs'), prof, ...args], { encoding: 'utf8', env: { ...process.env, DSH_TURNSTILE_STATE: state } });
 
+// 先放一张适配卡：快照必须记录它（方案 186 §6.4）
+mkdirSync(join(state, 'provision'), { recursive: true });
+writeFileSync(join(state, 'provision', 'profile-p.json'), JSON.stringify({ profile: 'p', cardDigest: 'aaaa1111', machineDigest: 'bbbb2222' }));
+process.env.DSH_TURNSTILE_STATE = state;
+
 const t1 = run('--take', '--label', 'before');
 ok('take 写出快照', /快照已存/.test(t1) && /1 个插件/.test(t1), t1.trim().split('\n')[1]);
+const snap1 = JSON.parse(readFileSync(join(state, 'snapshots', readdirSync(join(state, 'snapshots')).sort()[0]), 'utf8'));
+ok('快照记录了适配卡 digest', snap1.provision && snap1.provision.cardDigest === 'aaaa1111', JSON.stringify(snap1.provision));
 
 // 装一个新插件（模拟装后），再拍一张
 writeFileSync(join(prof, 'package.json'), JSON.stringify({ name: 'p', dependencies: {}, dsh: { profile: { bundles: ['a', 'b'] } } }));

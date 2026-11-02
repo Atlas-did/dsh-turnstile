@@ -70,6 +70,8 @@ const noToken = await run([profileDir, '--state', stateDir2, '--apply']);
 ok('--apply 不带 token 被拒', noToken.code === 2, String(noToken.code));
 const withToken = await run([profileDir, '--state', stateDir2, '--apply', '--token', plan2.token]);
 ok('带正确 token 的 apply 成功', withToken.code === 0 && existsSync(join(stateDir2, 'provision')), String(withToken.code));
+const applied = (() => { try { return JSON.parse(withToken.out.slice(withToken.out.indexOf('{'), withToken.out.lastIndexOf('}') + 1)); } catch { return null; } })();
+ok('apply 之后自动复探并报 current', applied && applied.recheck && applied.recheck.verdict === 'current', JSON.stringify(applied && applied.recheck));
 const reuse = await run([profileDir, '--state', stateDir2, '--apply', '--token', plan2.token]);
 ok('token 只能消费一次', reuse.code !== 0, String(reuse.code));
 const plan3 = await run([profileDir, '--state', stateDir2, '--plan']);

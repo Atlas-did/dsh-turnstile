@@ -144,7 +144,12 @@ if (isMain) {
       process.exit(2);
     }
     const files = writeCards(machine, card, stateDir);
-    console.log(JSON.stringify({ ok: true, wrote: files, machineDigest: machine.probeDigest, cardDigest: card.cardDigest, confirmed: Boolean(token) }, null, 2));
+    // 写后复探：刚写的卡必须与当前机器一致，否则说明中间有变化
+    const again = probeMachine(process.env);
+    const recheck = staleness(JSON.parse(readFileSync(files.cardFile, 'utf8')), again);
+    const verdict = recheck.isStale ? 'stale' : 'current';
+    console.log(JSON.stringify({ ok: !recheck.isStale, wrote: files, machineDigest: machine.probeDigest, cardDigest: card.cardDigest, confirmed: Boolean(token), recheck: { verdict, reason: recheck.reason } }, null, 2));
+    if (recheck.isStale) { console.error('写后复探不一致：' + recheck.reason + '（卡片已写入，但请重新 provision）'); process.exit(1); }
     process.exit(0);
   }
 

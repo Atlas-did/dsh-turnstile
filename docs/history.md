@@ -77,6 +77,7 @@
 | [190-provision-v1.md](190-provision-v1.md) | Provision 第一版：只读探测 + 两层卡 + stale（2026-11-02） |
 | [191-knowledge-three-states.md](191-knowledge-three-states.md) | 知识三态：current / stale / absent（2026-11-02） |
 | [192-provision-adoption.md](192-provision-adoption.md) | Provision 采纳流：计划 → token → apply（2026-11-02） |
+| [193-provision-in-snapshot.md](193-provision-in-snapshot.md) | 适配卡进快照 + 写后自动复探（2026-11-02） |
 | [22-gate-report.md](22-gate-report.md) | 闸门报告（自动生成） |
 | [26-provider-map.md](26-provider-map.md) | 26 · 多接口（provider）地图与切换 |
 | [31-plugin-manager.md](31-plugin-manager.md) | 31 · mini 的插件管理界面：现状与两条路 |

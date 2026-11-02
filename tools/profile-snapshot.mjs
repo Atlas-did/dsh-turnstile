@@ -40,9 +40,18 @@ function build() {
     const disabled = new RegExp('id:\\s*' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\n\\s*disabled:\\s*true').test(patchText);
     plugins.push({ name, version: meta.version || '', missing: false, disabled, ui });
   }
+  // 适配卡也进快照：它决定这台机器怎么被适配，属于「回滚范围」（方案 186 §6.4）
+  const provDir = join(stateDir, 'provision');
+  const provFile = join(provDir, 'profile-' + (profile.split(/[\\/]/).pop() || '') + '.json');
+  let provision = null;
+  try {
+    const card = JSON.parse(readFileSync(provFile, 'utf8'));
+    provision = { cardDigest: card.cardDigest || '', machineDigest: card.machineDigest || '', stale: Boolean(card.stale && card.stale.isStale) };
+  } catch { provision = null; }
   return {
     at: new Date().toISOString(),
     profile: profile.replace(/\\/g, '/'),
+    provision,
     bundles: bundles.length,
     patchBytes,
     patchRows: rows,
@@ -96,7 +105,16 @@ for (const s of new Set([...beforeSurf.keys(), ...afterSurf.keys()])) {
 }
 surfaceDelta.sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta));
 
-const out = { before: files[files.length - 2], after: files[files.length - 1], added, removed, surfaceDelta, patchBytes: { before: before.patchBytes, after: after.patchBytes } };
+// 适配卡变化单独列出来：它可能没改任何插件，但改变了这台机器的适配方式
+const provisionDelta = (() => {
+  const b = before.provision || null;
+  const a = after.provision || null;
+  if (!b && !a) return null;
+  if (!b || !a) return { before: b, after: a, changed: true, reason: b ? '卡片被删除' : '卡片被新增' };
+  const changed = b.cardDigest !== a.cardDigest || b.machineDigest !== a.machineDigest;
+  return { before: b, after: a, changed, reason: changed ? 'cardDigest 或 machineDigest 变化' : '' };
+})();
+const out = { before: files[files.length - 2], after: files[files.length - 1], added, removed, surfaceDelta, provisionDelta, patchBytes: { before: before.patchBytes, after: after.patchBytes } };
 if (has('--json')) { console.log(JSON.stringify(out, null, 1)); process.exit(0); }
 
 console.log('对比 ' + out.before.replace(/\.json$/, '') + ' → ' + out.after.replace(/\.json$/, ''));
@@ -106,5 +124,7 @@ if (surfaceDelta.length) {
   console.log('  UI 面变化');
   for (const d of surfaceDelta.slice(0, 10)) console.log('    ' + (d.delta > 0 ? '+' : '') + d.delta + '  ' + d.surface + '  (' + d.before + ' → ' + d.after + ')');
 } else console.log('  UI 面变化 无');
+if (provisionDelta && provisionDelta.changed) console.log('  适配卡变化 ' + (provisionDelta.reason || ''));
+else console.log('  适配卡变化 无');
 const db = after.patchBytes - before.patchBytes;
 console.log('  配置体积 ' + (db >= 0 ? '+' : '') + db + ' 字节  (' + before.patchBytes + ' → ' + after.patchBytes + ')');
