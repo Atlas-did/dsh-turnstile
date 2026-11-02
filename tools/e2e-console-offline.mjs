@@ -140,6 +140,18 @@ try {
       const txt = el ? el.textContent : '';
       return !!el && txt.includes('磁盘版本') && txt.includes('声明版本') && txt.includes('无法判断');
     }));
+    ok('environment commands are copyable and do not overflow', await page.evaluate(() => {
+      const saved = state.view; state.view = 'steward'; render();
+      const blocks = [...document.querySelectorAll('[data-testid="env-cmd"]')];
+      const panel = document.querySelector('[data-testid="environment-list"]');
+      const copy = document.querySelector('[data-testid="copy-cmd"]');
+      // 长路径必须换行而不是把面板撑出横向滚动
+      const noOverflow = panel ? panel.scrollWidth <= panel.clientWidth + 1 : false;
+      const wrap = blocks.length > 0 && blocks.every((b) => getComputedStyle(b).whiteSpace === 'pre-wrap');
+      const out = blocks.length === 2 && /doctor\.mjs/.test(blocks[0].textContent) && Boolean(copy) && wrap && noOverflow;
+      state.view = saved; render();
+      return out;
+    }));
     ok('steward view lists the current environment and says no mini exists', await page.evaluate(() => {
       const saved = state.view; state.view = 'steward'; render();
       const list = document.querySelector('[data-testid="environment-list"]');

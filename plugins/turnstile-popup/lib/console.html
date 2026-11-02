@@ -200,12 +200,19 @@ function navPalette(){
   return box;
 }
 // 环境管理（只读 + 切换目标）：没有 mini 时明说「未发现」，不显示成运行正常。
+  // 该环境的体检/预检命令：长路径一律 pre-wrap + 断词，避免复制到折行的半条命令
+  function commandBlock(label,text){
+    const pre=node('pre',{class:'mono','data-testid':'env-cmd','style':'white-space:pre-wrap;word-break:break-all;margin:4px 0 8px'},[text]);
+    const copy=btn('复制',()=>{try{navigator.clipboard.writeText(text);}catch(e){}},'copy-cmd','btn plain');
+    return node('div',{},[node('p',{class:'hint',text:label}),pre,copy]);
+  }
 function environmentPanel(){
   const list=(state.data&&state.data.environments)||[];
   const cur=state.data&&state.data.currentEnvironment;
   const rows=list.length?list.map(e=>node('div',{class:'prop'},[node('dt',{text:e.kind==='mini'?'mini':'主 DSH'}),node('dd',{},[node('span',{class:'mono','data-testid':'env-'+e.id,text:e.name+(e.current?'（当前）':'')}),btn(e.current?'当前':'切换',()=>setEnvironment(e.id),'select-env-'+e.id,e.current?'btn plain':'btn')])])):[node('p',{class:'hint','data-testid':'env-empty',text:'未发现可用环境（没有读到任何 profile）'})];
   const mini=list.filter(e=>e.kind==='mini');
-  return panel('环境管理'+(cur?' · 当前 '+cur.name:''),node('div',{'data-testid':'environment-list'},[node('dl',{},rows),node('p',{class:'hint','data-testid':'mini-absence',text:mini.length?'mini 环境：'+mini.map(e=>e.name).join('、'):'未发现 mini 环境'} )]));
+  const cmdBoxes=(cur?[commandBlock('体检（终端）','node tools/doctor.mjs --dir "'+cur.dir+'"'),commandBlock('实装预检','node tools/preflight.mjs "'+cur.dir+'"')]:[]).concat([node('p',{class:'hint','data-testid':'mini-absence',text:mini.length?'mini 环境：'+mini.map(e=>e.name).join('、'):'未发现 mini 环境'})]);
+  return panel('环境管理'+(cur?' · 当前 '+cur.name:''),node('div',{'data-testid':'environment-list'},[node('dl',{},rows),...cmdBoxes]));
 }
 function steward(){
   const d=state.data,main=$('main');
