@@ -1,0 +1,14 @@
+import { editorLink, linkLabel } from '../tools/lib/locator.mjs';
+let fail = 0;
+const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
+const a = editorLink({ file: 'node_modules/plug-a/package.json', line: null });
+ok('相对路径生成 vscode 链接', a && a.href === 'vscode://file/node_modules/plug-a/package.json', a && a.href);
+ok('没有行号时不拼 :line', a.line === null);
+const b = editorLink({ file: 'src/x.js', line: 12 });
+ok('有行号时拼 :line', b && b.href === 'vscode://file/src/x.js:12', b && b.href);
+ok('反斜杠被规范化', editorLink({ file: 'a\\b\\c.js' }).href === 'vscode://file/a/b/c.js');
+ok('缺 file 返回 null', editorLink({}) === null && editorLink(null) === null);
+ok('URL / 协议头被拒绝', editorLink({ file: 'https://x/y' }) === null && editorLink({ file: 'vscode://x' }) === null);
+ok('链接文案带行号', linkLabel(b) === 'src/x.js:12', linkLabel(b));
+console.log(fail ? 'LOCATOR_FAILED ' + fail : 'LOCATOR_OK');
+process.exitCode = fail ? 1 : 0;
