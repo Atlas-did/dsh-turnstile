@@ -499,6 +499,21 @@ try {
     await page.waitForTimeout(350);
     const surfaceBanner = await text('[data-testid="page-banner"]');
     ok('UI 占用页提示条讲共享面', /UI 面/.test(surfaceBanner), surfaceBanner.slice(0, 50));
+
+    // 视图切换恢复滚动位置（方案 01-B）：缩小视口让 #main 真的可滚动
+    await page.setViewportSize({ width: 1024, height: 600 });
+    await page.waitForTimeout(300);
+    await click('[data-testid="nav-plugins"]');
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { const m = document.querySelector('#main'); if (m) m.scrollTop = 220; });
+    await page.waitForTimeout(200);
+    const beforeScroll = await page.evaluate(() => document.querySelector('#main')?.scrollTop || 0);
+    await click('[data-testid="nav-surfaces"]');
+    await page.waitForTimeout(400);
+    await click('[data-testid="nav-plugins"]');
+    await page.waitForTimeout(500);
+    const afterScroll = await page.evaluate(() => document.querySelector('#main')?.scrollTop || 0);
+    ok('切回视图恢复滚动位置', beforeScroll > 40 && Math.abs(afterScroll - beforeScroll) < 10, JSON.stringify({ beforeScroll, afterScroll }));
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {
