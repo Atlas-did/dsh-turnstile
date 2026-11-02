@@ -42,6 +42,21 @@ export function stateFromLayer(status) {
   return 'not-run';
 }
 
+// 从「检查器产出的 check 对象」读出六态：只认显式标记，不靠猜。
+// ok 缺失 = 未执行（不是通过）；给了 ran:false + reason = 跳过；超时/抛错各自有名。
+export function stateFromCheck(check = {}) {
+  if (!check || typeof check !== 'object') return 'not-run';
+  if (check.threw) return 'checker-error';
+  if (check.timedOut) return 'timeout';
+  if (check.ran === false) return check.reason ? 'skipped' : 'not-run';
+  const findings = Array.isArray(check.findings) ? check.findings : [];
+  const bad = findings.some((f) => f && (f.severity === 'error' || f.severity === 'warning'));
+  if (bad) return 'target-failed';
+  if (check.ok === false) return 'target-failed';
+  if (check.ok === true) return 'unchanged';
+  return 'not-run';
+}
+
 // 验证层级 → 处理阶段：L0 静态、L1 写入、L2-L4 运行态、L5 写后回归。
 // 未知层级落到 discover，不静默接受，也不猜成某个具体阶段。
 export const PHASE_BY_LEVEL = { L0: 'static', L1: 'manifest', L2: 'runtime', L3: 'runtime', L4: 'runtime', L5: 'post-change' };

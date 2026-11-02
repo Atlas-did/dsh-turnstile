@@ -1,5 +1,5 @@
 // 检查阶段契约：六种状态各有名字，检查器自身失败不能冒充目标未通过。
-import { normalizeCheckResult, summarizePhases, stateFromLayer, phaseForLevel, PHASES, STATES } from './lib/check-phase.mjs';
+import { normalizeCheckResult, summarizePhases, stateFromLayer, stateFromCheck, phaseForLevel, PHASES, STATES } from './lib/check-phase.mjs';
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
 
@@ -43,6 +43,13 @@ ok('fail → target-failed', stateFromLayer('fail') === 'target-failed');
 ok('六个验证层都有阶段', ['L0','L1','L2','L3','L4','L5'].every((l) => PHASES.includes(phaseForLevel(l))));
 ok('L5 是写后回归，不是运行态', phaseForLevel('L5') === 'post-change');
 ok('未知层级落到 discover', phaseForLevel('L9') === 'discover' && phaseForLevel(undefined) === 'discover');
+
+// 从 check 对象读六态：没有 ok 就不是通过
+ok('check 没有 ok → not-run（不是通过）', stateFromCheck({ name: 'x' }) === 'not-run');
+ok('check.ran=false + reason → skipped', stateFromCheck({ ran: false, reason: '需要宿主' }) === 'skipped');
+ok('check 抛错 → checker-error', stateFromCheck({ threw: 'boom' }) === 'checker-error');
+ok('check 有 error finding → target-failed', stateFromCheck({ ok: true, findings: [{ severity: 'error' }] }) === 'target-failed');
+ok('check.ok=false → target-failed；ok=true → unchanged', stateFromCheck({ ok: false }) === 'target-failed' && stateFromCheck({ ok: true }) === 'unchanged');
 
 console.log(fail ? 'CHECK_PHASE_FAILED ' + fail : 'CHECK_PHASE_OK');
 process.exitCode = fail ? 1 : 0;
