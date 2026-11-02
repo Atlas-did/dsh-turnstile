@@ -29,10 +29,13 @@ const consoleFile = join(pluginLib, 'console.html');
 const designerFile = join(pluginLib, 'console-designer.js');
 
 // fixture=true 时返回可复现的假数据（仅供 e2e）；默认走真实工具，假数据不再无标注地混进生产路径。
-export function createConsoleServer({ profileDir, stateDir, fixture = false, token = '', sessionFile = '' } = {}) {
+export function createConsoleServer({ profileDir, stateDir, fixture = false, token = '', sessionFile = '', bootId = '' } = {}) {
   const dir = resolve(profileDir || join(root, 'tests', 'console-fixture'));
   // 每启动一份凭据（Q1=A）。不提供关闭认证的选项（Q4=1）：想省事只能在进程内注入固定令牌。
   const authToken = String(token || randomBytes(18).toString('base64url'));
+  // 宿主启动身份由调用方注入（mini 启动器传 mini-host-adapter 的值）；控制台不 import 任何宿主模块。
+  // 缺省为空 = unknown：journal 里就不写这个字段，待重启判断会如实返回 null。
+  const hostBootId = String(bootId || '');
   // 页面版本：文件 mtime+size 的哈希，够用来发现「别处改过」，不需要额外存储
   // 真实模式读 profile 里实际装了多少插件（不写死包名）
   const readInstalledPlugins = (profileDir) => {
@@ -330,7 +333,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
         const args = JSON.parse(body || '{}');
         dryRun = args.dryRun !== false;
         const summary = Array.isArray(args.operations) ? args.operations.slice(0, 100).map((op) => ({ type: String(op?.type || ''), package: String(op?.package || ''), disable: typeof op?.disable === 'boolean' ? op.disable : undefined, anchor: typeof op?.anchor === 'string' ? op.anchor : undefined })) : [];
-        beginOperation(auditDir, { planId, kind: 'designer', dryRun, target: 'cordis.patch.yml', workspace: String(args.workspace || 'default').slice(0, 80), operationCount: summary.length, operations: summary });
+        beginOperation(auditDir, { planId, kind: 'designer', dryRun, bootId: hostBootId || null, target: 'cordis.patch.yml', workspace: String(args.workspace || 'default').slice(0, 80), operationCount: summary.length, operations: summary });
         started = true;
         const plugins = collectConsoleData(dir, { stateDir: state }).plugins;
         const result = designerTransaction(dir, args.operations, { dryRun, expected: args.expected }, plugins);
