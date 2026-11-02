@@ -7,6 +7,8 @@ import { collectHealth } from '../plugins/turnstile-popup/lib/health-collect.js'
 import { COMMANDS } from './lib/commands.mjs';
 import { listOperations } from '../plugins/turnstile-popup/lib/journal.js';
 import { restartState } from './lib/lifecycle.mjs';
+import { listEnvironments, defaultMiniHome } from '../plugins/turnstile-popup/lib/environments.js';
+import { homedir } from 'node:os';
 
 const cleanPath = (p) => String(p || '').replace(/\\/g, '/');
 const readJson = (file) => {
@@ -228,8 +230,18 @@ export function collectConsoleData(profileDir, options = {}) {
     'snapshot-take': ['准备拍快照', 'history'],
   };
   const actions = Object.entries(ACTION_LABELS).filter(([id]) => COMMANDS[id]).map(([id, [label, view]]) => ({ id, label, view, mutating: Boolean(COMMANDS[id].mutating) }));
+  // 环境列表：主 DSH 与 mini 的真实 profile；fixture 只声明自己，不伪造 mini 状态
+  let environments = [];
+  try {
+    environments = options && options.fixture
+      ? [{ id: 'main:' + profileName, kind: 'main', name: profileName, label: profileName, dir: profileDir, current: true }]
+      : listEnvironments({ home: process.env.DSH_HOME || join(homedir(), '.dsh'), miniHome: process.env.MINI_HOME || defaultMiniHome({ homeDir: homedir() }), currentDir: profileDir });
+  } catch { environments = []; }
+  const currentEnvironment = environments.find((e) => e.current) || null;
+
   return {
     actions,
+    environments, currentEnvironment,
     schema: 'turnstile/console@1',
     issues, issueGroups: groupIssues(issues), generatedAt: new Date().toISOString(),
     profile: { name: profileName, dir: cleanPath(profileDir), bundles: bundleNames.length },
