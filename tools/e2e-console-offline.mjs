@@ -140,6 +140,13 @@ try {
       const txt = el ? el.textContent : '';
       return !!el && txt.includes('磁盘版本') && txt.includes('声明版本') && txt.includes('无法判断');
     }));
+    ok('sidebar note stays inside the sidebar instead of being clipped', await page.evaluate(() => {
+      const sb = document.querySelector('.sidebar');
+      const note = document.querySelector('.side-note');
+      if (!sb || !note) return false;
+      const box = sb.getBoundingClientRect(); const nb = note.getBoundingClientRect();
+      return nb.bottom <= box.bottom + 1 && nb.height > 0;
+    }));
     ok('environment commands are copyable and do not overflow', await page.evaluate(() => {
       const saved = state.view; state.view = 'steward'; render();
       const blocks = [...document.querySelectorAll('[data-testid="env-cmd"]')];
