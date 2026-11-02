@@ -23,8 +23,12 @@ const dshBin = join(mini, 'runtime', 'node_modules', '@deepseek-ai', 'dsh', 'lib
 import { judgeVerify, judgeAcceptance, hasTrialChanges } from './lib/acceptance.mjs';
 
 const state = { claim: "unknown", levels: null, after: null, ok: false, installedByUs: false, phase: "init", rollback: null };
+import { stateFromCheck } from './lib/check-phase.mjs';
+
 const steps = [];
-const step = (id, ok, detail, extra) => { steps.push(Object.assign({ id, ok, detail: detail || '' }, extra || {})); return ok; };
+// 每步带六态：ok===true 只说明「这一步没判失败」，不等价于「验证到了」。
+// 没跑/跳过/超时/检查器失败各自有名，避免验收里出现虚假绿灯。
+const step = (id, ok, detail, extra) => { const merged = Object.assign({ id, ok, detail: detail || '' }, extra || {}); merged.state = stateFromCheck(merged); steps.push(merged); return ok; };
 
 function runNode(script, args, timeout = 900000) {
   try { return { code: 0, out: execFileSync(process.execPath, [join(here, script), ...args], { encoding: 'utf8', timeout }) }; }
