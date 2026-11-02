@@ -188,17 +188,21 @@ export function collectConsoleData(profileDir, options = {}) {
   const historyFile = readJson(join(state, 'gate-history.json'));
   const history = (historyFile?.runs || []).filter((r) => !r.profile || String(r.profile) === profileDir || basename(String(r.profile)) === profileName).slice(-40).reverse();
   const runtime = readJson(join(state, 'runtime-' + profileName + '.json'));
+  const runtimeAvailable = Boolean(runtime);
   const occupancy = readJson(join(state, 'occupancy-' + profileName + '.json'));
   // 依赖风险扫描是独立 CLI 的产物（带时间戳与可选基线差异）；没有记录就如实显示「没有记录」，不补造空结果
   const risk = readJson(join(state, 'risk-' + profileName + '.json'));
   // 安装后状态：只看 journal 里最后一次「已应用」的写操作 + 注入的宿主启动身份。
   // 缺 journal、缺 applyBootId、缺宿主身份 → pendingRestart=null（unknown），不猜。
-  let install = { pendingRestart: null, reason: '没有可用的写操作记录', at: null };
+  let install = { pendingRestart: null, reason: '没有可用的写操作记录', at: null, runtimeSnapshot: runtimeAvailable };
   try {
     const entries = state ? listOperations(state) : [];
     const rs = restartState({ entries, currentBootId: (options && options.bootId) || '' });
     const last = entries.find((e) => e.status === 'applied') || null;
     install = { pendingRestart: rs.pendingRestart, reason: rs.reason, at: last ? (last.settledAt || last.at || null) : null };
+    // 逐插件「本次启动是否加载」还没有数据源：只有全局运行时快照。如实标注，不冒充 observed。
+    install.perPluginLoad = { available: false, reason: '还没有逐插件的加载观测（只有全局运行时快照）' };
+    install.runtimeSnapshot = runtimeAvailable;
   } catch { /* journal 读不出就是 unknown，不补默认结论 */ }
   // 诊断 issue：与 CLI/宿主同一份归一化规则；采集失败就是空数组，不补默认通过项
   const hostBases = Array.isArray(options.hostBases) ? options.hostBases.filter(Boolean) : [];

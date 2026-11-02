@@ -391,6 +391,8 @@ function inspectorInstall(s,box){
   const verdict=inst.pendingRestart===true?'已写入，等待重启':inst.pendingRestart===false?'宿主已重启，写入已生效':'无法判断';
   const rows=[['状态',verdict],['依据',inst.reason||'未提供']];
   if(inst.at)rows.push(['最后一次写入',String(inst.at)]);
+  rows.push(['运行时快照',inst.runtimeSnapshot?'有（全局）':'没有']);
+  rows.push(['逐插件加载观测',inst.perPluginLoad&&inst.perPluginLoad.available?'可用':(inst.perPluginLoad?inst.perPluginLoad.reason:'不可用')]);
   box.append(node('div',{class:'prop-group','data-testid':'install-state'},[node('div',{class:'prop-title',text:'安装后状态（只读）'}),node('dl',{},rows.flatMap(([k,v])=>[node('div',{class:'prop'},[node('dt',{text:k}),node('dd',{text:String(v)})])]))]));
   // 版本：声明与磁盘分开显示；只有 profile 写死精确版本时才能判断一致性，否则如实说无法判断
   const p=s.plugin;
