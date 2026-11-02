@@ -15,6 +15,16 @@ export function togglePatch(text, rowId, disable) {
   let next = text;
   if (disable) {
     if (ranges.some(disabled)) return text;
+    // 已有该行：把 disabled: true 插进它自己的块里，而不是再追加一条同 id 的记录
+    if (ranges.length) {
+      const range = ranges[ranges.length - 1];
+      let insertAt = range.end;
+      while (insertAt > range.start + 1 && !lines[insertAt - 1].trim()) insertAt--;
+      lines.splice(insertAt, 0, '  disabled: true');
+      let out = lines.join('\n');
+      if (/\n$/.test(text) && !/\n$/.test(out)) out += '\n';
+      return out;
+    }
     const block = '- id: ' + rowId + '\n  disabled: true';
     const emptyRe = /^\[\]\s*$/m;
     next = emptyRe.test(text)
