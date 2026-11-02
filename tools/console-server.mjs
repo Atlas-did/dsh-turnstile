@@ -335,7 +335,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
         const summary = Array.isArray(args.operations) ? args.operations.slice(0, 100).map((op) => ({ type: String(op?.type || ''), package: String(op?.package || ''), disable: typeof op?.disable === 'boolean' ? op.disable : undefined, anchor: typeof op?.anchor === 'string' ? op.anchor : undefined })) : [];
         beginOperation(auditDir, { planId, kind: 'designer', dryRun, bootId: hostBootId || null, target: 'cordis.patch.yml', workspace: String(args.workspace || 'default').slice(0, 80), operationCount: summary.length, operations: summary });
         started = true;
-        const plugins = collectConsoleData(dir, { stateDir: state }).plugins;
+        const plugins = collectConsoleData(dir, { bootId: hostBootId, stateDir: state }).plugins;
         const result = designerTransaction(dir, args.operations, { dryRun, expected: args.expected }, plugins);
         settleOperation(auditDir, planId, dryRun ? 'previewed' : 'applied', { changed: result.changed });
         return json(200, { ...result, auditId: planId });
@@ -351,7 +351,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
         try { body = await readJsonText(req, 1e6); }
         catch (e) { if (e && e.code === 'BODY_TOO_LARGE') return json(413, { error: '请求体过大（上限 ' + e.limit + ' 字节）' }); return json(400, { error: 'body 读不到：' + String(e.message).slice(0, 80) }); }
         const args = JSON.parse(body || '{}');
-        const plugin = collectConsoleData(dir, { stateDir: state }).plugins.find((p) => p.name === args.package);
+        const plugin = collectConsoleData(dir, { bootId: hostBootId, stateDir: state }).plugins.find((p) => p.name === args.package);
         if (!plugin?.row) return json(404, { error: 'no-row' });
         const file = join(dir, 'cordis.patch.yml');
         const before = existsSync(file) ? readFileSync(file, 'utf8') : '';
@@ -460,7 +460,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
       try {
         const hostBases = [];
         if (process.env.DSH_BIN) hostBases.push(process.env.DSH_BIN);
-        const data = collectConsoleData(dir, { stateDir: state, hostBases });
+        const data = collectConsoleData(dir, { bootId: hostBootId, stateDir: state, hostBases });
         res.setHeader('content-type', 'application/json; charset=utf-8');
         res.setHeader('cache-control', 'no-store');
         res.end(JSON.stringify(data));

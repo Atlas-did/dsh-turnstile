@@ -5,6 +5,8 @@ import { basename, join } from 'node:path';
 import { issuesFromHealth, groupIssues, issueDetail } from '../plugins/turnstile-popup/lib/health-issues.js';
 import { collectHealth } from '../plugins/turnstile-popup/lib/health-collect.js';
 import { COMMANDS } from './lib/commands.mjs';
+import { listOperations } from '../plugins/turnstile-popup/lib/journal.js';
+import { restartState } from './lib/lifecycle.mjs';
 
 const cleanPath = (p) => String(p || '').replace(/\\/g, '/');
 const readJson = (file) => {
@@ -189,6 +191,15 @@ export function collectConsoleData(profileDir, options = {}) {
   const occupancy = readJson(join(state, 'occupancy-' + profileName + '.json'));
   // 依赖风险扫描是独立 CLI 的产物（带时间戳与可选基线差异）；没有记录就如实显示「没有记录」，不补造空结果
   const risk = readJson(join(state, 'risk-' + profileName + '.json'));
+  // 安装后状态：只看 journal 里最后一次「已应用」的写操作 + 注入的宿主启动身份。
+  // 缺 journal、缺 applyBootId、缺宿主身份 → pendingRestart=null（unknown），不猜。
+  let install = { pendingRestart: null, reason: '没有可用的写操作记录', at: null };
+  try {
+    const entries = state ? listOperations(state) : [];
+    const rs = restartState({ entries, currentBootId: (options && options.bootId) || '' });
+    const last = entries.find((e) => e.status === 'applied') || null;
+    install = { pendingRestart: rs.pendingRestart, reason: rs.reason, at: last ? (last.settledAt || last.at || null) : null };
+  } catch { /* journal 读不出就是 unknown，不补默认结论 */ }
   // 诊断 issue：与 CLI/宿主同一份归一化规则；采集失败就是空数组，不补默认通过项
   const hostBases = Array.isArray(options.hostBases) ? options.hostBases.filter(Boolean) : [];
   let healthItems = [];
@@ -218,7 +229,7 @@ export function collectConsoleData(profileDir, options = {}) {
     schema: 'turnstile/console@1',
     issues, issueGroups: groupIssues(issues), generatedAt: new Date().toISOString(),
     profile: { name: profileName, dir: cleanPath(profileDir), bundles: bundleNames.length },
-    plugins, surfaces, architecture: { rootId, nodes }, report, history, runtime, occupancy, risk,
+    plugins, surfaces, architecture: { rootId, nodes }, report, history, runtime, occupancy, risk, install,
     coverage: {
       manifest: true, report: Boolean(report), history: Boolean(historyFile), runtime: Boolean(runtime), occupancy: Boolean(occupancy), risk: Boolean(risk),
       note: '架构默认来自清单和 patch；只有 runtime 快照存在时才提供运行态观测。',
