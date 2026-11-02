@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { patchParseError, safeWritePatch } from '../tools/lib/patch-write.mjs';
+import { patchParseError, safeWritePatch, fingerprint } from '../tools/lib/patch-write.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 let passed = 0;
@@ -49,4 +49,39 @@ test('写入内容不可解析 → 拒绝且不改文件', () => {
   assert.strictEqual(readFileSync(f, 'utf8'), '- id: a\n');
 });
 
+
+test('前置指纹不一致 → 视为并发冲突，不写不留 bak', () => {
+  const dir = tmp();
+  const f = join(dir, 'cordis.patch.yml');
+  writeFileSync(f, '- id: a\n');
+  const planned = fingerprint('- id: a\n');
+  writeFileSync(f, '- id: a\n- id: someone-else\n');
+  const current = readFileSync(f, 'utf8');
+  assert.throws(() => safeWritePatch(f, '- id: a\n- id: b\n', { expected: planned, now: () => 2 }), /前置内容已变化/);
+  assert.strictEqual(readFileSync(f, 'utf8'), current, '冲突时不能写文件');
+  assert.ok(!readdirSync(dir).some((x) => x.includes('.bak-')), '冲突时不该留备份');
+});
+
+test('前置指纹一致 → 正常写入', () => {
+  const dir = tmp();
+  const f = join(dir, 'cordis.patch.yml');
+  writeFileSync(f, '- id: a\n');
+  const bak = safeWritePatch(f, '- id: a\n- id: b\n', { expected: fingerprint('- id: a\n'), now: () => 3 });
+  assert.ok(bak.endsWith('.bak-3'));
+  assert.match(readFileSync(f, 'utf8'), /id: b/);
+});
+
+test('写后读回比对通过（内容与期望逐字节一致）', () => {
+  const dir = tmp();
+  const f = join(dir, 'cordis.patch.yml');
+  writeFileSync(f, '- id: a\n');
+  const next = '- id: a\n  name: a\n';
+  safeWritePatch(f, next, { now: () => 4 });
+  assert.strictEqual(readFileSync(f, 'utf8'), next);
+});
+
+test('指纹函数对内容敏感、对换行差异敏感', () => {
+  assert.notStrictEqual(fingerprint('- id: a\n'), fingerprint('- id: a\r\n'));
+  assert.strictEqual(fingerprint('- id: a\n'), fingerprint('- id: a\n'));
+});
 console.log('PATCHWRITE_TEST_OK ' + passed + ' checks');

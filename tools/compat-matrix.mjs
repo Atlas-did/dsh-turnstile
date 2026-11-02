@@ -10,7 +10,8 @@ const root = join(here, '..');
 const argv = process.argv.slice(2);
 const val = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
 const has = (n) => argv.includes(n);
-const mini = val('--mini') || process.env.MINI_HOME || 'C:/Users/finef/Desktop/mini-harness';
+// 不写死本机路径：显式参数 > 环境变量 > 让安装点探测失败（结果是 unknown，而不是猜一个目录）
+const mini = val('--mini') || process.env.MINI_HOME || '';
 const versions = (val('--versions') || '0.2.1-rc.3,0.2.1-rc.4,0.2.1-rc.5,0.2.2-alpha.2').split(',').map((s) => s.trim()).filter(Boolean);
 
 // 本机已知的安装点：mini runtime（版本随包）与 profile 自身 node_modules

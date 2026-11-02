@@ -35,3 +35,7 @@ tests/**/.turnstile/turnstile-view.json
 # 运行产物：预览状态 / 启动器索引 / 流水账不应进仓库
 tests/**/.turnstile/turnstile-journal.json
 tests/**/.turnstile/launcher-index.json
+
+# 写入备份与临时产物（由测试或手工 safeWritePatch 产生）
+*.bak-[0-9]*
+!docs/**
