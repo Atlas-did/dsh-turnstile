@@ -28,7 +28,8 @@ const short = (n) => String(n).split('/').pop();
 // 归一后再比：dsh-market / dshmarket / dsh_market 是同一个东西（今天就栽在这）
 const norm = (n) => short(n).toLowerCase().replace(/[-_.]/g, '');
 const siblings = bundles.concat(Object.keys(deps))
-  .filter((n, i, arr) => arr.indexOf(i) !== -2 && arr.indexOf(n) === i)
+  // 只留去重条件：原 `arr.indexOf(i) !== -2` 恒为真（indexOf 不会返回 -2），是死条件
+  .filter((n, i, arr) => arr.indexOf(n) === i)
   .filter((n) => n !== pkg && norm(n) === norm(pkg));
 const targetIsMarket = MARKET_PATTERN.test(pkg);
 const existingMarkets = bundles.concat(Object.keys(deps)).filter((n) => MARKET_PATTERN.test(n));
