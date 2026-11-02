@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { layer as level, claimOf, verdictOf, renderReport, LEVELS, STATUS } from './lib/evidence.mjs';
+import { summarizePhases } from './lib/check-phase.mjs';
 
 const argv = process.argv.slice(2);
 const val = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
@@ -219,6 +220,9 @@ const claim = claimOf(layers, { regressionComplete });
 const report = renderReport({ pkg: pkgName || '(未指定)', profile: profileName, layers, claim, verdict: verdictOf(layers) });
 const shaped = Object.assign({
   ok: report.verdict !== 'fail', verdict: report.verdict, command: 'verify-live',
+  // 两种结论并存：reached 管「连续性」（report.deepest），counts 管「每种状态有几个」。
+  // 不把 counts 汇总当成 verdict：L3 断了但 L5 绿，仍然不算通过。
+  counts: summarizePhases(layers),
   summary: report.summary, findings: [], evidence: [],
   next: report.deepest === 'L5' ? [] : [{ label: '看下一层怎么验', command: 'node tools/verify-live.mjs ' + profileName + ' --pkg ' + (pkgName || '<pkg>') + ' --json', mutating: false, reason: '当前只到 ' + (report.deepest || '无') }],
 }, report);
