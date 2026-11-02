@@ -50,6 +50,10 @@ ok('check.ran=false + reason → skipped', stateFromCheck({ ran: false, reason: 
 ok('check 抛错 → checker-error', stateFromCheck({ threw: 'boom' }) === 'checker-error');
 ok('check 有 error finding → target-failed', stateFromCheck({ ok: true, findings: [{ severity: 'error' }] }) === 'target-failed');
 ok('check.ok=false → target-failed；ok=true → unchanged', stateFromCheck({ ok: false }) === 'target-failed' && stateFromCheck({ ok: true }) === 'unchanged');
+// 真实检查器用 warn / high / fail 这三种写法；只认 error/warning 会把它们漏成 unchanged
+ok('warn 也算失败（doctor 的写法）', stateFromCheck({ ok: true, findings: [{ severity: 'warn' }] }) === 'target-failed');
+ok('high / fail 也算失败', stateFromCheck({ ok: true, findings: [{ severity: 'high' }] }) === 'target-failed' && stateFromCheck({ ok: true, findings: [{ severity: 'fail' }] }) === 'target-failed');
+ok('info 不算失败', stateFromCheck({ ok: true, findings: [{ severity: 'info' }] }) === 'unchanged');
 
 console.log(fail ? 'CHECK_PHASE_FAILED ' + fail : 'CHECK_PHASE_OK');
 process.exitCode = fail ? 1 : 0;

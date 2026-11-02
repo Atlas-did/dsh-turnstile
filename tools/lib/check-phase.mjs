@@ -50,7 +50,9 @@ export function stateFromCheck(check = {}) {
   if (check.timedOut) return 'timeout';
   if (check.ran === false) return check.reason ? 'skipped' : 'not-run';
   const findings = Array.isArray(check.findings) ? check.findings : [];
-  const bad = findings.some((f) => f && (f.severity === 'error' || f.severity === 'warning'));
+  // doctor 用 'warn'、部分检查器用 'high'/'fail'：只认两种写法会把真实问题漏成 unchanged
+  const BAD = ['error', 'warning', 'warn', 'high', 'fail'];
+  const bad = findings.some((f) => f && BAD.includes(String(f.severity || '').toLowerCase()));
   if (bad) return 'target-failed';
   if (check.ok === false) return 'target-failed';
   if (check.ok === true) return 'unchanged';
