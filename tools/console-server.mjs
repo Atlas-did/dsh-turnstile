@@ -237,7 +237,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       } catch { rules = []; source = 'unavailable'; }
       return json(200, { rules, rejected: [], source });
     }
-    if (pathname === '/turnstile/capabilities.js' || pathname === '/turnstile/history-timeline.js' || pathname === '/turnstile/selection.js' || pathname === '/turnstile/field-schema.js' || pathname === '/turnstile/hooks.js' || pathname === '/turnstile/virtual-window.js' || pathname === '/turnstile/hook-rules.js' || pathname === '/turnstile/annotations.js') {
+    if (pathname === '/turnstile/capabilities.js' || pathname === '/turnstile/history-timeline.js' || pathname === '/turnstile/selection.js' || pathname === '/turnstile/field-schema.js' || pathname === '/turnstile/hooks.js' || pathname === '/turnstile/virtual-window.js' || pathname === '/turnstile/hook-rules.js' || pathname === '/turnstile/annotations.js' || pathname === '/turnstile/locator.js') {
       const name = pathname.slice('/turnstile/'.length);
       const src = readFileSync(join(root, 'plugins', 'turnstile-popup', 'lib', name), 'utf8')
         .replace(/\bexport\s+(function|const|class)/g, '$1');

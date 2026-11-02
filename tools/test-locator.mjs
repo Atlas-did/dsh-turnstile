@@ -10,5 +10,8 @@ ok('反斜杠被规范化', editorLink({ file: 'a\\b\\c.js' }).href === 'vscode:
 ok('缺 file 返回 null', editorLink({}) === null && editorLink(null) === null);
 ok('URL / 协议头被拒绝', editorLink({ file: 'https://x/y' }) === null && editorLink({ file: 'vscode://x' }) === null);
 ok('链接文案带行号', linkLabel(b) === 'src/x.js:12', linkLabel(b));
+const win = editorLink({ file: 'C:/work/plug/package.json', line: 3 });
+ok('Windows 盘符不是协议', win && win.href === 'vscode://file/C:/work/plug/package.json:3', win && win.href);
+ok('两字符以上协议仍被拒绝', ['file:', 'ftp:', 'vscode:', 'mailto:'].every(p => editorLink({ file: p + 'x/y' }) === null));
 console.log(fail ? 'LOCATOR_FAILED ' + fail : 'LOCATOR_OK');
 process.exitCode = fail ? 1 : 0;

@@ -184,6 +184,10 @@ try {
     await click('[data-testid="inspector-actions"]');
     console.log('  debug inspector: ' + (await text('#inspector')).replace(/\n/g, ' | ').slice(0, 150));
     ok('actions are separate from properties', (await count('[data-testid="action-locate"]')) === 1);
+    ok('source action builds a vscode link carrying the line', await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="action-source"]');
+      return !!el && /^vscode:\/\/file\/.+:\d+$/.test(el.getAttribute('href') || '');
+    }));
     await click('[data-testid="action-locate"]');
     ok('locate action enters the exact plugin architecture node', (await text('.arch-current')).includes('plug-alpha'));
     await click('[data-testid="inspector-properties"]');
@@ -514,6 +518,18 @@ try {
     await page.waitForTimeout(500);
     const afterScroll = await page.evaluate(() => document.querySelector('#main')?.scrollTop || 0);
     ok('切回视图恢复滚动位置', beforeScroll > 40 && Math.abs(afterScroll - beforeScroll) < 10, JSON.stringify({ beforeScroll, afterScroll }));
+    ok('locator module is shared with the console', await page.evaluate(() => !!(window.TurnstileLocator && window.TurnstileLocator.editorLink)));
+    ok('finding with a locator renders an editor link', await page.evaluate(() => {
+      const saved = state.selected, tab = state.inspectorTab;
+      state.selected = { title: 'synthetic', properties: {}, findings: [{ message: 'm', locator: { file: 'src/x.js', line: 7 } }] };
+      state.inspectorTab = 'properties';
+      renderInspector();
+      const el = document.querySelector('[data-testid="finding-link"]');
+      const href = el && el.getAttribute('href');
+      const refused = (() => { state.selected = { title: 'synthetic', properties: {}, findings: [{ message: 'm', locator: { file: 'https://evil.example/x.js' } }] }; renderInspector(); return document.querySelector('[data-testid="finding-link"]') === null; })();
+      state.selected = saved; state.inspectorTab = tab; renderInspector();
+      return href === 'vscode://file/src/x.js:7' && refused;
+    }));
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {
