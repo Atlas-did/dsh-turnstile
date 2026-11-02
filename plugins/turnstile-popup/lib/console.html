@@ -97,6 +97,21 @@ function pluginDeltaClass(name){const d=state.delta;if(!d||d.firstRun)return'';i
 
 // ── 公共列表状态条（方案 01-C） ──
 // kind: data | no-match | failed | unknown
+
+// ── 页面级「结论 → 影响 → 下一步」（方案 01-D） ──
+function pageBanner(){
+  const d=state.data; if(!d) return null;
+  const report=d.report;
+  const blocking=(report&&report.blocking&&report.blocking.length)||0;
+  let verdict,impact,btnLabel,btnView;
+  if(!report){verdict='未观测';impact='还没有门禁报告；「未观测」不等于安全。';btnLabel='去跑门禁检查';btnView='checks';}
+  else if(blocking){verdict='发现阻塞 '+blocking+' 项';impact='有检查未通过，先看证据再决定是否继续。';btnLabel='查看门禁检查';btnView='checks';}
+  else {verdict='检查通过';impact='本次门禁没有阻塞项；这只覆盖已运行的检查。';btnLabel='查看检查明细';btnView='checks';}
+  const bar=node('section',{class:'notice','data-testid':'page-banner'});
+  bar.append(node('strong',{'data-testid':'page-banner-verdict',text:verdict}),node('span',{class:'hint',text:' · '+impact}));
+  bar.append(btn(btnLabel,()=>setView(btnView),'page-banner-action'));
+  return bar;
+}
 function listStatus(view,{shown,total,selected,kind}){
   const parts=['筛选后 '+shown+' / 共 '+total];
   if(selected!=null) parts.push('已选 '+selected+' 个');
@@ -305,7 +320,7 @@ function overview(){
   ]);
   const main=$('main');main.append(healthCard);main.append(pageHead('控制台总览',d.profile.name+' · '+d.profile.dir));
   if(state.notice)main.append(node('div',{class:'notice',text:state.notice}));
-  main.append(deltaStrip());
+  const _banner=pageBanner();main.append(deltaStrip());if(_banner)main.append(_banner);
   if(!d.coverage.report)main.append(node('div',{class:'notice',text:'尚未读取到门禁报告；“未观测”不代表安全。请先运行 preflight。'}));
   main.append(node('section',{class:'hero'},[node('div',{class:'hero-line'},[node('span',{class:'verdict '+verdict[1],text:verdict[0]}),report?chip(report.result||'unknown',blocking?'bad':'good'):null]),node('p',{text:report?blocking+' 个阻塞项 · '+(report.checks||[]).length+' 项检查':'没有报告时不推断 CLEAR / BLOCKED。'})]));
   const metrics=[['plugins',d.plugins.length,'插件','管理插件和配置行'],['surfaces',d.surfaces.length,'UI 面','查看界面占用与关联'],['architecture',d.architecture.nodes.length,'架构节点','逐层下钻到源码'],['history',d.history.length,'历史记录','检查是否反复波动']];
@@ -315,7 +330,7 @@ function overview(){
   main.append(panel('需要先看',contested.length?table(['UI 面','插件数','状态'],contested.slice(0,6).map(s=>row([node('span',{class:'mono',text:s.surface}),String(s.count),chip('共享','warn')],()=>select({title:s.surface,kind:'surface',properties:{UI面:s.surface,插件数:s.count,插件:s.plugins.map(p=>p.name).join(', ')},archId:s.plugins[0]?.architectureId}),'overview-surface-'+s.surface))):empty('没有共享 UI 面，或尚无占用数据。')));
   setStatus(d.plugins.length+d.surfaces.length,d.plugins.length+d.surfaces.length);
 }
-function checks(){const all=state.data.report?.checks||[];const list=all.filter(matches);$('main').append(pageHead('门禁检查','检查是 verdict 的账本；点击一行查看发现、证据和修复建议。'));if(!state.data.report){$('main').append(empty('没有报告。缺失报告不会被渲染成“检查通过”。'));setStatus(0,0);return;}$('main').append(panel('检查明细 · '+list.length+' / '+all.length,list.length?table(['检查','结果','耗时','发现'],list.map(c=>row([node('span',{class:'mono',text:c.name}),chip(c.ok?'PASS':'CHECK',c.ok?'good':'warn'),(c.ms??'—')+' ms',String((c.findings||[]).length)],()=>select({title:c.name,kind:'check',properties:{检查:c.name,结果:c.ok?'通过':'需检查',耗时:(c.ms??'未记录')+' ms',发现数:(c.findings||[]).length},findings:c.findings||[]}),'check-'+c.name))):empty('没有匹配的检查。')));setStatus(list.length,all.length);}
+function checks(){const all=state.data.report?.checks||[];const list=all.filter(matches);$('main').append(pageHead('门禁检查','检查是 verdict 的账本；点击一行查看发现、证据和修复建议。'));if(!state.data.report){$('main').append(empty('没有报告。缺失报告不会被渲染成“检查通过”。'));setStatus(0,0);return;}$('main').append(listStatus('checks',{shown:list.length,total:all.length,selected:state.selected&&state.selected.kind==='check'?1:0,kind:list.length?'data':'no-match'}));$('main').append(panel('检查明细 · '+list.length+' / '+all.length,list.length?table(['检查','结果','耗时','发现'],list.map(c=>row([node('span',{class:'mono',text:c.name}),chip(c.ok?'PASS':'CHECK',c.ok?'good':'warn'),(c.ms??'—')+' ms',String((c.findings||[]).length)],()=>select({title:c.name,kind:'check',properties:{检查:c.name,结果:c.ok?'通过':'需检查',耗时:(c.ms??'未记录')+' ms',发现数:(c.findings||[]).length},findings:c.findings||[]}),'check-'+c.name))):empty('没有匹配的检查。')));setStatus(list.length,all.length);}
 function plugins(){
   const filtered=state.data.plugins.filter(p=>(state.pluginStatus==='all'||(state.pluginStatus==='disabled'?p.disabled:state.pluginStatus==='missing'?p.missing:!p.disabled&&!p.missing))&&matches(p));
   // A sort context, not an inline comparator: ties resolve on name so the same context always
@@ -331,7 +346,7 @@ function plugins(){
   $('main').append(panel('插件清单 · '+all.length+' / '+state.data.plugins.length,all.length?table(headers,all.map(p=>row([node('span',{class:'mono','data-testid':'plugin-name-'+p.name,style:'cursor:pointer;text-decoration:underline dotted',title:'点击看实现骨架',text:p.name,onclick:()=>openSkeleton(p.name)}),p.version||'—',chip(p.missing?'未安装':p.disabled?'停用':'启用',p.missing||p.disabled?'bad':'good'),String(p.rows.length),String(p.ui.length)],(ev)=>{pickPlugin(p,ev);select(selectionForPlugin(p));},'plugin-'+p.name,pluginDeltaClass(p.name)+(state.selected?.title===p.name?' selected':''),e=>{e.preventDefault();select(selectionForPlugin(p));state.context={x:Math.min(e.clientX,innerWidth-200),y:Math.min(e.clientY,innerHeight-160),plugin:p};renderOverlays();}))):empty('没有匹配的插件。')));
   setStatus(all.length,state.data.plugins.length);
 }
-function surfaces(){const all=state.data.surfaces.filter(matches);$('main').append(pageHead('UI 占用','一个界面由哪些插件声明注入；点击行查看归属，再进入深层架构。'));$('main').append(panel('界面占用 · '+all.length+' / '+state.data.surfaces.length,all.length?table(['UI 面','插件数','归属','状态'],all.map(s=>row([node('span',{class:'mono',text:s.surface}),String(s.count),s.plugins.map(p=>p.name).join(', '),s.contested?chip('共享','warn'):chip('独占','good')],()=>select({title:s.surface,kind:'surface',properties:{UI面:s.surface,插件数:s.count,插件:s.plugins.map(p=>p.name).join(', '),说明:s.contested?'多个插件声明；不等于已发生视觉冲突':'一个插件声明'},archId:s.plugins[0]?.architectureId}),'surface-'+s.surface))):empty('没有 UI 面数据。宿主侧或自绘插件不会凭空出现在这里。')));setStatus(all.length,state.data.surfaces.length);}
+function surfaces(){const all=state.data.surfaces.filter(matches);$('main').append(pageHead('UI 占用','一个界面由哪些插件声明注入；点击行查看归属，再进入深层架构。'));$('main').append(listStatus('surfaces',{shown:all.length,total:state.data.surfaces.length,selected:state.selected&&state.selected.kind==='surface'?1:0,kind:all.length?'data':'no-match'}));$('main').append(panel('界面占用 · '+all.length+' / '+state.data.surfaces.length,all.length?table(['UI 面','插件数','归属','状态'],all.map(s=>row([node('span',{class:'mono',text:s.surface}),String(s.count),s.plugins.map(p=>p.name).join(', '),s.contested?chip('共享','warn'):chip('独占','good')],()=>select({title:s.surface,kind:'surface',properties:{UI面:s.surface,插件数:s.count,插件:s.plugins.map(p=>p.name).join(', '),说明:s.contested?'多个插件声明；不等于已发生视觉冲突':'一个插件声明'},archId:s.plugins[0]?.architectureId}),'surface-'+s.surface))):empty('没有 UI 面数据。宿主侧或自绘插件不会凭空出现在这里。')));setStatus(all.length,state.data.surfaces.length);}
 function ancestors(nodes,id){const out=[];let cur=nodes.find(n=>n.id===id);while(cur){out.unshift(cur);cur=nodes.find(n=>n.id===cur.parent);}return out;}
 function archRow(n){const nodes=state.data.architecture.nodes;const count=nodes.filter(x=>x.parent===n.id).length;const b=btn('',()=>locate(n.id),'arch-node-'+n.id,'arch-node');b.setAttribute('data-arch-id',n.id);b.append(node('span',{class:'kind',text:n.kind}),node('strong',{text:n.label}),node('small',{text:count?count+' 个下一级节点':'叶子节点 · 查看源码'}),node('span',{class:'enter',text:'进入 →'}));return b;}
 function archVirtual(list){const V=window.TurnstileWindow;const ROW=76,VIEW=520;const box=node('div',{class:'arch-virtual','data-testid':'arch-virtual','style':'display:block;max-height:'+VIEW+'px;overflow-y:auto;margin-top:16px'});const padTop=node('div',{style:'height:0px'}),padBottom=node('div',{style:'height:0px'}),body=node('div',{});box.append(padTop,body,padBottom);const paint=()=>{const w=V?V.computeWindow({total:list.length,scrollTop:box.scrollTop,rowHeight:ROW,viewportHeight:VIEW,overscan:6}):{start:0,end:list.length,topPad:0,bottomPad:0};padTop.style.height=w.topPad+'px';padBottom.style.height=w.bottomPad+'px';body.replaceChildren(...list.slice(w.start,w.end).map(archRow));box.dataset.rendered=String(body.childElementCount);};box.onscroll=()=>paint();paint();return box;}

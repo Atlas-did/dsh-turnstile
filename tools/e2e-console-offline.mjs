@@ -480,6 +480,15 @@ try {
     await page.locator('[data-testid="list-clear-plugins"]').click();
     await page.waitForTimeout(400);
     ok('清除筛选后回到全量', /筛选后 \d+ \/ 共 \d+/.test(await text('[data-testid="list-status-plugins"]')));
+
+    // 页面级提示条（方案 01-D）：结论 + 影响 + 一个主按钮
+    await click('[data-testid="nav-overview"]');
+    await page.waitForTimeout(400);
+    const bannerText = await text('[data-testid="page-banner"]').catch(() => '');
+    ok('总览有页面级提示条', bannerText.length > 0 && /未观测|发现阻塞|检查通过/.test(bannerText), bannerText.slice(0, 60));
+    await page.locator('[data-testid="page-banner-action"]').click();
+    await page.waitForTimeout(400);
+    ok('提示条主按钮导航到证据视图', await page.locator('[data-testid="list-status-checks"]').count() >= 1);
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {
