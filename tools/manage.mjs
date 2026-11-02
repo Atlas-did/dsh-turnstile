@@ -9,6 +9,7 @@ import { checkCompatibility } from './version.mjs';
 import { loadYaml } from './config.mjs';
 import { safeWritePatch } from './lib/patch-write.mjs';
 import { toggleText } from '../plugins/turnstile-popup/lib/toggle-text.js';
+import { fingerprint } from './lib/patch-write.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : null; };
@@ -198,7 +199,8 @@ const asJson = argv.includes('--json');
 if (!confirmed) {
   if (asJson) {
     console.log(JSON.stringify({ ok: true, dryRun: true, action: doDisable ? 'disable' : 'enable', target, row: id, file: patchPath,
-      plan: [doDisable ? '块内插入 disabled: true（保留其它键）' : '删除块内 disabled: true（保留其它键，空块才移除）'] }, null, 2));
+      plan: [doDisable ? '块内插入 disabled: true（保留其它键）' : '删除块内 disabled: true（保留其它键，空块才移除）'],
+      expect: fingerprint(patchText) }, null, 2));
     process.exit(0);
   }
   console.log('DRY RUN — 会写 ' + patchPath);
@@ -208,7 +210,8 @@ if (!confirmed) {
 }
 
 try {
-  safeWritePatch(patchPath, next);
+  // apply 必须带 dry-run 给的 expect：中途被别人改过就拒绝，而不是覆盖
+  safeWritePatch(patchPath, next, { expected: flag('--expect') || undefined });
 } catch (e) {
   console.error(String(e.message));
   process.exit(1);

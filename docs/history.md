@@ -73,6 +73,7 @@
 | [186-provision-batch-schema.md](186-provision-batch-schema.md) | Provision 批次：两层适配卡最小 schema（2026-11-02） |
 | [187-toggle-unify.md](187-toggle-unify.md) | 数据保护批次第一步：toggle 收敛为一份（2026-11-02） |
 | [188-write-hardening.md](188-write-hardening.md) | 批次一收尾：写路径加固、备份残留清理、隐私扫描扩围（2026-11-02） |
+| [189-manage-expect.md](189-manage-expect.md) | 计划指纹接进 manage（2026-11-02） |
 | [22-gate-report.md](22-gate-report.md) | 闸门报告（自动生成） |
 | [26-provider-map.md](26-provider-map.md) | 26 · 多接口（provider）地图与切换 |
 | [31-plugin-manager.md](31-plugin-manager.md) | 31 · mini 的插件管理界面：现状与两条路 |

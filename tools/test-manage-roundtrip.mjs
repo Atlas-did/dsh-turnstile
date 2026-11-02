@@ -58,5 +58,26 @@ r = await run(f.profile, ['--disable', 'plug-a', '--yes']);
 ok('空 [] 也能 disable 且不再是 []', r.code === 0 && !/^\[\]\s*$/m.test(readFileSync(f.patch, 'utf8')), readFileSync(f.patch, 'utf8').slice(0, 80));
 rmSync(f.tmp, { recursive: true, force: true });
 
+
+// 4) dry-run 的 expect 与 apply 绑定：指纹不一致必须拒绝，而不是覆盖别人刚写的内容
+f = makeProfile();
+writeFileSync(f.patch, '- id: plug-a\n  name: plug-a\n');
+const dry = await run(f.profile, ['--disable', 'plug-a', '--json']);
+const plan = JSON.parse(dry.out.slice(dry.out.indexOf('{'), dry.out.lastIndexOf('}') + 1));
+ok('dry-run 给出指纹', typeof plan.expect === 'string' && plan.expect.length >= 8, String(plan.expect));
+writeFileSync(f.patch, '- id: plug-a\n  name: plug-a\n  note: someone-else-edited\n');
+const stale = await run(f.profile, ['--disable', 'plug-a', '--yes', '--expect', plan.expect]);
+ok('指纹不符时 apply 被拒', stale.code !== 0 && /前置内容已变化/.test(stale.out), stale.out.slice(0, 60));
+ok('被拒后文件保持别人的修改', readFileSync(f.patch, 'utf8').includes('someone-else-edited'));
+rmSync(f.tmp, { recursive: true, force: true });
+
+// 5) 指纹一致时正常 apply
+f = makeProfile();
+writeFileSync(f.patch, '- id: plug-a\n  name: plug-a\n');
+const d2 = await run(f.profile, ['--disable', 'plug-a', '--json']);
+const p2 = JSON.parse(d2.out.slice(d2.out.indexOf('{'), d2.out.lastIndexOf('}') + 1));
+const okApply = await run(f.profile, ['--disable', 'plug-a', '--yes', '--expect', p2.expect]);
+ok('指纹一致时 apply 成功', okApply.code === 0 && /disabled:\s*true/.test(readFileSync(f.patch, 'utf8')), okApply.out.slice(0, 60));
+rmSync(f.tmp, { recursive: true, force: true });
 console.log(fail ? 'MANAGE_ROUNDTRIP_FAILED ' + fail : 'MANAGE_ROUNDTRIP_OK');
 process.exitCode = fail ? 1 : 0;
