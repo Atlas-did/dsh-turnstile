@@ -32,5 +32,13 @@ ok('view-state 也使用统一请求上限', viewBig.status === 413 && /过大/.
 
 server.close();
 rmSync(tmp, { recursive: true, force: true });
+// C-07：上限按字节算。等量的「字符数」在中英文之间字节数差 3 倍，这里用中文直接验。
+const { readBodyText } = await import('../plugins/turnstile-popup/lib/body.js');
+const fake = (text) => ({ [Symbol.asyncIterator]: async function* () { yield Buffer.from(text); } });
+let multibyteThrew = null;
+try { await readBodyText(fake('中'.repeat(10)), 20); } catch (e) { multibyteThrew = e; }
+ok('多字节正文按字节超限（10 个字 = 30 字节 > 20）', multibyteThrew && multibyteThrew.code === 'BODY_TOO_LARGE');
+ok('同样 20 字节以内的单字节正文通过', (await readBodyText(fake('a'.repeat(20)), 20)) === 'a'.repeat(20));
+
 console.log(fail ? 'JSON_BODY_FAILED ' + fail : 'JSON_BODY_OK');
 process.exitCode = fail ? 1 : 0;

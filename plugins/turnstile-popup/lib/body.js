@@ -3,30 +3,34 @@
 export const BODY_TOO_LARGE = 'BODY_TOO_LARGE';
 const DEFAULT_MAX = 1e6;
 
-export async function readJsonBody(req, { maxBytes = DEFAULT_MAX } = {}) {
-  let body = '';
+// 上限按**字节**算（C-07）：body.length 是 UTF-16 码元数，中文/emoji 会被低估 3-4 倍，
+// 于是「看起来没超」的请求实际已经超过声明的上限。分块累计 Buffer 长度才是真字节。
+async function readBodyText(req, maxBytes) {
+  const chunks = [];
+  let bytes = 0;
   let tooBig = false;
   for await (const chunk of req) {
-    if (tooBig) continue;
-    body += chunk;
-    if (body.length > maxBytes) { tooBig = true; body = ''; }
+    if (tooBig) continue; // 继续把流读完，避免半截连接；但不再累计
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+    bytes += buf.length;
+    if (bytes > maxBytes) { tooBig = true; chunks.length = 0; continue; }
+    chunks.push(buf);
   }
   if (tooBig) { const e = new Error('body too large'); e.code = BODY_TOO_LARGE; e.limit = maxBytes; throw e; }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+export { readBodyText };
+
+export async function readJsonBody(req, { maxBytes = DEFAULT_MAX } = {}) {
+  const body = await readBodyText(req, maxBytes);
   if (!body.trim()) return {};
   return JSON.parse(body);
 }
 
 /** 只要原始文本（调用方自己 JSON.parse）：同样有上限。 */
 export async function readJsonText(req, maxBytes = DEFAULT_MAX) {
-  let body = '';
-  let tooBig = false;
-  for await (const chunk of req) {
-    if (tooBig) continue;
-    body += chunk;
-    if (body.length > maxBytes) { tooBig = true; body = ''; }
-  }
-  if (tooBig) { const e = new Error('body too large'); e.code = BODY_TOO_LARGE; e.limit = maxBytes; throw e; }
-  return body;
+  return readBodyText(req, maxBytes);
 }
 
 export async function readJsonReply(req, sendJson, { maxBytes = DEFAULT_MAX } = {}) {
