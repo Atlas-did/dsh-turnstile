@@ -273,7 +273,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
       res.end(src + '\nwindow.TurnstileSort = { SORT_KEYS: SORT_KEYS, valueOf: valueOf, compareRows: compareRows, orderedRows: orderedRows };\n');
       return;
     }
-    if (['/turnstile/console-designer.js','/turnstile/console-annotation-picker.js','/turnstile/console-annotation-pick.js','/turnstile/console-annotations.js'].includes(pathname)) {
+    if (['/turnstile/console-designer.js','/turnstile/console-annotation-picker.js','/turnstile/console-annotation-pick.js','/turnstile/console-annotations.js','/turnstile/console-navigation.js'].includes(pathname)) {
       if (req.method !== 'GET') return json(405, { error: 'method' });
       res.setHeader('content-type', 'text/javascript; charset=utf-8');
       res.setHeader('cache-control', 'no-store');

@@ -370,7 +370,7 @@ export function apply(ctx, config) {
     },
   }), "turnstile: GET /turnstile/sort-context.js");
 
-  for (const file of ["console-designer.js", "console-annotation-picker.js", "console-annotation-pick.js", "console-annotations.js"]) {
+  for (const file of ["console-designer.js", "console-annotation-picker.js", "console-annotation-pick.js", "console-annotations.js", "console-navigation.js"]) {
     ctx.effect(() => ctx.webServer.register({
       kind: "exact",
       path: "/turnstile/" + file,

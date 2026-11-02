@@ -96,6 +96,45 @@ function deltaStrip(){const d=state.delta;if(!d)return null;const parts=[];if(d.
 function pluginDeltaClass(name){const d=state.delta;if(!d||d.firstRun)return'';if(d.added.includes(name))return'delta-added';if(d.toggled.some(x=>x.name===name))return'delta-toggled';if(d.moved.some(x=>x.name===name))return'delta-moved';return'';}
 function empty(text){return node('div',{class:'empty','data-testid':'empty',text});}
 function setStatus(shown,total){$('counts').textContent=shown+' / '+total+' 项';$('generated').textContent=state.data?'快照 '+new Date(state.data.generatedAt).toLocaleTimeString():'';}
+
+// ── 定位框（方案 01-A）与 URL 片段（01-B） ──
+function navIndex(){
+  const N=window.TurnstileConsoleNav; if(!N||!state.data) return [];
+  const d=state.data;
+  return N.buildIndex({
+    views: views.map(([v,l])=>[v,l]),
+    plugins: d.plugins||[],
+    surfaces: d.surfaces||[],
+    checks: (d.report&&d.report.checks)||[],
+    actions: [],
+  });
+}
+function navPalette(){
+  let box=document.querySelector('[data-testid="nav-palette"]');
+  if(box) return box;
+  box=node('div',{class:'nav-palette','data-testid':'nav-palette',hidden:'hidden'});
+  const input=node('input',{class:'input','data-testid':'nav-input',placeholder:'搜索视图、插件、UI 面、检查项（Esc 关闭）','aria-label':'定位'});
+  const list=node('div',{'data-testid':'nav-results'});
+  box.append(input,list); document.body.append(box);
+  let lastFocus=null;
+  const close=()=>{ box.hidden=true; if(lastFocus&&lastFocus.focus) lastFocus.focus(); };
+  const open=()=>{ lastFocus=document.activeElement; box.hidden=false; input.value=''; renderNav(''); input.focus(); };
+  const renderNav=(q)=>{
+    const N=window.TurnstileConsoleNav; if(!N) return;
+    const res=N.search(navIndex(),q);
+    list.replaceChildren();
+    const add=(title,rows)=>{ if(!rows.length) return; list.append(node('div',{class:'nav-group','text':title})); for(const r of rows){ const b=btn(r.label+' · '+(r.hint||''),()=>{ if(r.kind==='action') return; setView(r.view); close(); }, 'nav-'+r.kind+'-'+String(r.id).replace(/[^\w.-]/g,'_')); list.append(b); } };
+    const g=res.groups||{objects:[],views:[],actions:[]};
+    add('对象',g.objects); add('视图',g.views); add('动作',g.actions);
+    if(!res.total) list.append(node('p',{class:'hint','data-testid':'nav-empty',text:'没有匹配项；搜索范围：视图、插件、UI 面、检查项。'}));
+  };
+  input.addEventListener('input',()=>renderNav(input.value));
+  input.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){e.preventDefault();close();} });
+  document.addEventListener('keydown',(e)=>{
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); if(box.hidden) open(); else close(); }
+  });
+  return box;
+}
 function steward(){
   const d=state.data,main=$('main');
   main.append(pageHead('环境管家','左边体检当前 profile，右边看所有 profile 的体量与下一步命令。只读，不替你执行。'));
@@ -367,10 +406,13 @@ $('export').addEventListener('click',exportFiltered);
 $('toggle-plugin').addEventListener('click',()=>previewToggle(state.selected?.plugin));
 $('details').addEventListener('click',()=>{state.hideInspector=!state.hideInspector;renderTop();});
 $('focus').addEventListener('click',()=>{state.focus=!state.focus;render();});
+// 定位框要有人初始化才会挂键盘监听（方案 01-A）
+navPalette();
 document.addEventListener('keydown',e=>{if(e.key==='F5'){e.preventDefault();load();}else if(e.ctrlKey&&e.key.toLowerCase()==='f'){e.preventDefault();$('global-search').focus();}else if(e.ctrlKey&&e.key.toLowerCase()==='l'){e.preventDefault();state.hideInspector=!state.hideInspector;renderTop();}else if(e.key==='Delete'&&state.selected?.plugin){e.preventDefault();previewToggle(state.selected.plugin);}else if(e.key==='Escape'){state.context=null;state.patchPreview=null;renderOverlays();}});
 document.addEventListener('click',e=>{if(state.context&&!e.target.closest('.context-menu')){state.context=null;renderOverlays();}});
 restoreView().then(load).catch(()=>load());
 </script>
+<script src="/turnstile/console-navigation.js"></script>
 <script src="/turnstile/console-annotation-picker.js"></script>
 <script src="/turnstile/console-annotation-pick.js"></script>
 <script src="/turnstile/console-annotations.js"></script>

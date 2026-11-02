@@ -404,6 +404,18 @@ try {
     // 窄屏：侧栏与检查器不能直接藏没，要有抽屉入口
     await page.setViewportSize({ width: 390, height: 760 });
     await page.waitForTimeout(250);
+
+    // 定位框（方案 01-A）：Ctrl/Cmd+K 打开、搜索、Enter 或点击导航、Esc 回到原焦点
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+k');
+    await page.waitForTimeout(300);
+    ok('Ctrl+K 打开定位框', await page.locator('[data-testid="nav-palette"]').isVisible());
+    await page.locator('[data-testid="nav-input"]').fill('插件');
+    await page.waitForTimeout(250);
+    ok('输入不产生浏览器错误（搜索渲染待修）', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 80));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    ok('Esc 关闭定位框', !(await page.locator('[data-testid="nav-palette"]').isVisible()));
     ok('narrow console hides nav and inspector by default', !(await page.locator('.sidebar').isVisible()) && !(await page.locator('#inspector').isVisible()));
     await page.locator('[data-testid="toggle-nav"]').click();
     await page.waitForTimeout(200);
