@@ -51,6 +51,21 @@ export function compareIdentity(prev, next) {
   };
 }
 
+// 待重启判断：只看「最后一次已应用的写操作」和「当前宿主启动身份」。
+// 语义：写入发生在本次启动之后 → 宿主还没加载它 → pendingRestart=true；写入早于本次启动 → 已重启 → false。
+// 缺 applyBootId（旧记录）或当前身份未知 → null，不猜。
+export function restartState({ entries, currentBootId } = {}) {
+  const applied = (Array.isArray(entries) ? entries : [])
+    .filter((e) => e && e.status === 'applied')
+    .sort((a, b) => String(a.settledAt || a.at || '').localeCompare(String(b.settledAt || b.at || '')));
+  const last = applied[applied.length - 1] || null;
+  if (!last) return { pendingRestart: null, reason: '没有已应用的写操作记录' };
+  if (!last.bootId) return { pendingRestart: null, reason: '记录里没有 applyBootId，无法判断是否已重启' };
+  if (!currentBootId) return { pendingRestart: null, reason: '当前宿主身份未知' };
+  if (String(last.bootId) === String(currentBootId)) return { pendingRestart: true, reason: '写入发生在本次启动之后：宿主还没加载它' };
+  return { pendingRestart: false, reason: '写入早于本次启动：宿主已重启' };
+}
+
 // 上游消失时的处置：已安装的只警告，未安装的才从目录消失（HACS 的保守策略）
 export function onSourceMissing(record) {
   const installed = Boolean(record && record.version && record.version.installed);

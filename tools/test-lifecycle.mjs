@@ -1,5 +1,5 @@
 // 第一批（身份与生命周期）的契约测试：重点是两个「不能做」的负例。
-import { facts, compareIdentity, onSourceMissing, stableIdFor, LIFECYCLE_SCHEMA } from './lib/lifecycle.mjs';
+import { facts, compareIdentity, onSourceMissing, restartState, stableIdFor, LIFECYCLE_SCHEMA } from './lib/lifecycle.mjs';
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
 
@@ -28,6 +28,19 @@ const delisted = onSourceMissing({ ...prev, version: { declared: '1.0.0', instal
 ok('已安装：保留本地并只警告', delisted.keepLocal === true && delisted.action === 'warn' && delisted.sourceState === 'delisted');
 const notInstalled = onSourceMissing({ ...prev, version: { declared: null, installed: null, mismatch: false } });
 ok('未安装：才从目录移除', notInstalled.keepLocal === false && notInstalled.action === 'drop-from-catalog');
+
+// 待重启：写入发生在本次启动之后 → true；早于本次启动 → false；缺证据 → null
+const appliedNow = [{ status: 'applied', bootId: 'b2', settledAt: 'T1' }];
+const r1 = restartState({ entries: appliedNow, currentBootId: 'b2' });
+ok('本次启动之后写入 → 待重启', r1.pendingRestart === true, r1.reason);
+const r2 = restartState({ entries: appliedNow, currentBootId: 'b3' });
+ok('写入早于本次启动 → 已重启，不再待重启', r2.pendingRestart === false, r2.reason);
+const r3 = restartState({ entries: [{ status: 'applied', settledAt: 'T1' }], currentBootId: 'b2' });
+ok('旧记录没有 applyBootId → unknown，不冒充待重启', r3.pendingRestart === null, r3.reason);
+const r4 = restartState({ entries: appliedNow, currentBootId: null });
+ok('当前宿主身份未知 → unknown', r4.pendingRestart === null, r4.reason);
+const r5 = restartState({ entries: [{ status: 'failed', bootId: 'b2' }, { status: 'applied', bootId: 'b9', settledAt: 'T9' }], currentBootId: 'b2' });
+ok('只看最后一次已应用的记录，失败记录不参与', r5.pendingRestart === false, r5.reason);
 
 console.log(fail ? 'LIFECYCLE_FAILED ' + fail : 'LIFECYCLE_OK');
 process.exitCode = fail ? 1 : 0;
