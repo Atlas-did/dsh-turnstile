@@ -99,6 +99,13 @@ console.log('import evidence: ' + lastEvidence);
 console.log('summary: ' + JSON.stringify(counts));
 if (wantsJson()) {
   const findings = rows.filter((r) => r.level !== 'GREEN').map((r) => ({
+    // 方案 03：每条 finding 带稳定规则、对象、位置、证据强度与推翻条件
+    ruleId: r.level === 'RED' ? 'risk.peer-only-scope' : 'risk.undeclared-scope',
+    subject: { kind: 'plugin', id: r.name },
+    // 位置指向该插件的 manifest（能找到 import 声明的地方）；行号未知就写 null，不编造
+    locator: { file: 'node_modules/' + r.name + '/package.json', line: null },
+    strength: 'static-ast',
+    falsifier: '在真实宿主里 import 成功且不触发解析错误，可推翻这条静态结论',
     severity: r.level === 'RED' ? 'error' : 'warning',
     plugin: r.name + '@' + (r.version || '?'),
     resource: r.why,
