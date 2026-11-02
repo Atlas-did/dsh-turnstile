@@ -30,13 +30,16 @@ for (const b of bundles) {
   if (!existsSync(pj)) { rows.push({ name: b, engine: '-', verdict: 'NOT INSTALLED' }); continue; }
   const j = JSON.parse(readFileSync(pj, 'utf8'));
   const engine = j.engines?.dsh || '';
-  if (!engine) { rows.push({ name: b, version: j.version, engine: '(none)', verdict: 'loads' }); continue; }
+  // 没有 engines.dsh 不等于「已验证兼容」：宿主确实不拦，但我们没有声明可依据。
+  // 结论写 basis，让读者区分「声明了且通过」与「没有声明所以没人拦」。（C-12）
+  if (!engine) { rows.push({ name: b, version: j.version, engine: '(none)', verdict: 'loads (no engines.dsh)', basis: 'undeclared' }); continue; }
   const issue = checkCompatibility({ name: j.name, version: j.version, engines: { dsh: engine } });
   const ok = issue === null;
   const exempt = (compat[b + '@' + j.version] || []).includes(runtime);
   rows.push({
     name: b, version: j.version, engine,
     verdict: ok ? 'loads' : exempt ? 'loads (exempted)' : 'SKIPPED',
+    basis: ok ? 'declared-compatible' : exempt ? 'exempted' : 'declared-incompatible',
   });
 }
 
@@ -58,6 +61,8 @@ if (wantsJson()) {
   console.log(JSON.stringify({
     profile: dir, runtime,
     skipped: skipped.map((r) => r.name + '@' + r.version + '  engines=' + r.engine),
+  // 三种依据分开报：没人拦（undeclared）/ 声明通过 / 凭 exemptions 放行
+  bases: rows.reduce((acc, r) => { const k = r.basis || 'unknown'; acc[k] = (acc[k] || 0) + 1; return acc; }, {}),
     exempted: exempted.map((r) => r.name + '@' + r.version),
     ok: skipped.length === 0,
     evaluated: Boolean(runtime),
