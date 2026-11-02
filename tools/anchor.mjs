@@ -7,6 +7,9 @@ import { join } from 'node:path';
 import { patchFiles } from './lib/patch-files.mjs';
 import { safeWritePatch } from './lib/patch-write.mjs';
 
+// --expect 与 manage 同一语义：dry-run 给的指纹与当前内容不符就拒绝写
+const expectFlag = () => { const i = process.argv.indexOf('--expect'); return i >= 0 ? process.argv[i + 1] : undefined; };
+
 // The value space belongs to the plugin, not to us: any short token is accepted.
 // (We only refuse things that would break the YAML line.)
 const isValidAnchor = (v) => typeof v === 'string' && v.length > 0 && v.length <= 40 && /^[A-Za-z0-9_.:-]+$/.test(v);
@@ -92,7 +95,7 @@ if (rowIdx === -1) {
   const appended = text.replace(/\s*$/, '') + '\n- id: ' + row + '\n  config:\n    anchor: ' + anchor + '\n';
   console.log('- id: ' + row + '\n  config:\n    anchor: ' + anchor + '\n');
   if (!apply) { console.log('dry run: pass --apply to write this override into cordis.patch.yml'); process.exit(0); }
-  try { safeWritePatch(patchPath, appended); } catch (e) { console.error(String(e.message)); process.exit(1); }
+  try { safeWritePatch(patchPath, appended, { expected: expectFlag() }); } catch (e) { console.error(String(e.message)); process.exit(1); }
   console.log('wrote override for ' + row + ' (backup kept)');
   process.exit(0);
 }
@@ -125,5 +128,5 @@ console.log('row: ' + row + '  package: ' + pkgName);
 console.log(next.slice(rowIdx, Math.min(rowIdx + 8, next.length)).join('\n'));
 if (!apply) { console.log(''); console.log('DRY RUN - re-run with --apply to write.'); process.exit(0); }
 // B8: same discipline as manage - parse before and after, refuse instead of corrupting.
-try { safeWritePatch(patchPath, out); } catch (e) { console.error(String(e.message)); process.exit(1); }
+try { safeWritePatch(patchPath, out, { expected: expectFlag() }); } catch (e) { console.error(String(e.message)); process.exit(1); }
 console.log(''); console.log('written; restart DSH to take effect.');
