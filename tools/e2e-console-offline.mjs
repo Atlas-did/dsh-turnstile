@@ -435,6 +435,23 @@ try {
     await page.evaluate(() => { location.hash = ''; });
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelector('#connection')?.textContent === '数据已读取', null, { timeout: 15000 });
+
+    // 动作组（方案 01-A）：写操作只出提示，不执行
+    await page.keyboard.press('Control+k');
+    await page.waitForTimeout(250);
+    await page.locator('[data-testid="nav-input"]').fill('停用');
+    await page.waitForTimeout(300);
+    const actionBtn = page.locator('[data-testid^="nav-action-"]').first();
+    const hasAction = await actionBtn.count();
+    ok('写操作出现在动作组', hasAction >= 1, String(hasAction));
+    if (hasAction) {
+      const label = await actionBtn.innerText();
+      ok('动作标注只出计划', /只出计划/.test(label), label.slice(0, 40));
+      await actionBtn.click();
+      await page.waitForTimeout(400);
+      const noticeText = await page.locator('body').innerText();
+      ok('点击动作只提示不写入', /只生成计划/.test(noticeText), noticeText.slice(0, 60));
+    }
     ok('narrow console hides nav and inspector by default', !(await page.locator('.sidebar').isVisible()) && !(await page.locator('#inspector').isVisible()));
     await page.locator('[data-testid="toggle-nav"]').click();
     await page.waitForTimeout(200);

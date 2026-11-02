@@ -133,7 +133,7 @@ function navIndex(){
     plugins: d.plugins||[],
     surfaces: d.surfaces||[],
     checks: (d.report&&d.report.checks)||[],
-    actions: [],
+    actions: d.actions||[],
   });
 }
 function navPalette(){
@@ -150,7 +150,7 @@ function navPalette(){
     const N=window.TurnstileConsoleNav; if(!N) return;
     const res=N.search(navIndex(),q);
     list.replaceChildren();
-    const add=(title,rows)=>{ if(!rows.length) return; list.append(node('div',{class:'nav-group','text':title})); for(const r of rows){ const b=btn(r.label+' · '+(r.hint||''),()=>{ if(r.kind==='action') return; setView(r.view); close(); }, 'nav-'+r.kind+'-'+String(r.id).replace(/[^\w.-]/g,'_')); list.append(b); } };
+    const add=(title,rows)=>{ if(!rows.length) return; list.append(node('div',{class:'nav-group','text':title})); for(const r of rows){ const label=r.label+(r.mutating?' · 写操作（只出计划）':'')+' · '+(r.hint||''); const b=btn(label,()=>{ if(r.kind==='action'){ if(r.mutating){ state.notice='「'+r.label+'」只生成计划：在 CLI 或面板确认流里执行，定位框不写入。'; } setView(r.view); close(); return; } setView(r.view); close(); }, 'nav-'+r.kind+'-'+String(r.id).replace(/[^\w.-]/g,'_')); list.append(b); } };
     const g=res.groups||{objects:[],views:[],actions:[]};
     add('对象',g.objects); add('视图',g.views); add('动作',g.actions);
     if(!res.total) list.append(node('p',{class:'hint','data-testid':'nav-empty',text:'没有匹配项；搜索范围：视图、插件、UI 面、检查项。'}));

@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { issuesFromHealth, groupIssues, issueDetail } from '../plugins/turnstile-popup/lib/health-issues.js';
 import { collectHealth } from '../plugins/turnstile-popup/lib/health-collect.js';
+import { COMMANDS } from './lib/commands.mjs';
 
 const cleanPath = (p) => String(p || '').replace(/\\/g, '/');
 const readJson = (file) => {
@@ -192,7 +193,19 @@ export function collectConsoleData(profileDir, options = {}) {
     }
     return row;
   });
+  const ACTION_LABELS = {
+    'doctor': ['体检当前 profile', 'steward'],
+    'gate': ['跑门禁检查', 'checks'],
+    'surfaces': ['看 UI 占用', 'surfaces'],
+    'slot-report': ['看槽位分布', 'surfaces'],
+    'trial-status': ['看上次试装结果', 'steward'],
+    'manage-disable': ['准备停用计划', 'plugins'],
+    'manage-enable': ['准备启用计划', 'plugins'],
+    'snapshot-take': ['准备拍快照', 'history'],
+  };
+  const actions = Object.entries(ACTION_LABELS).filter(([id]) => COMMANDS[id]).map(([id, [label, view]]) => ({ id, label, view, mutating: Boolean(COMMANDS[id].mutating) }));
   return {
+    actions,
     schema: 'turnstile/console@1',
     issues, issueGroups: groupIssues(issues), generatedAt: new Date().toISOString(),
     profile: { name: profileName, dir: cleanPath(profileDir), bundles: bundleNames.length },
