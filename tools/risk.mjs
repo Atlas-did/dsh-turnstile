@@ -117,6 +117,8 @@ if (wantsJson()) {
   }));
   const baseFlag = (() => { const i = process.argv.indexOf('--baseline'); return i >= 0 ? process.argv[i + 1] : null; })();
   const saveFlag = (() => { const i = process.argv.indexOf('--save-baseline'); return i >= 0 ? process.argv[i + 1] : null; })();
+  // 控制台读这份「上次扫描」：带时间戳与 delta，缺文件时控制台就诚实说没有记录
+  const saveReport = (() => { const i = process.argv.indexOf('--save'); return i >= 0 ? process.argv[i + 1] : null; })();
   const keyOf = (f) => (f.ruleId || 'risk.unknown') + '|' + ((f.subject && f.subject.id) || f.plugin || '');
   let baseline = null;
   if (baseFlag) { try { baseline = JSON.parse(readFileSync(baseFlag, 'utf8')); } catch { console.log('WARNING: 读不出基线 ' + baseFlag + '，按首次运行处理'); } }
@@ -127,6 +129,7 @@ if (wantsJson()) {
     delta = { added: [...after].filter((k) => !before.has(k)), resolved: [...before].filter((k) => !after.has(k)), still: [...after].filter((k) => before.has(k)) };
   }
   if (saveFlag) { try { writeFileSync(saveFlag, JSON.stringify({ at: new Date().toISOString(), findings: findings.map((f) => ({ ruleId: f.ruleId, subject: f.subject, plugin: f.plugin })) }, null, 2) + '\n'); console.log('基线已写 ' + saveFlag); } catch (e) { console.log('WARNING: 基线写不出：' + e.message); } }
+  if (saveReport) { try { writeFileSync(saveReport, JSON.stringify({ at: new Date().toISOString(), profile: dir, counts, findings, delta }, null, 2) + '\n'); console.log('扫描结果已写 ' + saveReport); } catch (e) { console.log('WARNING: 结果写不出：' + e.message); } }
   emitJson('risk', findings, counts.RED ? 6 : 0, delta ? { delta } : {});
   process.exit(counts.RED ? 6 : 0);
 }

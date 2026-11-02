@@ -27,6 +27,5 @@ test-risk-findings  9 条（新增 1 条负夹具断言）
 
 ## 仍未做
 
-- 控制台里 finding 还不能跳到文件：`locator.file` 已具备，UI 接 `vscode://file/...` 的改动还没做
-  （`renderInspector` 是一整行大函数，改动需要小心，留到下一轮单独处理）；
-- 规则级「基线差异」（新增/消失/仍存在）未做。
+- 规则级「基线差异」已有 CLI（`--baseline` / `--save-baseline`），控制台的展示已接（检查页风险区块）；
+- 控制台还不能自己触发一次扫描并落盘（现在靠 CLI 跑 `--save`），按钮留到下一轮。

@@ -230,6 +230,22 @@ try {
     await click('[data-testid="nav-checks"]');
     await click('[data-testid="check-prompt-vars"]');
     ok('check row exposes finding evidence and fix', (await text('#inspector')).includes('unsupported variable') && (await text('#inspector')).includes('replace'));
+    ok('checks view says there is no risk scan yet', await page.evaluate(() => !!document.querySelector('[data-testid="risk-empty"]')));
+    ok('risk panel renders findings, delta and a locator link', await page.evaluate(() => {
+      const saved = state.data.risk;
+      state.data.risk = { at: 'T0', delta: { added: ['a'], resolved: [], still: ['b'] }, findings: [{ ruleId: 'risk.peer-only-scope', subject: { kind: 'plugin', id: 'plug-red' }, plugin: 'plug-red@1.0.0', message: '装不活：import 了 peer-only 的官方 scope', severity: 'error', strength: 'static-ast', falsifier: '在真实宿主里 import 成功可推翻', locator: { file: 'node_modules/plug-red/package.json', line: null } }] };
+      render();
+      const meta = document.querySelector('[data-testid="risk-meta"]');
+      const rowEl = document.querySelector('[data-testid="risk-plug-red"]');
+      const okMeta = !!meta && (meta.textContent || '').includes('新增 1');
+      if (rowEl) rowEl.click();
+      const insp = document.querySelector('#inspector');
+      const link = document.querySelector('[data-testid="finding-link"]');
+      const okInsp = !!insp && (insp.textContent || '').includes('risk.peer-only-scope');
+      const okLink = !!link && (link.getAttribute('href') || '').indexOf('vscode://file/node_modules/plug-red/package.json') === 0;
+      state.data.risk = saved; render();
+      return okMeta && okInsp && okLink;
+    }));
 
     await click('[data-testid="nav-history"]');
     await click('[data-testid="history-0"]');

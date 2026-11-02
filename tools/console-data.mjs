@@ -180,6 +180,8 @@ export function collectConsoleData(profileDir, options = {}) {
   const history = (historyFile?.runs || []).filter((r) => !r.profile || String(r.profile) === profileDir || basename(String(r.profile)) === profileName).slice(-40).reverse();
   const runtime = readJson(join(state, 'runtime-' + profileName + '.json'));
   const occupancy = readJson(join(state, 'occupancy-' + profileName + '.json'));
+  // 依赖风险扫描是独立 CLI 的产物（带时间戳与可选基线差异）；没有记录就如实显示「没有记录」，不补造空结果
+  const risk = readJson(join(state, 'risk-' + profileName + '.json'));
   // 诊断 issue：与 CLI/宿主同一份归一化规则；采集失败就是空数组，不补默认通过项
   const hostBases = Array.isArray(options.hostBases) ? options.hostBases.filter(Boolean) : [];
   let healthItems = [];
@@ -209,9 +211,9 @@ export function collectConsoleData(profileDir, options = {}) {
     schema: 'turnstile/console@1',
     issues, issueGroups: groupIssues(issues), generatedAt: new Date().toISOString(),
     profile: { name: profileName, dir: cleanPath(profileDir), bundles: bundleNames.length },
-    plugins, surfaces, architecture: { rootId, nodes }, report, history, runtime, occupancy,
+    plugins, surfaces, architecture: { rootId, nodes }, report, history, runtime, occupancy, risk,
     coverage: {
-      manifest: true, report: Boolean(report), history: Boolean(historyFile), runtime: Boolean(runtime), occupancy: Boolean(occupancy),
+      manifest: true, report: Boolean(report), history: Boolean(historyFile), runtime: Boolean(runtime), occupancy: Boolean(occupancy), risk: Boolean(risk),
       note: '架构默认来自清单和 patch；只有 runtime 快照存在时才提供运行态观测。',
     },
   };

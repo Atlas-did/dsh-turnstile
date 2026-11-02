@@ -35,5 +35,12 @@ ok('对同一份结果：仍存在的项被列出', same.j && same.j.delta && sa
 const cleanBase = await run([join(here, '..', 'tests', 'risk-fixture-clean'), '--baseline', base]);
 ok('换成干净夹具：旧问题显示为消失', cleanBase.j && cleanBase.j.delta && cleanBase.j.delta.resolved.length > 0, JSON.stringify(cleanBase.j && cleanBase.j.delta));
 try { fs.unlinkSync(base); } catch {}
+// --save：控制台读的「上次扫描」必须带时间戳和差异，不能只有一堆 finding
+const saved = join(os.tmpdir(), 'risk-save-' + Date.now() + '.json');
+await run([join(here, '..', 'tests', 'risk-fixture'), '--save', saved]);
+const sj = JSON.parse(fs.readFileSync(saved, 'utf8'));
+ok('--save 写出控制台快照', typeof sj.at === 'string' && Array.isArray(sj.findings) && sj.findings.length > 0, String(sj.findings && sj.findings.length));
+ok('--save 不编造基线差异（没有基线就是 null）', sj.delta === null);
+try { fs.unlinkSync(saved); } catch {}
 console.log(fail ? 'RISK_FINDINGS_FAILED ' + fail : 'RISK_FINDINGS_OK');
 process.exitCode = fail ? 1 : 0;
