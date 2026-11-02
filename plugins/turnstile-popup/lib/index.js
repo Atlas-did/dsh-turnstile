@@ -218,7 +218,7 @@ function readRows(dir) {
   if (!existsSync(pkgPath)) return [];
   const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
   const bundles = (pkg.dsh && pkg.dsh.profile && pkg.dsh.profile.bundles) || [];
-  const patchPath = join(dir, "cordis.patch.yml");
+  const patchPath = join(dir, "cordis.patch.yml"); // readRows(dir) 自己的参数，不是环境选择
   const blocks = blocksOf(existsSync(patchPath) ? readFileSync(patchPath, "utf8") : "");
   return bundles.filter((b) => b.indexOf("@deepseek-ai/") !== 0).map((b) => {
     const d = join(dir, "node_modules", b);
@@ -1035,9 +1035,11 @@ export function apply(ctx, config) {
       const clear = args.anchor === "" || args.anchor === null || args.anchor === undefined;
       const ok = clear || (typeof args.anchor === "string" && args.anchor.length <= 40 && /^[A-Za-z0-9_.:-]+$/.test(args.anchor));
       if (!args.package || !ok) return sendJson(res, 400, { error: "args" });
-      const row = readRows(dir).find((r) => r.name === args.package);
+      const sel = target(req, res);
+      if (!sel) return;
+      const row = readRows(sel.dir).find((r) => r.name === args.package);
       if (!row || !row.row) return sendJson(res, 404, { error: "no-row", package: args.package });
-      const patchPath = join(dir, "cordis.patch.yml");
+      const patchPath = join(sel.dir, "cordis.patch.yml");
       if (!existsSync(patchPath)) return sendJson(res, 404, { error: "no-patch" });
       const lines = readFileSync(patchPath, "utf8").split(/\r?\n/);
       const idx = lines.findIndex((l) => new RegExp("^\\s*-?\\s*id:\\s*" + row.row.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*$").test(l));
@@ -1081,9 +1083,11 @@ export function apply(ctx, config) {
         return sendJson(res, 400, { error: "body 不是 JSON：" + String(e.message).slice(0, 120) });
       }
       const args = parsedRaw || {};
-      const row = readRows(dir).find((r) => r.name === args.package);
+      const sel = target(req, res);
+      if (!sel) return;
+      const row = readRows(sel.dir).find((r) => r.name === args.package);
       if (!row || !row.row) return sendJson(res, 404, { error: "no-row", package: args.package });
-      const patchPath = join(dir, "cordis.patch.yml");
+      const patchPath = join(sel.dir, "cordis.patch.yml");
       const before = existsSync(patchPath) ? readFileSync(patchPath, "utf8") : "";
       const nextText = toggle(before, row.row, Boolean(args.disable));
       return txnWrite(res, patchPath, nextText, args, "toggle:" + row.name + "=" + (args.disable ? "off" : "on"));
