@@ -580,6 +580,12 @@ try {
       state.selected = saved; state.inspectorTab = tab; renderInspector();
       return href === 'vscode://file/src/x.js:7' && refused;
     }));
+    // 控制台里有个同名 history() 视图函数，window.history 被它占掉了，所以走真实导航而不是 replaceState
+    const envReqs = [];
+    page.on('request', (r) => envReqs.push(r.url()));
+    await page.goto(base + '/?env=main:console-fixture', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(900); // 等首屏数据请求发出后再断言（导航后不需要再渲染任何具体元素）
+    ok('data requests carry the selected environment', envReqs.some((u) => u.indexOf('/api/console') !== -1 && u.indexOf('env=main') !== -1), JSON.stringify(envReqs.slice(-3)));
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {
