@@ -280,6 +280,10 @@ export function apply(ctx, config) {
     if (!found) { sendJson(res, 400, { error: "unknown-environment", env: id }); return null; }
     return found;
   }
+  function selectedDir(req, res) {
+    const row = target(req, res);
+    return row ? row.dir : null;
+  }
   function targetState(row) {
     return row && row.kind === "mini" ? join(miniHome, "state") : STATE_DIR();
   }
@@ -594,7 +598,7 @@ export function apply(ctx, config) {
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
       bump("plugins");
-      const rowsNow = readRows(dir);
+      const rowsNow = readRows(selectedDir(req, res) || dir);
       const peek = String(req.url || "").indexOf("update=0") !== -1;
       sendJson(res, 200, { profile, rows: rowsNow, delta: peek ? null : computeDelta(rowsNow) });
     }
