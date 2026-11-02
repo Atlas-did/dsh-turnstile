@@ -441,13 +441,15 @@ export function apply(ctx, config) {
         const args = JSON.parse(body || "{}");
         dryRun = args.dryRun !== false;
         const summary = Array.isArray(args.operations) ? args.operations.slice(0, 100).map((op) => ({ type: String(op?.type || ""), package: String(op?.package || ""), disable: typeof op?.disable === "boolean" ? op.disable : undefined, anchor: typeof op?.anchor === "string" ? op.anchor : undefined })) : [];
-        beginOperation(STATE_DIR(), { planId, kind: "designer", dryRun, target: "cordis.patch.yml", workspace: String(args.workspace || "default").slice(0, 80), operationCount: summary.length, operations: summary });
+        const dsel = target(req, res);
+        if (!dsel) return;
+        beginOperation(targetState(dsel), { planId, kind: "designer", dryRun, target: "cordis.patch.yml", workspace: String(args.workspace || "default").slice(0, 80), operationCount: summary.length, operations: summary });
         started = true;
-        const result = designerTransaction(dir, args.operations, { dryRun, expected: args.expected }, readRows(dir));
-        settleOperation(STATE_DIR(), planId, dryRun ? "previewed" : "applied", { changed: result.changed });
+        const result = designerTransaction(dsel.dir, args.operations, { dryRun, expected: args.expected }, readRows(dsel.dir));
+        settleOperation(targetState(dsel), planId, dryRun ? "previewed" : "applied", { changed: result.changed });
         sendJson(res, 200, Object.assign({}, result, { auditId: planId }));
       } catch (e) {
-        if (started) { try { settleOperation(STATE_DIR(), planId, "failed", String((e && e.message) || e).slice(0, 180)); } catch {} }
+        if (started) { try { settleOperation(targetState(dsel), planId, "failed", String((e && e.message) || e).slice(0, 180)); } catch {} }
         sendJson(res, e.status || 400, { error: String((e && e.message) || e).slice(0, 180), details: e.details || [], auditId: started ? planId : undefined });
       }
     },
