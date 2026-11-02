@@ -4,6 +4,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { createConsoleServer } from './console-server.mjs';
+import { installTokenFetch } from './lib/test-auth.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 let fail = 0;
@@ -27,6 +28,7 @@ const profileDir = join(tmp, 'p');
 mkdirSync(profileDir, { recursive: true });
 writeFileSync(join(profileDir, 'package.json'), JSON.stringify({ name: 'p', version: '0.0.1' }));
 const server = createConsoleServer({ profileDir, stateDir: join(tmp, 's') });
+installTokenFetch(server.turnstileToken);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = 'http://127.0.0.1:' + server.address().port;
 const res = await fetch(base + '/turnstile/tokens.css');

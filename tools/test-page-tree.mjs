@@ -3,6 +3,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { createConsoleServer } from './console-server.mjs';
+import { installTokenFetch } from './lib/test-auth.mjs';
 
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
@@ -12,6 +13,7 @@ mkdirSync(profileDir, { recursive: true });
 writeFileSync(join(profileDir, 'package.json'), JSON.stringify({ name: 'p', version: '0.0.1' }));
 const stateDir = join(tmp, 'state');
 const server = createConsoleServer({ profileDir, stateDir });
+installTokenFetch(server.turnstileToken);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = 'http://127.0.0.1:' + server.address().port;
 const post = async (body) => { const r = await fetch(base + '/turnstile/page', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); return { status: r.status, body: await r.json() }; };

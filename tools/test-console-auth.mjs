@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { request } from 'node:http';
 import { copyTreeSafe } from './safe-copy.mjs';
 import { createConsoleServer } from './console-server.mjs';
 
@@ -35,11 +36,24 @@ try {
   const health = await call('/health');
   ok('存活探针保持匿名', health.status === 200, 'status=' + health.status);
 
-  const names = JSON.parse(read.text).plugins.map((p) => p.name).filter(Boolean);
+  const authRead = await fetch(base + '/api/console', { headers: { 'x-turnstile-token': server.turnstileToken } });
+  ok('正确的令牌可以读数据', authRead.status === 200, 'status=' + authRead.status);
+  const names = (await authRead.json()).plugins.map((p) => p.name).filter(Boolean);
   const target = names.find((n) => /plug-/.test(n)) || names[0];
+  const wrong = await call('/api/console', { headers: { 'x-turnstile-token': 'nope-' + Date.now() } });
+  ok('错误的令牌同样是 401', wrong.status === 401, 'status=' + wrong.status);
+  const crossOrigin = await call('/api/console', { headers: { 'x-turnstile-token': server.turnstileToken, origin: 'http://evil.example' } });
+  ok('跨源请求即使带对令牌也 403', crossOrigin.status === 403, 'status=' + crossOrigin.status);
+  // fetch 不允许改 Host，这条只能用 http.request 打
+  const badHost = await new Promise((resolve) => {
+    const probe = request({ host: '127.0.0.1', port: server.address().port, path: '/api/console', method: 'GET', headers: { host: 'evil.example', 'x-turnstile-token': server.turnstileToken } }, (r2) => { r2.resume(); resolve(r2.statusCode); });
+    probe.on('error', () => resolve(0));
+    probe.end();
+  });
+  ok('非本机 Host 被拒绝（防 rebinding）', badHost === 403, 'status=' + badHost);
   const toggle = await call('/turnstile/toggle', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', origin: 'http://evil.example' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ package: target, dryRun: false, disable: true }),
   });
   const patchAfter = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : '';

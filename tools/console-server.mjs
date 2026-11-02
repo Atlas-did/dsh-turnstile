@@ -18,7 +18,10 @@ import { readViewState, writeViewState } from '../plugins/turnstile-popup/lib/vi
 import { exportPlugin } from '../plugins/turnstile-popup/lib/plugin-export.js';
 import { verifyExportedPlugin } from '../plugins/turnstile-popup/lib/export-verify.js';
 import { beginOperation, settleOperation, listOperations } from '../plugins/turnstile-popup/lib/journal.js';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes } from 'node:crypto';
+import { chmodSync } from 'node:fs';
+import { originAllowed, hostAllowed, PAGE_ROUTES, credentialOf, tokenMatches, sessionCookie } from '../plugins/turnstile-popup/lib/console-auth.js';
+import { routeFor } from './lib/routes.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const pluginLib = join(root, 'plugins', 'turnstile-popup', 'lib');
@@ -26,8 +29,10 @@ const consoleFile = join(pluginLib, 'console.html');
 const designerFile = join(pluginLib, 'console-designer.js');
 
 // fixture=true 时返回可复现的假数据（仅供 e2e）；默认走真实工具，假数据不再无标注地混进生产路径。
-export function createConsoleServer({ profileDir, stateDir, fixture = false } = {}) {
+export function createConsoleServer({ profileDir, stateDir, fixture = false, token = '', sessionFile = '' } = {}) {
   const dir = resolve(profileDir || join(root, 'tests', 'console-fixture'));
+  // 每启动一份凭据（Q1=A）。不提供关闭认证的选项（Q4=1）：想省事只能在进程内注入固定令牌。
+  const authToken = String(token || randomBytes(18).toString('base64url'));
   // 页面版本：文件 mtime+size 的哈希，够用来发现「别处改过」，不需要额外存储
   // 真实模式读 profile 里实际装了多少插件（不写死包名）
   const readInstalledPlugins = (profileDir) => {
@@ -47,9 +52,36 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
   };
 
   const state = stateDir || (dir.includes(join('tests', 'console-fixture')) ? join(dir, '.turnstile') : undefined);
-  return createServer(async (req, res) => {
+  // 会话令牌落盘只给 CLI 入口用（Q2=B）；测试进程内直接读 server.turnstileToken，不产生文件。
+  if (sessionFile) {
+    try {
+      mkdirSync(dirname(sessionFile), { recursive: true });
+      writeFileSync(sessionFile, JSON.stringify({ token: authToken, at: new Date().toISOString(), profile: dir, fixture: Boolean(fixture) }) + '\n', { mode: 0o600 });
+      try { chmodSync(sessionFile, 0o600); } catch { /* Windows 上 chmod 对 ACL 基本无效：best-effort，不假装成功 */ }
+    } catch { /* 写不出会话文件不阻断启动：令牌仍可从 --token 拿到 */ }
+  }
+  const server = createServer(async (req, res) => {
     const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
     const json = (code, value) => { res.statusCode = code; res.setHeader('content-type', 'application/json; charset=utf-8'); res.end(JSON.stringify(value)); };
+    // 统一认证闸门（Q1=A / Q3=2 / Q4=1 / Q6）：Host 与 Origin 白名单先行，再按路由要求凭据；
+    // 只有 /health 匿名，只有三张引导页接受 ?token=，其余路由只认 cookie 或 x-turnstile-token 头。
+    if (!hostAllowed(req.headers.host)) return json(403, { error: 'host' });
+    if (!originAllowed(req.headers.origin)) return json(403, { error: 'cross-origin' });
+    const route = routeFor(pathname);
+    if (route && route.kind !== 'liveness') {
+      const isPage = PAGE_ROUTES.has(route.path);
+      const presented = credentialOf(req, { allowQuery: isPage });
+      if (!tokenMatches(authToken, presented)) {
+        if (isPage && req.method !== 'POST') {
+          res.statusCode = 401;
+          res.setHeader('content-type', 'text/html; charset=utf-8');
+          res.end('<!doctype html><meta charset="utf-8"><title>需要令牌</title><body style="font-family:system-ui;padding:40px;line-height:1.7"><h1>需要令牌</h1><p>用启动时给你的带令牌 URL 打开本页；令牌也可以从控制台 session 文件里读。</p></body>');
+          return;
+        }
+        return json(401, { error: 'unauthorized' });
+      }
+      if (isPage && new URL(req.url, 'http://127.0.0.1').searchParams.get('token')) res.setHeader('set-cookie', sessionCookie(authToken));
+    }
     if (pathname === '/turnstile/diagnose' && fixture) {
       res.setHeader('content-type', 'application/json; charset=utf-8');
       res.end(JSON.stringify({ fixture: true, verdict: 'failing', files: 2, records: 42, channels: [
@@ -440,6 +472,8 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false } = 
     res.statusCode = 404;
     res.end('not found');
   });
+  server.turnstileToken = authToken;
+  return server;
 }
 
 function arg(name, fallback) {
@@ -462,10 +496,17 @@ if (isMain) {
   const port = Number(arg('--port', '7100'));
   // --fixture：显式用可复现的假数据（e2e/演示用）；默认走真实工具，假数据不会无声出现。
   const useFixture = process.argv.includes('--fixture');
-  const server = createConsoleServer({ profileDir, fixture: useFixture });
+  // 令牌：--token 显式指定（演示/脚本），否则每启动随机一份；落到会话文件供 CLI/脚本读取（Q2=B）。
+  const explicitToken = arg('--token', process.env.TURNSTILE_TOKEN || '');
+  // 不往夹具里写运行产物：fixture profile 下不落会话文件（令牌只走 --token 或终端输出）
+  const sessionFile = /tests[\\/]console-fixture/.test(profileDir) ? '' : join(profileDir, '.turnstile', 'console-session.json');
+  const server = createConsoleServer({ profileDir, fixture: useFixture, token: explicitToken, sessionFile });
   server.listen(port, host, () => {
     const address = server.address();
-    console.log('Turnstile console: http://' + host + ':' + address.port + '/');
+    if (!/^(127\.0\.0\.1|localhost|\[::1\])$/.test(host)) console.log('WARNING: 绑定 ' + host + '（非 loopback）：持有令牌的人都能读写这个 profile');
+    console.log('Turnstile console: http://' + host + ':' + address.port + '/  (需要令牌)');
+    console.log('引导 URL: http://' + host + ':' + address.port + '/?token=' + server.turnstileToken);
+    console.log('令牌文件: ' + sessionFile + (explicitToken ? '（来自 --token）' : ''));
     console.log('Profile: ' + profileDir + ' (changes require preview and confirmation)');
     console.log('Data: ' + (useFixture ? 'FIXTURE（假数据，仅供演示）' : 'real（真跑工具）'));
   });

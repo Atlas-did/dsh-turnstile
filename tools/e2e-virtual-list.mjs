@@ -34,6 +34,7 @@ let browser = null;
 for (const channel of ['msedge', 'chrome']) { try { browser = await chromium.launch({ channel, headless: true }); break; } catch {} }
 if (!browser) browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
+  await page.setExtraHTTPHeaders({ 'x-turnstile-token': server.turnstileToken });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 let failed = 0;

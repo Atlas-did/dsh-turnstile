@@ -67,6 +67,7 @@ try {
     process.exitCode = 3;
   } else {
     const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
+  await page.setExtraHTTPHeaders({ 'x-turnstile-token': server.turnstileToken });
     page.on('pageerror', (e) => pageErrors.push(String(e.message || e)));
     await page.goto(base, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid="metric-architecture"]');

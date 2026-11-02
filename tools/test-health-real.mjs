@@ -4,6 +4,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { createConsoleServer } from './console-server.mjs';
+import { installTokenFetch } from './lib/test-auth.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 let fail = 0;
@@ -20,6 +21,7 @@ writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
 
 async function boot(opts, stateName) {
   const server = createConsoleServer(Object.assign({ profileDir, stateDir: join(tmp, stateName) }, opts));
+installTokenFetch(server.turnstileToken);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const base = 'http://127.0.0.1:' + server.address().port;
   return { server, base };

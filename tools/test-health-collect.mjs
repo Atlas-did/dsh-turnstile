@@ -4,6 +4,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { createConsoleServer } from './console-server.mjs';
+import { installTokenFetch } from './lib/test-auth.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 let fail = 0;
@@ -22,6 +23,7 @@ writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
 process.env.DSH_HOME = home;
 
 const server = createConsoleServer({ profileDir, stateDir: join(tmp, 'state'), fixture: false });
+installTokenFetch(server.turnstileToken);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = 'http://127.0.0.1:' + server.address().port;
 const body = await (await fetch(base + '/turnstile/health')).json();

@@ -25,6 +25,7 @@ try {
   browser = await chromium.launch({ channel: 'msedge', headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
+  await page.setExtraHTTPHeaders({ 'x-turnstile-token': server.turnstileToken });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(base + '/', { waitUntil: 'domcontentloaded' });
