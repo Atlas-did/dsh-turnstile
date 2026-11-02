@@ -175,7 +175,7 @@ try {
       if (expectMounted && !(await page.locator('[data-testid="panel"]').count())) throw new Error("panel unmounted after click");
     }
 
-    ok("panel mounts with real client and routes", true);
+    ok("panel mounts with real client and routes", (await page.locator('[data-testid="panel"]').count()) === 1 && (await page.locator('[data-testid="gate-badge"]').count()) === 1);
     ok("gate verdict comes from report", /1 项阻塞/.test(await page.locator('[data-testid="gate-badge"]').innerText()));
     ok("all three plugins render", (await page.locator('[data-testid^="row-"]').count()) === 3);
 
@@ -261,7 +261,8 @@ try {
     const inspectBox = await page.locator('[data-testid="inspect-target"]').boundingBox();
     await page.mouse.move(inspectBox.x + inspectBox.width / 2, inspectBox.y + inspectBox.height / 2);
     await page.waitForSelector('[data-testid="inspect-highlight"]');
-    ok("crosshair hover draws the real target bounds", true);
+    const hlBox = await page.locator('[data-testid="inspect-highlight"]').boundingBox();
+    ok("crosshair hover draws the real target bounds", Boolean(hlBox) && hlBox.width > 4 && hlBox.height > 4 && Math.abs(hlBox.width - inspectBox.width) < 3 && Math.abs(hlBox.height - inspectBox.height) < 3, JSON.stringify({ hlBox, inspectBox }));
     await page.mouse.click(inspectBox.x + inspectBox.width / 2, inspectBox.y + inspectBox.height / 2);
     await page.waitForSelector('[data-testid="inspect-result"]');
     const inspected = await page.locator('[data-testid="inspect-result"]').innerText();
@@ -287,7 +288,7 @@ try {
     const reopenBox = await page.locator('[data-testid="reopen"]').boundingBox();
     await page.mouse.click(reopenBox.x + reopenBox.width / 2, reopenBox.y + reopenBox.height / 2);
     await page.waitForSelector('[data-testid="panel"]');
-    ok("reopen restores the panel", true);
+    ok("reopen restores the panel", (await page.locator('[data-testid="panel"]').count()) === 1 && (await page.locator('[data-testid="reopen"]').count()) === 0);
 
     await page.screenshot({ path: join(state, "panel-offline.png"), fullPage: true });
     const handle = page.locator('[data-testid="drag-handle"]');
