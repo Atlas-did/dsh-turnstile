@@ -9,6 +9,7 @@ import { makePlan, applyPlan, describePlan } from "./txn.js";
 import { validatePageTree } from "./page-validate.js";
 import { readPage, writePage } from "./page-store.js";
 import { readJsonBody, readJsonText, BODY_TOO_LARGE } from "./body.js";
+import { resolveAsset } from "./asset-path.js";
 import { collectConsoleData } from "./console-data.js";
 import { readViewState, writeViewState } from "./view-state.js";
 import { toggleText } from "./toggle-text.js";
@@ -746,22 +747,19 @@ export function apply(ctx, config) {
       const q = String(req.url || "");
       const m = /[?&]path=([^&]*)/.exec(q);
       if (!m) return sendJson(res, 400, { error: "缺少 path" });
-      const wanted = decodeURIComponent(m[1]);
+      // C-08：路径边界收到 asset-path.js 里（缺根拒绝 / 解码失败 400 / 真实路径再校验防软链接）
+      let wanted = "";
+      try { wanted = decodeURIComponent(m[1]); } catch { return sendJson(res, 400, { error: "path 无法解码" }); }
       const repo = process.env.DSH_TURNSTILE_HOME || "";
       const roots = [
-        join(repo, "docs", "img"),
-        join(repo, "state"),
+        repo ? join(repo, "docs", "img") : "",
+        repo ? join(repo, "state") : "",
         process.env.DSH_TURNSTILE_ASSETS || "",
-      ].filter(Boolean).map((p) => resolve(p));
-      const target = resolve(wanted);
-      const ok = roots.some((r) => target === r || target.startsWith(r + sep));
-      if (!ok) return sendJson(res, 403, { error: "不在允许的图片目录里", tried: target, roots });
-      if (!existsSync(target)) return sendJson(res, 404, { error: "文件不存在", target });
-      const ext = (target.split(".").pop() || "").toLowerCase();
-      const types = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml" };
-      if (!types[ext]) return sendJson(res, 415, { error: "不是图片：" + ext });
-      res.writeHead(200, { "content-type": types[ext], "cache-control": "no-store" });
-      res.end(readFileSync(target));
+      ].filter(Boolean);
+      const resolved = resolveAsset({ wanted, roots });
+      if (!resolved.ok) return sendJson(res, resolved.status, { error: resolved.error, target: resolved.target, roots });
+      res.writeHead(200, { "content-type": resolved.type, "cache-control": "no-store" });
+      res.end(readFileSync(resolved.file));
     },
   }), "turnstile: GET /turnstile/asset");
   // 宿主内页面：/turnstile/view 只读渲染 state 里的页面 JSON（搭建器负责编辑）。
