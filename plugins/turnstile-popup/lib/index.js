@@ -700,6 +700,11 @@ export function apply(ctx, config) {
       try {
         const libDir = dirname(fileURLToPath(import.meta.url));
         const mod = await import(pathToFileURL(join(libDir, "run-route.js")).href);
+        // 命令的目标环境：mini 环境时注入 mini 根与目标 profile，避免命令跑到启动时的 profile 上
+        const rsel = target(req, res);
+        if (!rsel) return;
+        if (rsel.kind === 'mini') parsed.args = Object.assign({}, parsed.args, { mini: miniHome });
+        if (rsel.dir) parsed.args = Object.assign({}, parsed.args, { profile: rsel.dir });
         const out = await mod.handleRun(parsed, { toolsRoot: process.env.DSH_TURNSTILE_HOME ? join(process.env.DSH_TURNSTILE_HOME, 'tools') : undefined });
         return sendJson(res, out.status, out.body);
       } catch (e) { return sendJson(res, 500, { ok: false, verdict: "unknown", summary: String(e.message).slice(0, 200) }); }
