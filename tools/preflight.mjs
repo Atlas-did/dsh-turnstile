@@ -11,6 +11,7 @@ import { existsSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadCheckManifest } from './lib/check-manifest.mjs';
+import { stateFromCheck } from './lib/check-phase.mjs';
 
 const run = promisify(execFile);
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -146,6 +147,9 @@ async function one(c) {
 }
 
 const results = await Promise.all(selected.map(one));
+// 每条检查都带六态（未执行/跳过/超时/检查器失败/目标未通过/无变化）。
+// 判 blocking 仍用 ok，不改门禁语义；state 只是把「为什么」说清楚。
+for (const r of results) r.state = stateFromCheck(r);
 // A check marked advisory can report findings without blocking the gate (e.g. an engine skip
 // means "this plugin will not load", not "your profile is broken").
 const blocking = results.filter((r) => !r.ok && !selected.find((c) => c.name === r.name)?.advisory);
@@ -164,7 +168,7 @@ if (!isFlag('--no-report')) {
       generatedAt: new Date().toISOString(),
       runtimeTimeoutMs: timeout,
       checks: results.map((r) => ({
-        name: r.name, source: r.source, ok: r.ok, exit: r.exit, ms: r.ms, timedOut: Boolean(r.timedOut),
+        name: r.name, state: r.state, source: r.source, ok: r.ok, exit: r.exit, ms: r.ms, timedOut: Boolean(r.timedOut),
         skipped: Boolean(r.skipped), skipReason: r.skipReason || null, next: r.next || null,
         structured: r.structured, findings: r.findings,
         summary: r.structured ? '' : (r.out.trim().split('\n').pop() || '').slice(0, 200),
@@ -181,7 +185,7 @@ if (isFlag('--json')) {
     profile: dir,
     timeoutMs: timeout,
     checks: results.map((r) => ({
-      name: r.name, source: r.source, ok: r.ok, exit: r.exit, ms: r.ms, timedOut: Boolean(r.timedOut),
+      name: r.name, state: r.state, source: r.source, ok: r.ok, exit: r.exit, ms: r.ms, timedOut: Boolean(r.timedOut),
       skipped: Boolean(r.skipped), skipReason: r.skipReason || null, next: r.next || null,
       structured: r.structured, findings: r.findings,
       summary: r.structured ? '' : (r.out.trim().split('\n').pop() || '').slice(0, 200),
