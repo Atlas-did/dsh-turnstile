@@ -52,7 +52,12 @@ const run = (args) => new Promise((resolve) => {
 });
 const dry = await run([profileDir, '--state', stateDir]);
 ok('不加 --write 时不创建 state 目录', dry.code === 0 && !existsSync(join(stateDir, 'provision')));
-const wrote = await run([profileDir, '--state', stateDir, '--write']);
+// C-05：--write 旁路已移除，落盘必须先 --plan 拿 token
+const legacyWrite = await run([profileDir, '--state', stateDir, '--write']);
+ok('无 token 的 --write 被移除（迁移错误，不是静默继续）', legacyWrite.code === 2, String(legacyWrite.code));
+const planForWrite = await run([profileDir, '--state', stateDir, '--plan']);
+const planW = JSON.parse((planForWrite.out.match(/\{[\s\S]*\}/) || ['{}'])[0] || '{}');
+const wrote = await run([profileDir, '--state', stateDir, '--apply', '--token', String(planW.token || '')]);
 const files = existsSync(join(stateDir, 'provision')) ? readdirSync(join(stateDir, 'provision')) : [];
 ok('--write 写出机器与卡片两个文件', wrote.code === 0 && files.length === 2, JSON.stringify(files));
 const check = await run([profileDir, '--state', stateDir, '--check']);

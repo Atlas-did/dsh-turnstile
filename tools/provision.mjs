@@ -110,7 +110,7 @@ if (isMain) {
   const val = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
   const has = (n) => argv.includes(n);
   const profileArg = argv.find((a) => !a.startsWith('--') && a !== val('--state'));
-  if (!profileArg) { console.error('usage: node tools/provision.mjs <profileDir> [--json] [--write] [--state <dir>] [--check]'); process.exit(2); }
+  if (!profileArg) { console.error('usage: node tools/provision.mjs <profileDir> [--json] [--plan|--apply --token <t>] [--state <dir>] [--check]'); process.exit(2); }
   const profileDir = profileArg;
   if (!existsSync(join(profileDir, 'package.json'))) { console.error('not a profile: ' + profileDir); process.exit(2); }
 
@@ -134,15 +134,20 @@ if (isMain) {
     process.exit(0);
   }
 
-  if (has('--apply') || has('--write')) {
+  // C-05：无 token 的 --write 旁路已移除。旧脚本必须迁移成 --plan → --apply --token，
+  // 否则「写卡片」可以完全绕过确认流，和一次性 token 的设计自相矛盾。
+  if (has('--write')) {
+    console.error('--write 已移除：写卡片必须先 --plan 拿一次性 token，再 --apply --token（见 docs/186-provision-batch-schema.md）');
+    process.exit(2);
+  }
+  if (has('--apply')) {
     const token = val('--token');
-    if (token) {
-      const checked = verify(token, 'provision', plan);
-      if (!checked.ok) { console.error(checked.reason); process.exit(1); }
-    } else if (!has('--write')) {
+    if (!token) {
       console.error('--apply 需要 --token（先跑 --plan）');
       process.exit(2);
     }
+    const checked = verify(token, 'provision', plan);
+    if (!checked.ok) { console.error(checked.reason); process.exit(1); }
     const files = writeCards(machine, card, stateDir);
     // 写后复探：刚写的卡必须与当前机器一致，否则说明中间有变化
     const again = probeMachine(process.env);
@@ -160,5 +165,5 @@ if (isMain) {
   console.log('profile：' + card.profile + '  插件 ' + card.plugins.length + '（已安装 ' + card.plugins.filter((p) => p.installed).length + '）');
   console.log('能力：' + Object.entries(machine.capabilities).map(([k, v]) => k + '=' + v.state).join('  '));
   console.log('');
-  console.log('这是只读探测，没有写任何文件。加 --write 才会落盘（' + stateDir + '）。');
+  console.log('这是只读探测，没有写任何文件。落盘要走 --plan 拿一次性 token，再 --apply --token（目标目录 ' + stateDir + '）。');
 }
