@@ -22,5 +22,18 @@ ok('severity 用 error/warning 而不是内部色阶', ['error', 'warning'].incl
 // 成对夹具：同一条规则在「声明了依赖」的插件上必须是绿的（否则规则只会报警）
 const clean = await run([join(here, '..', 'tests', 'risk-fixture-clean')]);
 ok('负夹具：声明了官方 scope 的插件不报警', clean.j && clean.j.status === 'pass' && (clean.j.findings || []).length === 0, JSON.stringify(clean.j && clean.j.findings));
+
+// 基线差异（方案 03-D）：同一规则、同一对象 → 稳定键；新增/消失要能区分
+const os = await import('node:os');
+const fs = await import('node:fs');
+const base = join(os.tmpdir(), 'risk-baseline-' + Date.now() + '.json');
+await run([join(here, '..', 'tests', 'risk-fixture'), '--save-baseline', base]);
+ok('基线文件写出', fs.existsSync(base));
+const same = await run([join(here, '..', 'tests', 'risk-fixture'), '--baseline', base]);
+ok('对同一份结果：没有任何新增', same.j && same.j.delta && same.j.delta.added.length === 0, JSON.stringify(same.j && same.j.delta));
+ok('对同一份结果：仍存在的项被列出', same.j && same.j.delta && same.j.delta.still.length > 0, String(same.j && same.j.delta && same.j.delta.still.length));
+const cleanBase = await run([join(here, '..', 'tests', 'risk-fixture-clean'), '--baseline', base]);
+ok('换成干净夹具：旧问题显示为消失', cleanBase.j && cleanBase.j.delta && cleanBase.j.delta.resolved.length > 0, JSON.stringify(cleanBase.j && cleanBase.j.delta));
+try { fs.unlinkSync(base); } catch {}
 console.log(fail ? 'RISK_FINDINGS_FAILED ' + fail : 'RISK_FINDINGS_OK');
 process.exitCode = fail ? 1 : 0;

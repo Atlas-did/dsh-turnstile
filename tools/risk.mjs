@@ -2,7 +2,7 @@
 // Idea: a plugin that imports a non-official scope (@someone/x) only works on
 // the author's machine unless that package is a real dependency (not a peer).
 // usage: node tools/risk.mjs <profileDir>
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { importsOf } from './scan.mjs';
 import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
@@ -115,7 +115,19 @@ if (wantsJson()) {
     evidence: { file: 'node_modules/' + r.name + '/package.json', importEvidence: lastEvidence },
     ...(r.alias ? { fix: { kind: 'npm-alias', snippet: r.alias } } : {}),
   }));
-  emitJson('risk', findings, counts.RED ? 6 : 0);
+  const baseFlag = (() => { const i = process.argv.indexOf('--baseline'); return i >= 0 ? process.argv[i + 1] : null; })();
+  const saveFlag = (() => { const i = process.argv.indexOf('--save-baseline'); return i >= 0 ? process.argv[i + 1] : null; })();
+  const keyOf = (f) => (f.ruleId || 'risk.unknown') + '|' + ((f.subject && f.subject.id) || f.plugin || '');
+  let baseline = null;
+  if (baseFlag) { try { baseline = JSON.parse(readFileSync(baseFlag, 'utf8')); } catch { console.log('WARNING: 读不出基线 ' + baseFlag + '，按首次运行处理'); } }
+  let delta = null;
+  if (baseline && Array.isArray(baseline.findings)) {
+    const before = new Set(baseline.findings.map(keyOf));
+    const after = new Set(findings.map(keyOf));
+    delta = { added: [...after].filter((k) => !before.has(k)), resolved: [...before].filter((k) => !after.has(k)), still: [...after].filter((k) => before.has(k)) };
+  }
+  if (saveFlag) { try { writeFileSync(saveFlag, JSON.stringify({ at: new Date().toISOString(), findings: findings.map((f) => ({ ruleId: f.ruleId, subject: f.subject, plugin: f.plugin })) }, null, 2) + '\n'); console.log('基线已写 ' + saveFlag); } catch (e) { console.log('WARNING: 基线写不出：' + e.message); } }
+  emitJson('risk', findings, counts.RED ? 6 : 0, delta ? { delta } : {});
   process.exit(counts.RED ? 6 : 0);
 }
 process.exitCode = counts.RED ? 6 : 0;
