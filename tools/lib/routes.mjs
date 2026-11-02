@@ -3,9 +3,9 @@
 // 目的：把「哪些路由只是静态资源、哪些读数据、哪些写 profile」写在一处，
 // 这样新增路由不能悄悄绕过认证，也不会出现「页面能点、CLI 没有」的两套语义。
 //
-// 现状（source-confirmed，未运行取证）：console-server.mjs 没有认证中间层，
-// /turnstile/toggle 与 /turnstile/designer 会自行写文件。本表只是声明，
-// POLICY_ENFORCED 仍是 false；执行接入在下一包（见第 01 包）。
+// 现状：console-server.mjs 已在每个路由前执行本策略（Host/Origin 白名单 + 每启动令牌），
+// 所以 POLICY_ENFORCED = true；test-console-auth 用真实 HTTP 证明未认证请求被拒。
+// 宿主侧（plugins/turnstile-popup/lib/index.js）仍只查令牌字段存在，属于 C-02，另行处理。
 //
 // 字段：
 //   kind      page | asset | read | state | write | liveness
@@ -15,7 +15,7 @@
 //   stateWrite 只写 .turnstile 状态（审计、缓存），不改用户配置
 //   bodyLimit POST 正文上限（字节）；0 表示不做正文解析
 
-export const POLICY_ENFORCED = false;
+export const POLICY_ENFORCED = true;
 
 const page = (path) => ({ path, kind: 'page', methods: ['GET'], auth: 'token', mutating: false, stateWrite: false, bodyLimit: 0 });
 const asset = (path) => ({ path, kind: 'asset', methods: ['GET'], auth: 'token', mutating: false, stateWrite: false, bodyLimit: 0 });

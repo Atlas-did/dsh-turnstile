@@ -501,9 +501,11 @@ if (isMain) {
   const useFixture = process.argv.includes('--fixture');
   // 令牌：--token 显式指定（演示/脚本），否则每启动随机一份；落到会话文件供 CLI/脚本读取（Q2=B）。
   const explicitToken = arg('--token', process.env.TURNSTILE_TOKEN || '');
+  // 宿主启动身份：由启动方注入（--boot-id 或 TURNSTILE_BOOT_ID），控制台不自己去猜
+  const bootId = arg('--boot-id', process.env.TURNSTILE_BOOT_ID || '');
   // 不往夹具里写运行产物：fixture profile 下不落会话文件（令牌只走 --token 或终端输出）
   const sessionFile = /tests[\\/]console-fixture/.test(profileDir) ? '' : join(profileDir, '.turnstile', 'console-session.json');
-  const server = createConsoleServer({ profileDir, fixture: useFixture, token: explicitToken, sessionFile });
+  const server = createConsoleServer({ profileDir, fixture: useFixture, token: explicitToken, sessionFile, bootId });
   server.listen(port, host, () => {
     const address = server.address();
     if (!/^(127\.0\.0\.1|localhost|\[::1\])$/.test(host)) console.log('WARNING: 绑定 ' + host + '（非 loopback）：持有令牌的人都能读写这个 profile');

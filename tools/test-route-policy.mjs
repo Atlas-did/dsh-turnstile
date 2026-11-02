@@ -45,8 +45,9 @@ ok('除存活探针外都需要凭据', ROUTES.filter((r) => r.kind !== 'livenes
 ok('存活探针保持匿名（供脚本探活）', routeFor('/health').auth === 'none');
 ok('写路由全部要求凭据', ROUTES.filter((r) => r.mutating).every((r) => r.auth === 'token'));
 ok('高风险写入集中在已知的五个路由', summary.mutating.length === 5, summary.mutating.join(' '));
-ok('策略目前只声明、未执行（下一包接入）', POLICY_ENFORCED === false && summary.enforced === false);
+ok('策略已执行', POLICY_ENFORCED === true && summary.enforced === true);
+ok('控制台确实加载了认证原语（不是只写在表里）', /tokenMatches|console-auth/.test(source), 'console-server 需要 import console-auth');
 
 console.log(fail ? 'ROUTE_POLICY_FAILED ' + fail : 'ROUTE_POLICY_OK');
-console.log('提示：POLICY_ENFORCED=false 时控制台仍无认证，本测试只保证清单与实现一致。');
+console.log('提示：本测试保证「清单与实现一致」；认证本身由 test-console-auth 用真实 HTTP 证明。');
 process.exitCode = fail ? 1 : 0;
