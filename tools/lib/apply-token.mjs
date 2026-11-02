@@ -9,8 +9,15 @@ import { tmpdir } from 'node:os';
 const TTL = 5 * 60 * 1000;
 const DEDUPE = 2000;
 
+// 目录解析与宿主插件保持一致（index.js 用 DSH_HOME/turnstile-state），不新增第四套推导：
+//   DSH_TURNSTILE_STATE > DSH_HOME/turnstile-state > 用户主目录下的 .dsh/turnstile-state > 系统临时目录（仅兜底）
+function storeDir() {
+  const home = process.env.DSH_HOME || join(process.env.USERPROFILE || process.env.HOME || '', '.dsh');
+  return process.env.DSH_TURNSTILE_STATE || (home ? join(home, 'turnstile-state') : join(tmpdir(), 'turnstile-state'));
+}
+
 function storePath() {
-  const base = process.env.DSH_TURNSTILE_STATE || join(tmpdir(), 'turnstile-state');
+  const base = storeDir();
   try { mkdirSync(base, { recursive: true }); } catch {}
   return join(base, 'apply-tokens.json');
 }

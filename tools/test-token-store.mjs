@@ -27,6 +27,15 @@ const locked = mod.issue('manage-disable', { profile: 'p1' });
 ok('锁被占用时失败关闭（不排队硬写）', locked.ok === false && /另一个进程/.test(locked.reason || ''), locked.reason);
 try { rmSync(join(store, 'apply-tokens.json.lock'), { force: true }); } catch {}
 
+// 目录解析：没有 DSH_TURNSTILE_STATE 时跟着 DSH_HOME 走（与宿主一致），不再默认写系统临时目录
+const homeDir = mkdtempSync(join(tmpdir(), 'home-'))
+delete process.env.DSH_TURNSTILE_STATE;
+process.env.DSH_HOME = homeDir;
+mod.issue('manage-disable', { profile: 'p2' });
+ok('令牌跟着 DSH_HOME 走', existsSync(join(homeDir, 'turnstile-state', 'apply-tokens.json')));
+process.env.DSH_TURNSTILE_STATE = store;
+rmSync(homeDir, { recursive: true, force: true });
+
 rmSync(store, { recursive: true, force: true });
 console.log(fail ? 'TOKEN_STORE_FAILED ' + fail : 'TOKEN_STORE_OK');
 process.exitCode = fail ? 1 : 0;
