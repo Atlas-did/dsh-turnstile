@@ -535,7 +535,9 @@ export function apply(ctx, config) {
       const here = dirname(fileURLToPath(import.meta.url));
       const home = process.env.DSH_HOME || join(process.env.USERPROFILE || "", ".dsh");
       const profileName = (config && config.profile) || "mini";
-      const profileDir = join(home, "profiles", profileName);
+      const healthSel = target(req, res);
+      if (!healthSel) return;
+      const profileDir = healthSel.dir;
       const collectMod = await import(pathToFileURL(join(here, "health-collect.js")).href);
       const collected = collectMod.collectHealth({ profileDir, hostBases: [process.argv[1], import.meta.url] });
       const items = collected.items;
@@ -939,7 +941,7 @@ export function apply(ctx, config) {
       const pkg = u.searchParams.get("package") || "";
       const row = readRows(dir).find((r) => r.name === pkg);
       if (!row) return sendJson(res, 404, { error: "no-package" });
-      const base = join(dir, "node_modules", pkg);
+      const base = join(selectedDir(req, res) || dir, "node_modules", pkg);
       let rowText = "";
       try {
         const j = JSON.parse(readFileSync(join(base, "package.json"), "utf8"));
@@ -996,7 +998,7 @@ export function apply(ctx, config) {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
       const u = new URL(String(req.url), "http://localhost");
       const pkg = u.searchParams.get("package") || "";
-      const base = join(dir, "node_modules", pkg);
+      const base = join(selectedDir(req, res) || dir, "node_modules", pkg);
       if (!pkg || !existsSync(base)) return sendJson(res, 404, { error: "no-package" });
       const found = new Set();
       const scan = (rel, quotedOnly) => {
