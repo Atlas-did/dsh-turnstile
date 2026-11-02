@@ -87,6 +87,10 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
     // 只有 /health 匿名，只有三张引导页接受 ?token=，其余路由只认 cookie 或 x-turnstile-token 头。
     if (!hostAllowed(req.headers.host)) return json(403, { error: 'host' });
     if (!originAllowed(req.headers.origin)) return json(403, { error: 'cross-origin' });
+    const reqEnv = requestEnvironment(req);
+    if (!reqEnv) return json(400, { error: 'unknown environment' });
+    const envDir = reqEnv.dir;
+    const envState = reqEnv.state || state;
     const route = routeFor(pathname);
     if (route && route.kind !== 'liveness') {
       const isPage = PAGE_ROUTES.has(route.path);
@@ -189,7 +193,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
     if (pathname === '/turnstile/search') {
       // 之前返回两条编造的 hits；现在真搜 launcher 索引，没有索引就如实说。
       const q = new URL(req.url, 'http://x').searchParams.get('q') || '';
-      const idxFile = join(state || join(dir, '.turnstile'), 'launcher-index.json');
+      const idxFile = join(envState || join(envDir, '.turnstile'), 'launcher-index.json');
       if (!existsSync(idxFile)) {
         return json(200, { query: q, hits: [], status: 'no-index', hint: 'node tools/launcher.mjs index --root <dir>' });
       }
@@ -335,7 +339,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
     }
     if (pathname === '/turnstile/audit') {
       if (req.method !== 'GET') return json(405, { error: 'method' });
-      return json(200, { entries: listOperations(state || join(dir, '.turnstile')) });
+      return json(200, { entries: listOperations(envState || join(envDir, '.turnstile')) });
     }
     if (pathname === '/turnstile/designer') {
       if (req.method !== 'POST') return json(405, { error: 'method' });
@@ -386,7 +390,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
       } catch (e) { return json(500, { error: String(e?.message || e).slice(0, 160) }); }
     }
     // 页面创作与独立控制台共用同一份模型、渲染器和导出器。
-    const pageFile = join(state || join(dir, '.turnstile'), 'page-console.json');
+    const pageFile = join(envState || join(envDir, '.turnstile'), 'page-console.json');
     if (pathname === '/turnstile/builder') {
       res.setHeader('content-type', 'text/html; charset=utf-8');
       res.setHeader('cache-control', 'no-store');
@@ -440,7 +444,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
         catch (e) { if (e && e.code === 'BODY_TOO_LARGE') return json(413, { error: '页面过大（上限 ' + e.limit + ' 字节）' }); return json(400, { error: 'body 读不到：' + String(e.message).slice(0, 80) }); }
         const parsed = JSON.parse(body || '{}');
         const renderer = readFileSync(join(pluginLib, 'page-render.js'), 'utf8');
-        const result = exportPlugin(parsed.page, join(state || join(dir, '.turnstile'), 'exports', String(parsed.name || '')), { name: parsed.name, renderer });
+        const result = exportPlugin(parsed.page, join(envState || join(envDir, '.turnstile'), 'exports', String(parsed.name || '')), { name: parsed.name, renderer });
         const verification = await verifyExportedPlugin(result.outDir);
         return json(200, { ok: verification.ok, ...result, verification });
       } catch (e) { return json(400, { error: String(e?.message || e).slice(0, 180) }); }
@@ -454,7 +458,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
     }
     if (req.method !== 'GET' && pathname !== '/turnstile/view-state') { res.statusCode = 405; res.end('method'); return; }
     if (pathname === '/turnstile/view-state') {
-      const viewDir = state || join(dir, '.turnstile');
+      const viewDir = envState || join(envDir, '.turnstile');
       if (req.method === 'GET') {
         const r = readViewState(viewDir);
         res.setHeader('content-type', 'application/json');
