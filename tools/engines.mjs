@@ -53,8 +53,26 @@ const engineFindings = skipped.map((r) => ({
   evidence: { file: 'node_modules/' + r.name + '/package.json' },
   fix: { kind: 'engines-widen', snippet: 'widen engines.dsh locally via pnpm patch if the author has not caught up' },
 }));
+// 覆盖范围（C-14）：只有 bundles 被评估；未安装的没法判断；没有运行时版本时**一个都没评估**。
+const coverage = coverageOf({ rows, runtime });
+// 纯函数，便于直接测两个分支（有/没有运行时版本）
+export function coverageOf({ rows, runtime }) {
+  const list = Array.isArray(rows) ? rows : [];
+  return {
+    plugins: list.length,
+    evaluated: list.filter((r) => r.verdict !== 'NOT INSTALLED').length,
+    notInstalled: list.filter((r) => r.verdict === 'NOT INSTALLED').length,
+    runtimeKnown: Boolean(runtime),
+    note: !runtime
+      ? '运行时版本未知：没有任何插件被 engines.dsh 评估过（不是通不过）'
+      : list.some((r) => r.verdict === 'loads (no engines.dsh)')
+        ? '有插件没有声明 engines.dsh：能加载但未经声明验证'
+        : '全部插件都按声明评估过',
+  };
+}
+
 if (wantsJson()) {
-  emitJson('engines', engineFindings, skipped.length ? 5 : 0);
+  emitJson('engines', engineFindings, skipped.length ? 5 : 0, { coverage });
 } else {
   // B10: an empty runtime means the version gate could NOT run. Say so instead of printing ok:true.
   if (!runtime) console.error('NOTE: runtime version unknown (set DSH_BIN or DSH_VERSION) - no plugin was evaluated against engines.dsh.');
@@ -63,6 +81,7 @@ if (wantsJson()) {
     skipped: skipped.map((r) => r.name + '@' + r.version + '  engines=' + r.engine),
   // 三种依据分开报：没人拦（undeclared）/ 声明通过 / 凭 exemptions 放行
   bases: rows.reduce((acc, r) => { const k = r.basis || 'unknown'; acc[k] = (acc[k] || 0) + 1; return acc; }, {}),
+    coverage,
     exempted: exempted.map((r) => r.name + '@' + r.version),
     ok: skipped.length === 0,
     evaluated: Boolean(runtime),
