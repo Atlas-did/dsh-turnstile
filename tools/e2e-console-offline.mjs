@@ -489,6 +489,16 @@ try {
     await page.locator('[data-testid="page-banner-action"]').click();
     await page.waitForTimeout(400);
     ok('提示条主按钮导航到证据视图', await page.locator('[data-testid="list-status-checks"]').count() >= 1);
+
+    // 各视图各自的一条结论（不同视图不共用门禁结论）
+    await click('[data-testid="nav-plugins"]');
+    await page.waitForTimeout(350);
+    const pluginBanner = await text('[data-testid="page-banner"]');
+    ok('插件页提示条讲插件事实', /插件/.test(pluginBanner) && /配置/.test(pluginBanner), pluginBanner.slice(0, 50));
+    await click('[data-testid="nav-surfaces"]');
+    await page.waitForTimeout(350);
+    const surfaceBanner = await text('[data-testid="page-banner"]');
+    ok('UI 占用页提示条讲共享面', /UI 面/.test(surfaceBanner), surfaceBanner.slice(0, 50));
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {

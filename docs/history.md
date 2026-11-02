@@ -83,6 +83,7 @@
 | [196-nav-actions.md](196-nav-actions.md) | 定位框的动作组（方案 01-A 收尾，2026-11-02） |
 | [197-list-status.md](197-list-status.md) | 列表状态条（方案 01-C 第一步，2026-11-02） |
 | [198-banner-and-status.md](198-banner-and-status.md) | 状态条扩到 checks/surfaces + 页面级提示条（01-C/01-D，2026-11-02） |
+| [199-banner-per-view.md](199-banner-per-view.md) | 提示条按视图分化（01-D 收尾，2026-11-02） |
 | [22-gate-report.md](22-gate-report.md) | 闸门报告（自动生成） |
 | [26-provider-map.md](26-provider-map.md) | 26 · 多接口（provider）地图与切换 |
 | [31-plugin-manager.md](31-plugin-manager.md) | 31 · mini 的插件管理界面：现状与两条路 |
