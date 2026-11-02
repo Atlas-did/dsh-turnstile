@@ -8,6 +8,38 @@ import { join, dirname } from 'node:path';
 const sha = (text) => createHash('sha256').update(text, 'utf8').digest('hex');
 const PLAN_TTL_MS = 10 * 60 * 1000;
 
+/**
+ * 收敛写入的最小可用件：锁 + 前置哈希（含锁后再验）+ 原子替换 + 写后校验 + 失败回滚。
+ * 与 applyPlan 的区别只是不做「确认字符串」这一步——给已经过确认流（dry-run → apply）的调用方用，
+ * 让它们不必再各写一套 copyFileSync + writeFileSync。
+ */
+export function atomicReplace(file, next, { expectBeforeSha } = {}) {
+  const evidence = { steps: [], backup: null, existed: existsSync(file) };
+  const before = evidence.existed ? readFileSync(file, 'utf8') : null;
+  const beforeSha = before === null ? null : sha(before);
+  if (expectBeforeSha !== undefined && expectBeforeSha !== beforeSha) return { ok: false, reason: 'precondition hash changed', evidence };
+  const lock = file + '.lock';
+  if (existsSync(lock)) return { ok: false, reason: 'another mutation holds the lock', evidence };
+  try { writeFileSync(lock, String(process.pid)); } catch (e) { return { ok: false, reason: 'cannot take lock: ' + e.message, evidence }; }
+  try {
+    const locked = existsSync(file) ? readFileSync(file, 'utf8') : null;
+    if ((locked === null ? null : sha(locked)) !== beforeSha) return { ok: false, reason: 'precondition changed while waiting for the lock', evidence };
+    const backup = file + '.bak-' + Date.now();
+    if (evidence.existed) { copyFileSync(file, backup); evidence.backup = backup; }
+    const tmp = file + '.tmp-' + process.pid;
+    writeFileSync(tmp, next, 'utf8');
+    renameSync(tmp, file);
+    const after = readFileSync(file, 'utf8');
+    if (sha(after) !== sha(next)) {
+      if (evidence.existed) copyFileSync(backup, file); else unlinkSync(file);
+      return { ok: false, reason: 'post-write hash mismatch', evidence };
+    }
+    return { ok: true, evidence, beforeSha, afterSha: sha(next) };
+  } finally {
+    try { unlinkSync(lock); } catch { /* 锁不存在就算了 */ }
+  }
+}
+
 /** Build a single-use plan describing one file edit. Does not touch the file. */
 export function makePlan({ file, next, reason }) {
   if (!file || typeof next !== 'string') throw new Error('plan needs file and next content');

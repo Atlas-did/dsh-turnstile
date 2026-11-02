@@ -13,6 +13,9 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { collectConsoleData } from './console-data.mjs';
 import { togglePatch } from './toggle-patch.mjs';
+import { atomicReplace } from '../plugins/turnstile-popup/lib/txn.js';
+import { createHash } from 'node:crypto';
+const shaOf = (text) => createHash('sha256').update(String(text), 'utf8').digest('hex');
 import { designerTransaction } from './designer-ops.mjs';
 import { readViewState, writeViewState } from '../plugins/turnstile-popup/lib/view-state.js';
 import { exportPlugin } from '../plugins/turnstile-popup/lib/plugin-export.js';
@@ -356,9 +359,10 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
         const file = join(dir, 'cordis.patch.yml');
         const before = existsSync(file) ? readFileSync(file, 'utf8') : '';
         const after = togglePatch(before, plugin.row, Boolean(args.disable));
+        // C-01：不再自己 copyFileSync + writeFileSync —— 走 txn 的锁/前置哈希/原子替换/写后校验
         if (!args.dryRun && after !== before) {
-          if (existsSync(file)) copyFileSync(file, file + '.bak-' + Date.now());
-          writeFileSync(file, after, 'utf8');
+          const written = atomicReplace(file, after, { expectBeforeSha: before === '' ? null : shaOf(before) });
+          if (!written.ok) return json(409, { error: 'not applied', reason: written.reason, package: plugin.name, before, after });
         }
         return json(200, { ok: true, package: plugin.name, row: plugin.row, disabled: Boolean(args.disable), dryRun: Boolean(args.dryRun), before, after, changed: before !== after });
       } catch (e) { return json(500, { error: String(e?.message || e).slice(0, 160) }); }
