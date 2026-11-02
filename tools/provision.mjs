@@ -2,7 +2,7 @@
 // Provision：只读探测 → 机器快照 + profile 适配卡（方案 docs/186）。
 // 约束：探测不调用任何宿主副作用接口；只有 --apply --token 才写卡片。
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, unlinkSync, renameSync } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { issue, verify } from './lib/apply-token.mjs';
@@ -102,13 +102,28 @@ export function rollbackStaleCard(files) {
 }
 
 /** 写卡片：只有显式 --apply --token 才落盘；先打印摘要再写。 */
+// 原子写：临时文件 + rename，避免读到半截 JSON（C-05）。
+function writeAtomic(file, text) {
+  const tmp = file + '.tmp-' + process.pid;
+  writeFileSync(tmp, text);
+  renameSync(tmp, file);
+}
+
+// 两个文件各自原子写；第二个失败就把第一个恢复回写之前的样子（含原本不存在的情况）。
+// 诚实说明：这不是「两个文件一起原子」，只是每一步可回滚；见 docs/186 的已知边界。
 export function writeCards(machine, card, stateDir) {
   const dir = join(stateDir, 'provision');
   mkdirSync(dir, { recursive: true });
   const machineFile = join(dir, 'machine-' + machine.probeDigest + '.json');
   const cardFile = join(dir, 'profile-' + card.profile + '.json');
-  writeFileSync(machineFile, JSON.stringify(machine, null, 2) + '\n');
-  writeFileSync(cardFile, JSON.stringify(card, null, 2) + '\n');
+  const prevMachine = existsSync(machineFile) ? readFileSync(machineFile, 'utf8') : null;
+  writeAtomic(machineFile, JSON.stringify(machine, null, 2) + '\n');
+  try {
+    writeAtomic(cardFile, JSON.stringify(card, null, 2) + '\n');
+  } catch (e) {
+    try { if (prevMachine === null) unlinkSync(machineFile); else writeAtomic(machineFile, prevMachine); } catch { /* 回滚失败也要抛出原始错误 */ }
+    throw e;
+  }
   return { machineFile, cardFile };
 }
 
