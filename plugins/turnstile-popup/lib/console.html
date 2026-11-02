@@ -58,7 +58,9 @@ function btn(text,onClick,testid,cls='btn'){return node('button',{type:'button',
 function chip(text,kind=''){return node('span',{class:'chip '+kind,text});}
 function matches(value){return !state.query||JSON.stringify(value).toLowerCase().includes(state.query.toLowerCase());}
 function apiUrl(){return location.pathname.indexOf('/turnstile/console')===0?'/turnstile/console-data':'/api/console';}
-function tokenSuffix(){const t=new URLSearchParams(location.search).get('token');return t?'?token='+encodeURIComponent(t):'';}
+function tokenSuffix(){const p=new URLSearchParams(location.search);const out=new URLSearchParams();const t=p.get('token');if(t)out.set('token',t);if(p.get('env'))out.set('env',p.get('env'));const s=out.toString();return s?'?'+s:'';}
+// 切换目标环境：URL 保留令牌并带上新的 env，视图回到环境管理页
+function setEnvironment(id){const u=new URL(location.href);u.searchParams.set('env',id);u.hash='view=steward';location.href=u.toString();}
 function snapshotOf(d){const out={};const positions={};(d.occupancy?.surfaces||[]).forEach(s=>Object.entries(s.anchors||{}).forEach(([name,anchor])=>{if(anchor)positions[name]=anchor;}));d.plugins.forEach(p=>{out[p.name]={state:p.missing?'missing':p.disabled?'off':'on',position:positions[p.name]||''};});return out;}
 function deltaOf(current,previous){const delta={firstRun:!previous,at:previous?.at||null,added:[],removed:[],toggled:[],moved:[]};if(!previous?.rows)return delta;for(const [name,row] of Object.entries(current)){const old=previous.rows[name];if(!old)delta.added.push(name);else{if(old.state!==row.state)delta.toggled.push({name,from:old.state,to:row.state});if(old.position!==row.position)delta.moved.push({name,from:old.position||'未设置',to:row.position||'未设置'});}}for(const name of Object.keys(previous.rows))if(!current[name])delta.removed.push(name);return delta;}
 function selectionForPlugin(p){return{title:p.name,kind:'plugin',plugin:p,properties:{名称:p.name,版本:p.version||'未安装',状态:p.missing?'未安装':p.disabled?'已停用':'配置启用',行ID:p.rows.join(', ')||'无',UI面:p.ui.join(', ')||'无',引擎范围:p.engineRange||'未声明'},source:{file:p.manifest,line:1},archId:p.architectureId};}
