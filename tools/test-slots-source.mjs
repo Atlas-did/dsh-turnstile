@@ -1,0 +1,12 @@
+import { resolveSlotsSource, sourceLabel } from '../plugins/turnstile-popup/lib/slots-source.js';
+let fail = 0;
+const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
+const recs = new Map();
+ok('没有 slots → unavailable', resolveSlotsSource(null).source === 'unavailable');
+ok('只有私有 records → private-fallback（不是公开观测）', resolveSlotsSource({ _core: { records: recs } }).source === 'private-fallback');
+ok('公开 snapshot 优先于私有', resolveSlotsSource({ snapshot: () => ({ a: 1 }), _core: { records: recs } }).source === 'public-snapshot');
+ok('公开入口抛错时不退回私有装没事', resolveSlotsSource({ snapshot: () => { throw new Error('x'); }, _core: { records: recs } }).source === 'unavailable');
+ok('两者都没有 → unavailable', resolveSlotsSource({}).source === 'unavailable');
+ok('标签不把私有说成观测', sourceLabel('private-fallback').includes('非公开') && sourceLabel('public-snapshot') === '公开 snapshot');
+console.log(fail ? 'SLOTS_SOURCE_FAILED ' + fail : 'SLOTS_SOURCE_OK');
+process.exitCode = fail ? 1 : 0;
