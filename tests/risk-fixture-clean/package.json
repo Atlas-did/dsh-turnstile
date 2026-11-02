@@ -1,0 +1,6 @@
+{
+  "name": "clean",
+  "version": "0.0.1",
+  "dependencies": { "plug-ok": "file:x" },
+  "dsh": { "profile": { "bundles": ["plug-ok"] } }
+}

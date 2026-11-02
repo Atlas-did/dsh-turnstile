@@ -19,7 +19,8 @@ ok('locator 不编造行号', f.locator && f.locator.line === null, String(f.loc
 ok('finding 标明证据强度', f.strength === 'static-ast', String(f.strength));
 ok('finding 给了推翻条件', typeof f.falsifier === 'string' && f.falsifier.length > 8, String(f.falsifier).slice(0, 30));
 ok('severity 用 error/warning 而不是内部色阶', ['error', 'warning'].includes(f.severity), String(f.severity));
-const clean = await run([join(here, '..', 'tests', 'console-fixture')]);
-ok('干净夹具不产生 RED findings', clean.j && !(clean.j.findings || []).some((x) => x.severity === 'error'), String(clean.j && (clean.j.findings || []).length));
+// 成对夹具：同一条规则在「声明了依赖」的插件上必须是绿的（否则规则只会报警）
+const clean = await run([join(here, '..', 'tests', 'risk-fixture-clean')]);
+ok('负夹具：声明了官方 scope 的插件不报警', clean.j && clean.j.status === 'pass' && (clean.j.findings || []).length === 0, JSON.stringify(clean.j && clean.j.findings));
 console.log(fail ? 'RISK_FINDINGS_FAILED ' + fail : 'RISK_FINDINGS_OK');
 process.exitCode = fail ? 1 : 0;
