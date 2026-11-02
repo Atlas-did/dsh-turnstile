@@ -611,7 +611,9 @@ export function apply(ctx, config) {
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
       // B17: one state base for every endpoint, and a missing report is data, not a 404.
-      const file = join(stateBase(), "report-" + profile + ".json");
+      const sel = target(req, res);
+      if (!sel) return;
+      const file = join(targetState(sel), "report-" + sel.name + ".json");
       if (!existsSync(file)) return sendJson(res, 200, { status: "not-generated", file, hint: "node tools/preflight.mjs <profile>" });
       try {
         sendJson(res, 200, JSON.parse(readFileSync(file, "utf8")));
@@ -627,7 +629,9 @@ export function apply(ctx, config) {
     path: "/turnstile/occupancy",
     handler: async (req, res) => {
       if (req.method !== "GET") return sendJson(res, 405, { error: "method" });
-      const file = join(stateBase(), "occupancy-" + profile + ".json");
+      const sel = target(req, res);
+      if (!sel) return;
+      const file = join(targetState(sel), "occupancy-" + sel.name + ".json");
       if (!existsSync(file)) return sendJson(res, 200, { status: "not-generated", file, hint: "node tools/occupancy.mjs <profile> --out" });
       try { sendJson(res, 200, JSON.parse(readFileSync(file, "utf8"))); }
       catch (e) { sendJson(res, 500, { error: String((e && e.message) || e).slice(0, 160) }); }
