@@ -18,7 +18,11 @@ export function togglePatch(text, rowId, disable) {
     // 已有该行：把 disabled: true 插进它自己的块里，而不是再追加一条同 id 的记录
     if (ranges.length) {
       const range = ranges[ranges.length - 1];
-      let insertAt = range.end;
+      // 读取方只在「config: 之前」认 disabled；插到 name: 之后、config 之前，别写到块尾
+      let insertAt = range.start + 1;
+      for (let i = range.start + 1; i < range.end; i++) {
+        if (/^\s*name:/.test(lines[i])) { insertAt = i + 1; break; }
+      }
       while (insertAt > range.start + 1 && !lines[insertAt - 1].trim()) insertAt--;
       lines.splice(insertAt, 0, '  disabled: true');
       let out = lines.join('\n');
