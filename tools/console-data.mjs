@@ -86,10 +86,17 @@ export function collectConsoleData(profileDir, options = {}) {
     const inject = manifest?.dsh?.client?.inject || [];
     const ui = [...new Set(inject.filter((s) => /ui-/.test(s)).map((s) => String(s).replace('@deepseek-ai/dsh-client-', '')))];
     for (const row of pluginRows) if (/^ui-/.test(row.id) && !ui.includes(row.id)) ui.push(row.id);
+    // 身份与生命周期（研究第一批）：声明版本与磁盘版本分开记；只有 profile 写了精确版本时才能判断不一致，
+    // 范围（^1.0.0）或缺失一律给 null = 无法判断，不猜。
+    const declaredRange = (profilePackage.dependencies && profilePackage.dependencies[name]) || null;
+    const exactVersion = declaredRange && /^\d+\.\d+\.\d+([-+][\w.]+)?$/.test(String(declaredRange)) ? String(declaredRange) : null;
+    const installedVersion = manifest?.version || null;
     const plugin = {
       name, version: manifest?.version || '', missing: !manifest, disabled,
       row: ids[0] || '', rows: ids, ui, engineRange: manifest?.engines?.dsh || '',
       manifest: cleanPath(manifestPath), architectureId: pid,
+      declaredRange, declaredVersion: exactVersion, installedVersion,
+      versionMismatch: exactVersion && installedVersion ? exactVersion !== installedVersion : null,
     };
     plugins.push(plugin);
     addNode({
