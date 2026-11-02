@@ -135,6 +135,11 @@ try {
 
     await click('[data-testid="plugin-plug-alpha"]');
     ok('plugin selection fills property inspector', (await text('#inspector')).includes('alpha-row'));
+    ok('declared and installed versions stay separate in the inspector', await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="install-version"]');
+      const txt = el ? el.textContent : '';
+      return !!el && txt.includes('磁盘版本') && txt.includes('声明版本') && txt.includes('无法判断');
+    }));
     ok('install state is shown for a plugin and says unknown without a journal', await page.evaluate(() => {
       const el = document.querySelector('[data-testid="install-state"]');
       const txt = el ? el.textContent : '';

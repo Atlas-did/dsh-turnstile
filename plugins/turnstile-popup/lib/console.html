@@ -392,6 +392,14 @@ function inspectorInstall(s,box){
   const rows=[['状态',verdict],['依据',inst.reason||'未提供']];
   if(inst.at)rows.push(['最后一次写入',String(inst.at)]);
   box.append(node('div',{class:'prop-group','data-testid':'install-state'},[node('div',{class:'prop-title',text:'安装后状态（只读）'}),node('dl',{},rows.flatMap(([k,v])=>[node('div',{class:'prop'},[node('dt',{text:k}),node('dd',{text:String(v)})])]))]));
+  // 版本：声明与磁盘分开显示；只有 profile 写死精确版本时才能判断一致性，否则如实说无法判断
+  const p=s.plugin;
+  if(p){
+    const vrows=[['磁盘版本',p.installedVersion||'未安装']];
+    vrows.push(['声明版本',p.declaredVersion||(p.declaredRange?String(p.declaredRange)+'（范围，不判断）':'未声明')]);
+    vrows.push(['版本一致',p.versionMismatch===true?'不一致':p.versionMismatch===false?'一致':'无法判断']);
+    box.append(node('div',{class:'prop-group','data-testid':'install-version'},[node('div',{class:'prop-title',text:'版本（声明 / 磁盘）'}),node('dl',{},vrows.flatMap(([k,v])=>[node('div',{class:'prop'},[node('dt',{text:k}),node('dd',{text:String(v)})])]))]));
+  }
 }
 
 function inspectorProperties(s,box){const entries=inspectorEntries(s);const list=entries.length?entries.flatMap(([k,v])=>[node('div',{class:'prop'},[node('dt',{text:k}),node('dd',{text:String(v)})])]):[node('p',{class:'hint',text:'没有额外属性。'})];box.append(node('div',{class:'prop-group'},[node('div',{class:'prop-title',text:'值 / 状态 / 位置'}),node('dl',{},list)]));const findings=inspectorFindings(s);if(findings)box.append(findings);inspectorInstall(s,box);}
