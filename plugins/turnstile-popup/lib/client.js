@@ -4,7 +4,7 @@ window.__ModuleLoader__.load({
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;
-    exports.inject = ["slots"];
+    exports.inject = ["slots", "layout", "commandUi"];
     exports.apply = function apply(ctx) {
       var React = require("react");
       var h = React.createElement;
@@ -536,6 +536,24 @@ window.__ModuleLoader__.load({
           h("footer", { style: { marginTop: "10px", color: C.muted, fontSize: "10.5px", lineHeight: 1.5 } }, "写操作会保留备份；插件状态与位置变更需重启 DSH 后生效。"));
       }
 
+      function consoleUrl(view) {
+        var t = token();
+        return "/turnstile/console" + (t ? "?token=" + encodeURIComponent(t) : "") + "#view=" + (view || "steward");
+      }
+      function ConsoleFrame(props) {
+        return h("iframe", {
+          "data-testid": props.testid,
+          title: "Turnstile 环境管理控制台",
+          src: consoleUrl(props.view),
+          style: { display: "block", width: "100%", height: props.main ? "100vh" : "calc(100vh - 170px)", minHeight: props.main ? "560px" : "520px", border: "0", background: "#0b1117" }
+        });
+      }
+      function SidebarIcon(props) {
+        var size = props && props.size || 20;
+        return h("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true" },
+          h("path", { d: "M5 4h14v4H5zM5 10h14v10H5zM9 13v4M15 13v4", stroke: "currentColor", strokeWidth: 1.7, strokeLinejoin: "round" }));
+      }
+
       // 把观测到的 slot 记录交给宿主存盘（供 tools/ui-atlas.mjs 的运行时列使用）。
       try {
         var t0 = token();
@@ -552,9 +570,37 @@ window.__ModuleLoader__.load({
         setTimeout(sendSlots, 4000);
       } catch (e) {}
       try { window.__DSH_SLOTS_SNAPSHOT__ = globalSlotsSnapshot; } catch (e) {}
+
+      // 四个入口，同一份业务页面：轻量悬浮、设置页、左侧完整页面、斜杠命令。
       ctx.slots.inject("shell.overlay", function () {
         return ctx.slots.register({ name: "shell.overlay", id: "turnstile.plugin-list" }, Card);
       });
+      ctx.slots.inject("settings.section", function () {
+        return ctx.slots.register({
+          name: "settings.section", id: "turnstile", order: 120,
+          label: function () { return "Turnstile 环境管理"; }
+        }, function SettingsSection() { return h(ConsoleFrame, { testid: "turnstile-settings", view: "steward" }); });
+      });
+      ctx.slots.inject("main", function () {
+        return ctx.slots.register({ name: "main", key: "turnstile" }, function TurnstileMain() {
+          return h(ConsoleFrame, { testid: "turnstile-main", view: "steward", main: true });
+        });
+      });
+      ctx.slots.inject("sidebar.panellist", function () {
+        return ctx.slots.register({
+          name: "sidebar.panellist", id: "turnstile", order: 60,
+          label: function () { return "Turnstile 环境管理"; }
+        }, SidebarIcon);
+      });
+      ctx.effect(function () {
+        return ctx.commandUi.register({
+          name: "turnstile",
+          label: function () { return "打开 Turnstile 环境管理"; },
+          description: function () { return "检查插件、切换主 DSH / mini、管理实验环境"; },
+          available: function () { return true; },
+          ui: { kind: "action", run: function () { ctx.layout.selectPanel("turnstile"); } }
+        });
+      }, "turnstile: /turnstile command");
     };
     return module.exports;
   },

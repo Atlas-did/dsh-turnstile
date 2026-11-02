@@ -2,7 +2,7 @@
     - id: turnstile-popup
       name: turnstile-popup
       config:
-        profile: mini
+        profile: auto
         # Declared so two plugins cannot silently fight over the same corner (preflight ui-placement).
         slot: shell.overlay
         anchor: bottom-right
