@@ -199,6 +199,14 @@ function navPalette(){
   });
   return box;
 }
+// 环境管理（只读 + 切换目标）：没有 mini 时明说「未发现」，不显示成运行正常。
+function environmentPanel(){
+  const list=(state.data&&state.data.environments)||[];
+  const cur=state.data&&state.data.currentEnvironment;
+  const rows=list.length?list.map(e=>node('div',{class:'prop'},[node('dt',{text:e.kind==='mini'?'mini':'主 DSH'}),node('dd',{},[node('span',{class:'mono','data-testid':'env-'+e.id,text:e.name+(e.current?'（当前）':'')}),btn(e.current?'当前':'切换',()=>setEnvironment(e.id),'select-env-'+e.id,e.current?'btn plain':'btn')])])):[node('p',{class:'hint','data-testid':'env-empty',text:'未发现可用环境（没有读到任何 profile）'})];
+  const mini=list.filter(e=>e.kind==='mini');
+  return panel('环境管理'+(cur?' · 当前 '+cur.name:''),node('div',{'data-testid':'environment-list'},[node('dl',{},rows),node('p',{class:'hint','data-testid':'mini-absence',text:mini.length?'mini 环境：'+mini.map(e=>e.name).join('、'):'未发现 mini 环境'} )]));
+}
 function steward(){
   const d=state.data,main=$('main');
   main.append(pageHead('环境管家','左边体检当前 profile，右边看所有 profile 的体量与下一步命令。只读，不替你执行。'));
@@ -214,6 +222,7 @@ function steward(){
     node('div',{class:'panel-head'},[node('strong',{text:'诊断（日志+通道）'}),btn('跑诊断',()=>runDiagnose(),'diagnose-run')]),
     node('div',{'data-testid':'diagnose-box'},[node('p',{class:'hint',text:'读 AA 与插件日志，按通道给结论；每条带证据与推翻条件。'})]),
   ]);
+  main.append(environmentPanel());
   main.append(node('div',{class:'steward-grid','data-testid':'steward-grid'},[card,list,diagCard]));
   runHealth();runProfiles();
 }

@@ -140,6 +140,15 @@ try {
       const txt = el ? el.textContent : '';
       return !!el && txt.includes('磁盘版本') && txt.includes('声明版本') && txt.includes('无法判断');
     }));
+    ok('steward view lists the current environment and says no mini exists', await page.evaluate(() => {
+      const saved = state.view; state.view = 'steward'; render();
+      const list = document.querySelector('[data-testid="environment-list"]');
+      const absence = document.querySelector('[data-testid="mini-absence"]');
+      const txt = list ? list.textContent : '';
+      const out = !!list && txt.includes('console-fixture') && !!absence && absence.textContent.includes('未发现 mini 环境');
+      state.view = saved; render();
+      return out;
+    }));
     ok('install state is shown for a plugin and says unknown without a journal', await page.evaluate(() => {
       const el = document.querySelector('[data-testid="install-state"]');
       const txt = el ? el.textContent : '';
