@@ -25,6 +25,7 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import { chmodSync } from 'node:fs';
 import { originAllowed, hostAllowed, PAGE_ROUTES, credentialOf, tokenMatches, sessionCookie } from '../plugins/turnstile-popup/lib/console-auth.js';
 import { routeFor } from './lib/routes.mjs';
+import { resolveEnvironment, environmentForDir, defaultMiniHome } from '../plugins/turnstile-popup/lib/environments.js';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const pluginLib = join(root, 'plugins', 'turnstile-popup', 'lib');
@@ -58,6 +59,19 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
   };
 
   const state = stateDir || (dir.includes(join('tests', 'console-fixture')) ? join(dir, '.turnstile') : undefined);
+  // 环境解析（合并自 source-current）：?env= 只能选枚举里的 ID，不能提交任意路径。
+  // 顺序很重要：认证闸门在 handler 开头，环境解析只发生在已认证的请求里。
+  const mainHome = process.env.DSH_HOME || join(homedir(), '.dsh');
+  const miniHome = process.env.MINI_HOME || defaultMiniHome({ homeDir: homedir() });
+  const environmentOptions = { home: mainHome, miniHome, currentDir: dir };
+  const fixtureEnvironment = { id: 'main:console-fixture', kind: 'main', name: 'console-fixture', label: '主 DSH · console-fixture', dir, current: true };
+  const defaultEnvironment = fixture ? fixtureEnvironment : environmentForDir(dir, environmentOptions);
+  const requestEnvironment = (req) => {
+    const id = new URL(req.url, 'http://127.0.0.1').searchParams.get('env');
+    if (!id) return defaultEnvironment;
+    if (fixture) return id === fixtureEnvironment.id ? fixtureEnvironment : null;
+    return resolveEnvironment(id, environmentOptions);
+  };
   // 会话令牌落盘只给 CLI 入口用（Q2=B）；测试进程内直接读 server.turnstileToken，不产生文件。
   if (sessionFile) {
     try {
@@ -464,7 +478,9 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
       try {
         const hostBases = [];
         if (process.env.DSH_BIN) hostBases.push(process.env.DSH_BIN);
-        const data = collectConsoleData(dir, { bootId: hostBootId, stateDir: state, hostBases });
+        const env = requestEnvironment(req);
+    if (!env) return json(400, { error: 'unknown environment' });
+    const data = collectConsoleData(env.dir, { bootId: hostBootId, stateDir: env.state || state, hostBases });
         res.setHeader('content-type', 'application/json; charset=utf-8');
         res.setHeader('cache-control', 'no-store');
         res.end(JSON.stringify(data));
