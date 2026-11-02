@@ -340,7 +340,9 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
     if (pathname === '/turnstile/designer') {
       if (req.method !== 'POST') return json(405, { error: 'method' });
       const planId = randomUUID();
-      const auditDir = state || join(dir, '.turnstile');
+      const env = requestEnvironment(req);
+        if (!env) return json(400, { error: 'unknown environment' });
+        const auditDir = env.state || state || join(env.dir, '.turnstile');
       let dryRun = true;
       let started = false;
       try {
@@ -352,7 +354,7 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
         const summary = Array.isArray(args.operations) ? args.operations.slice(0, 100).map((op) => ({ type: String(op?.type || ''), package: String(op?.package || ''), disable: typeof op?.disable === 'boolean' ? op.disable : undefined, anchor: typeof op?.anchor === 'string' ? op.anchor : undefined })) : [];
         beginOperation(auditDir, { planId, kind: 'designer', dryRun, bootId: hostBootId || null, target: 'cordis.patch.yml', workspace: String(args.workspace || 'default').slice(0, 80), operationCount: summary.length, operations: summary });
         started = true;
-        const plugins = collectConsoleData(dir, { bootId: hostBootId, stateDir: state }).plugins;
+        const plugins = collectConsoleData(env.dir, { bootId: hostBootId, stateDir: env.state || state }).plugins;
         const result = designerTransaction(dir, args.operations, { dryRun, expected: args.expected }, plugins);
         settleOperation(auditDir, planId, dryRun ? 'previewed' : 'applied', { changed: result.changed });
         return json(200, { ...result, auditId: planId });
@@ -368,9 +370,11 @@ export function createConsoleServer({ profileDir, stateDir, fixture = false, tok
         try { body = await readJsonText(req, 1e6); }
         catch (e) { if (e && e.code === 'BODY_TOO_LARGE') return json(413, { error: '请求体过大（上限 ' + e.limit + ' 字节）' }); return json(400, { error: 'body 读不到：' + String(e.message).slice(0, 80) }); }
         const args = JSON.parse(body || '{}');
-        const plugin = collectConsoleData(dir, { bootId: hostBootId, stateDir: state }).plugins.find((p) => p.name === args.package);
+        const env = requestEnvironment(req);
+        if (!env) return json(400, { error: 'unknown environment' });
+        const plugin = collectConsoleData(env.dir, { bootId: hostBootId, stateDir: env.state || state }).plugins.find((p) => p.name === args.package);
         if (!plugin?.row) return json(404, { error: 'no-row' });
-        const file = join(dir, 'cordis.patch.yml');
+        const file = join(env.dir, 'cordis.patch.yml');
         const before = existsSync(file) ? readFileSync(file, 'utf8') : '';
         const after = togglePatch(before, plugin.row, Boolean(args.disable));
         // C-01：不再自己 copyFileSync + writeFileSync —— 走 txn 的锁/前置哈希/原子替换/写后校验
