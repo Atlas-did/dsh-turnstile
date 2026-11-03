@@ -22,7 +22,17 @@ import { designerTransaction } from "./designer-ops.js";
 import { beginOperation, settleOperation, recoverJournal, listOperations } from "./journal.js";
 import { randomUUID } from "node:crypto";
 
-const STATE_DIR = () => process.env.DSH_TURNSTILE_STATE || join(process.env.DSH_TURNSTILE_HOME || process.cwd(), "state");
+// 与 stateBase() 同一套解析（评审 v3 §3.2）：以前只设 DSH_HOME 时，报告落在 DSH_HOME/turnstile-state，
+// 而 journal / view-state 却跑到 cwd/state，两个目录各说各话。现在顺序统一，且保留旧目录作为兼容回退。
+const STATE_DIR = () => {
+  if (process.env.DSH_TURNSTILE_STATE) return process.env.DSH_TURNSTILE_STATE;
+  const home = process.env.DSH_HOME || join(process.env.USERPROFILE || '.dsh', '.dsh');
+  const modern = join(home, 'turnstile-state');
+  const legacy = join(process.env.DSH_TURNSTILE_HOME || process.cwd(), 'state');
+  // 迁移期：两者都存在就用统一位置；只有旧目录存在则继续用旧的，避免把已有审计记录“弄丢”
+  if (existsSync(modern) || !existsSync(legacy)) return modern;
+  return legacy;
+};
 // B17: every endpoint must read the same state base, or two of them disagree about the same data.
 // Order: explicit override, the toolkit's own state dir, then the DSH home convention.
 const stateBase = () => process.env.DSH_TURNSTILE_STATE
