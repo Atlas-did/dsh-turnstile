@@ -17,6 +17,7 @@ const nm = join(dir, 'node_modules');
 const compatPath = join(dir, 'compatibility.json');
 const compat = existsSync(compatPath) ? JSON.parse(readFileSync(compatPath, 'utf8')) : {};
 
+import { classifyEngine } from './lib/engine-verdict.mjs';
 import { checkCompatibility, runtimeVersion, usingHostEvaluator } from './version.mjs';
 import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
 import { requireProfile } from './config.mjs';
@@ -32,15 +33,12 @@ for (const b of bundles) {
   const engine = j.engines?.dsh || '';
   // 没有 engines.dsh 不等于「已验证兼容」：宿主确实不拦，但我们没有声明可依据。
   // 结论写 basis，让读者区分「声明了且通过」与「没有声明所以没人拦」。（C-12）
-  if (!engine) { rows.push({ name: b, version: j.version, engine: '(none)', verdict: 'loads (no engines.dsh)', basis: 'undeclared' }); continue; }
+  if (!engine) { const v = classifyEngine({ engine: '' }); rows.push({ name: b, version: j.version, engine: '(none)', verdict: v.verdict, basis: v.basis }); continue; }
   const issue = checkCompatibility({ name: j.name, version: j.version, engines: { dsh: engine } });
   const ok = issue === null;
   const exempt = (compat[b + '@' + j.version] || []).includes(runtime);
-  rows.push({
-    name: b, version: j.version, engine,
-    verdict: ok ? 'loads' : exempt ? 'loads (exempted)' : 'SKIPPED',
-    basis: ok ? 'declared-compatible' : exempt ? 'exempted' : 'declared-incompatible',
-  });
+  const v = classifyEngine({ engine, issue, exempt });
+  rows.push({ name: b, version: j.version, engine, verdict: v.verdict, basis: v.basis });
 }
 
 const skipped = rows.filter((r) => r.verdict === 'SKIPPED');
