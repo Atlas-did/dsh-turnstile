@@ -25,7 +25,10 @@ const pkg = {
   dsh: { bundle: { patch: "./cordis.patch.yml" }, client: { platform: "web", inject: realPkg.dsh.client.inject } },
 };
 writeFileSync(join(out, "package.json"), JSON.stringify(pkg, null, 2));
-const patchRows = ["- insert:", "    - id: turnstile-popup", "      name: turnstile-popup", "      config:", "        profile: mini", ""];
+// profile 必须是 auto 或显式指定：写死 mini 会让装到主 DSH 的包只在小实验场里加载
+const argProfile = (() => { const i = process.argv.indexOf("--profile"); return i >= 0 ? process.argv[i + 1] : null; })();
+const servedProfile = argProfile || "auto";
+const patchRows = ["- insert:", "    - id: turnstile-popup", "      name: turnstile-popup", "      config:", "        profile: " + servedProfile, ""];
 writeFileSync(join(out, "cordis.patch.yml"), patchRows.join("\n"));
 // 直接读正式 client.js：旧模板与正式文件分叉过，构建产物会丢掉四类入口
 const tpl = readFileSync(join(ROOT, "plugins", "turnstile-popup", "lib", "client.js"), "utf8");
