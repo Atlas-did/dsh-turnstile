@@ -127,6 +127,23 @@ export function writeCards(machine, card, stateDir) {
   return { machineFile, cardFile };
 }
 
+// 计划对象是纯数据：抽出来以后 CLI 只负责打印与发 token，测试可以直接比对字段
+export function cardPlan({ machine, card, action = 'provision-write' }) {
+  return {
+    action,
+    profile: card.profile,
+    machineDigest: machine.probeDigest,
+    cardDigest: card.cardDigest,
+    runtimeFingerprint: card.runtimeFingerprint,
+    adapterSelections: card.adapterSelections,
+  };
+}
+
+// 写后裁决：复探不一致就必须回滚卡片，别留一张看起来仍有效的卡
+export function afterApplyVerdict({ recheck }) {
+  const stale = Boolean(recheck && recheck.isStale);
+  return { verdict: stale ? 'stale' : 'current', keepCard: !stale, ok: !stale, reason: (recheck && recheck.reason) || '' };
+}
 // 注意：test-provision.mjs 也以 provision.mjs 结尾，必须比 basename
 const isMain = process.argv[1] && basename(process.argv[1]) === 'provision.mjs';
 if (isMain) {
@@ -151,7 +168,7 @@ if (isMain) {
   }
 
   // 采纳也进确认流：--plan 出计划并发一次性 token；--apply 必须带 token 且环境未变
-  const plan = { action: 'provision-write', profile: card.profile, machineDigest: machine.probeDigest, cardDigest: card.cardDigest, runtimeFingerprint: card.runtimeFingerprint, stateDir };
+  const plan = cardPlan({ machine, card });
   if (has('--plan')) {
     const issued = issue('provision', plan);
     console.log(JSON.stringify({ ok: true, dryRun: true, plan, token: issued.token, expiresAt: issued.expiresAt, ttlMs: issued.ttlMs }, null, 2));

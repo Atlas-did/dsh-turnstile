@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdi
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { probeMachine, probeProfile, staleness, digestOf, CAPABILITY_STATES, rollbackStaleCard, writeCards } from './provision.mjs';
+import { probeMachine, probeProfile, staleness, digestOf, CAPABILITY_STATES, rollbackStaleCard, writeCards, cardPlan, afterApplyVerdict } from './provision.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
@@ -107,5 +107,13 @@ rmSync(staleDir, { recursive: true, force: true });
 
 rmSync(stateDir2, { recursive: true, force: true });
 rmSync(tmp, { recursive: true, force: true });
+// 纯函数：计划对象与写后裁决不再藏在 CLI 段里，可以直接断言
+const samplePlan = cardPlan({ machine: { probeDigest: 'm1' }, card: { profile: 'p', cardDigest: 'c1', runtimeFingerprint: 'r1', adapterSelections: { platform: 'windows' } } });
+ok('计划字段来自 machine/card 且带 action', samplePlan.action === 'provision-write' && samplePlan.machineDigest === 'm1' && samplePlan.cardDigest === 'c1' && samplePlan.adapterSelections.platform === 'windows', JSON.stringify(samplePlan));
+const v1 = afterApplyVerdict({ recheck: { isStale: true, reason: '机器变了' } });
+ok('复探 stale → 不留卡片且不给 ok', v1.verdict === 'stale' && v1.keepCard === false && v1.ok === false && v1.reason === '机器变了');
+const v2 = afterApplyVerdict({ recheck: { isStale: false } });
+ok('复探一致 → current 且保留卡片', v2.verdict === 'current' && v2.keepCard === true && v2.ok === true);
+
 console.log(fail ? 'PROVISION_FAILED ' + fail : 'PROVISION_OK');
 process.exitCode = fail ? 1 : 0;
