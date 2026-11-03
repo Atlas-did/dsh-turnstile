@@ -3,6 +3,7 @@
 // DSH_HOME            → a DSH home directory that holds profiles/<name>/
 // DSH_BIN             → path to @deepseek-ai/dsh/lib/bin.js (needed for --dump-config)
 import { existsSync } from 'node:fs';
+import { resolveStateDir, describeStateDir } from './lib/state-root.mjs';
 import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -37,11 +38,12 @@ export function requireProfile(dir, usage, hint = '') {
  * A globally installed package lives in a read-only tree, so state belongs next to the user's
  * DSH home first; the package directory is only a fallback for a bare git clone.
  */
-export function stateDir() {
-  if (process.env.DSH_TURNSTILE_STATE) return process.env.DSH_TURNSTILE_STATE;
-  const home = process.env.DSH_HOME;
-  if (home) return join(home, 'turnstile-state');
-  return join(ROOT, 'state');
+export function stateDir(options = {}) {
+  // 唯一解析器：算法和读取现在只有一份（之前这里是第二套推导，仓库根 state 只作为裸克隆兜底）
+  const resolved = resolveStateDir({ explicit: options.explicit, profileDir: options.profileDir });
+  const { source } = describeStateDir(resolved, { explicit: options.explicit, profileDir: options.profileDir });
+  // 裸克隆（没有 DSH_HOME、没有 profile）：仓库根的 state 比系统临时目录可靠，保持旧行为
+  return source === 'tmp-fallback' ? join(ROOT, 'state') : resolved;
 }
 
 /**
