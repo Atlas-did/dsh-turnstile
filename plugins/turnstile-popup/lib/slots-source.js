@@ -27,3 +27,5 @@ export function sourceLabel(source) {
   if (source === 'private-fallback') return '私有降级（非公开观测）';
   return '不可用';
 }
+
+if (typeof window !== 'undefined') window.TurnstileSlotsSource = { resolveSlotsSource: resolveSlotsSource, sourceLabel: sourceLabel };

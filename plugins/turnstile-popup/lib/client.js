@@ -60,7 +60,12 @@ window.__ModuleLoader__.load({
       function globalSlotsSnapshot() {
         var out = [];
         try {
-          var recs = ctx.slots && ctx.slots._core && ctx.slots._core.records;
+        // 来源由 resolver 判定（公开 snapshot 优先；私有 _core 只算降级）；拿不到就是不可用，不偷偷读私有字段
+        var slotsSource = (window.TurnstileSlotsSource && window.TurnstileSlotsSource.resolveSlotsSource)
+          ? window.TurnstileSlotsSource.resolveSlotsSource(ctx.slots)
+          : { source: 'unavailable', records: null, note: 'resolver 未加载' };
+        try { window.__TURNSTILE_SLOTS_SOURCE__ = slotsSource.source; } catch (e) {}
+        var recs = slotsSource.source === 'unavailable' ? null : slotsSource.records;
           if (!recs || typeof recs.forEach !== "function") return out;
           recs.forEach(function (node, slot) {
             var ids = [];

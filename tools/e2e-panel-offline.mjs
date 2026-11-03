@@ -139,7 +139,13 @@ try {
         register(meta, component) { return component; },
         // The client registers more than one slot now; only the overlay is the panel.
         inject(slot, fn) { const c = fn(); if (slot === 'shell.overlay') window.__PanelComponent = c; },
-      } };
+        // 客户端现在注册四类入口；桩要提供它们，否则 apply() 会在 ctx.effect 处直接抛错
+      }, 
+        effect(fn) { try { fn(); } catch (e) {} return () => {}; },
+        commandUi: { register(m) { return m; } },
+        layout: { selectPanel() {} },
+        settings: { section() {} },
+      };
       exported.apply(ctx);
       window.ReactDOM.createRoot(document.getElementById("root")).render(window.React.createElement(window.__PanelComponent));
     });

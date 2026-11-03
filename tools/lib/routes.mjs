@@ -39,6 +39,7 @@ export const ROUTES = [
   asset('/turnstile/virtual-window.js'),
   asset('/turnstile/annotations.js'),
   asset('/turnstile/locator.js'),
+  asset('/turnstile/slots-source.js'),
   asset('/turnstile/diff-state.js'),
   asset('/turnstile/inspector-model.js'),
   asset('/turnstile/sort-context.js'),
