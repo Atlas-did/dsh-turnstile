@@ -94,4 +94,5 @@ export const SUITES = [
   "node tools/test-engine-verdict.mjs",
   "node tools/test-manage-plan.mjs",
   "node tools/test-anchor-plan.mjs",
+  "node tools/test-degraded-plan.mjs",
 ];

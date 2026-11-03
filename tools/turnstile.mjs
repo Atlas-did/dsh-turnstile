@@ -119,7 +119,7 @@ if (COMMANDS[argv[0]] && COMMANDS[argv[0]].mutating) {
       if (diag && diag.file) diff = { file: diag.file, action: diag.action || '', target: diag.target || '' };
     } catch { /* 底层不支持就保留一行说明 */ }
     console.log(JSON.stringify({
-      ok: true, verdict: 'ok', dryRun: true, command: argv[0], args,
+      ok: true, verdict: 'ok', dryRun: true, degraded: true, degradedReason: 'drySafe:false —— 该命令没有只读模式，本计划未执行任何底层脚本', command: argv[0], args,
       plan, diff,
       applyToken: issued.token, expiresAt: issued.expiresAt,
       next: [{ label: '确认后带 token 重放', command: 'node tools/turnstile.mjs ' + argv[0] + ' ' + positional.join(' ') + ' --apply --token <token>', mutating: true, reason: '写操作两段式' }],
