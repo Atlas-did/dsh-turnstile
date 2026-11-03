@@ -5,6 +5,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { importsOf } from './scan.mjs';
+import { classifyScopes } from './lib/risk-classify.mjs';
 import { emitJson, wantsJson, silenceWhenJson } from './json-out.mjs';
 import { requireProfile } from './config.mjs';
 silenceWhenJson();
@@ -58,12 +59,8 @@ for (const name of deps) {
   const peers = new Set(Object.keys(j.peerDependencies || {}).filter(x => x.startsWith('@')));
   const imported = scopes((existsSync(join(d, 'lib')) ? jsText(join(d, 'lib')) : '') + jsText(d));
   // 每个插件的正文都过了同一个 jsText，truncatedScan 在超限时置位
-  const missing = [...imported].filter(s => !declared.has(s));
-  const peerOnly = [...imported].filter(s => peers.has(s) && !declared.has(s));
-  let level = 'GREEN', why = 'only official/public packages';
-  if (peerOnly.length) { level = 'RED'; why = 'imports peer-only scope: ' + peerOnly.join(', '); }
-  else if (missing.length) { level = 'AMBER'; why = 'imports undeclared scope: ' + missing.join(', '); }
-  rows.push({ name, version: j.version, level, why });
+  const verdict = classifyScopes({ imported, declared, peers });
+  rows.push({ name, version: j.version, level: verdict.level, why: verdict.why });
 }
 
 // For RED/AMBER, suggest the official package with the same basename when the

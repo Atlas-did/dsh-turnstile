@@ -1,5 +1,6 @@
 // 方案 03-A：每条 finding 必须带稳定规则、对象、位置、证据强度与推翻条件。
 import { spawn } from 'node:child_process';
+import { classifyScopes } from './lib/risk-classify.mjs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
@@ -46,5 +47,15 @@ const sj = JSON.parse(fs.readFileSync(saved, 'utf8'));
 ok('--save 写出控制台快照', typeof sj.at === 'string' && Array.isArray(sj.findings) && sj.findings.length > 0, String(sj.findings && sj.findings.length));
 ok('--save 不编造基线差异（没有基线就是 null）', sj.delta === null);
 try { fs.unlinkSync(saved); } catch {}
+// 纯函数：三组 scope 直接判红/黄/绿，不必跑整个目录扫描
+const classifiedRed = classifyScopes({ imported: ['@someone/x'], declared: [], peers: ['@someone/x'] });
+ok('peer-only scope → RED', classifiedRed.level === 'RED' && classifiedRed.peerOnly.includes('@someone/x'), classifiedRed.why);
+const amber = classifyScopes({ imported: ['@someone/y'], declared: [], peers: [] });
+ok('未声明 scope → AMBER', amber.level === 'AMBER' && amber.missing.includes('@someone/y'), amber.why);
+const green = classifyScopes({ imported: ['@deepseek-ai/ok'], declared: ['@deepseek-ai/ok'], peers: [] });
+ok('声明了就是 GREEN', green.level === 'GREEN', green.why);
+const peerButDeclared = classifyScopes({ imported: ['@someone/z'], declared: ['@someone/z'], peers: ['@someone/z'] });
+ok('既是 peer 又声明成依赖 → 不报 RED（这条规则最容易误伤）', peerButDeclared.level === 'GREEN', peerButDeclared.why);
+
 console.log(fail ? 'RISK_FINDINGS_FAILED ' + fail : 'RISK_FINDINGS_OK');
 process.exitCode = fail ? 1 : 0;
