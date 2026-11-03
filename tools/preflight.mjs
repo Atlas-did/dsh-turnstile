@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { loadCheckManifest } from './lib/check-manifest.mjs';
 import { stateFromCheck } from './lib/check-phase.mjs';
 import { resolveStateDir } from './lib/state-root.mjs';
+import { blockingOf } from './lib/gate-verdict.mjs';
 
 const run = promisify(execFile);
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -153,7 +154,8 @@ const results = await Promise.all(selected.map(one));
 for (const r of results) r.state = stateFromCheck(r);
 // A check marked advisory can report findings without blocking the gate (e.g. an engine skip
 // means "this plugin will not load", not "your profile is broken").
-const blocking = results.filter((r) => !r.ok && !selected.find((c) => c.name === r.name)?.advisory);
+const gate = blockingOf({ results, selected });
+const blocking = gate.blocking;
 const failed = blocking;
 // 覆盖范围：跳过项以前是 ok:true + exit:0，汇总只看 ok:false → 顶层会写成「通过」。
 // 这里单独记一份，让「没跑」有名字，不冒充「没问题」。
