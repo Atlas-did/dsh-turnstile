@@ -7,6 +7,8 @@ import { claimOf, layer, STATUS } from './lib/evidence.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const vl = readFileSync(join(here, '..', 'tools', 'verify-live.mjs'), 'utf8');
 const ts = readFileSync(join(here, '..', 'tools', 'trial-status.mjs'), 'utf8');
+// claim 词表已抽到 lib：两个文件一起看，避免「词搬家了测试就说词汇消失」
+const tsWords = ts + readFileSync(join(here, '..', 'tools', 'lib', 'trial-verdict.mjs'), 'utf8');
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
 
@@ -26,7 +28,7 @@ ok('验收器采 L5 基线（UI 面）', /l5-baseline/.test(acc) && /surfaceCoun
 ok('验收器复判时传 --surfaces-before', /--surfaces-before'/.test(acc));
 ok('复判用不重启的 token（否则会把宿主再重启一次）', /--no-restart/.test(acc));
 ok('trial-status 输出 claim 字段', /claim,/.test(ts));
-ok('trial-status 的 claim 只用阶梯词', ['static-only', 'verified-with-regression', 'failed', 'unknown'].every((w) => ts.includes("'" + w + "'")));
+ok('trial-status 的 claim 只用阶梯词', ['static-only', 'verified-with-regression', 'failed', 'unknown'].every((w) => tsWords.includes("'" + w + "'")));
 ok('两边没有第二套成功词（loaded/pass/ok 之外的）', !/claim\s*=\s*'pass'/.test(ts) && !/claim\s*=\s*'loaded'/.test(ts));
 
 // 阶梯本身：同一组层必须给出同一个 claim

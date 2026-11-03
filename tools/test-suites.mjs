@@ -89,4 +89,5 @@ export const SUITES = [
   "node tools/test-state-root.mjs",
   "node tools/test-conflict-verdict.mjs",
   "node tools/test-gate-verdict.mjs",
+  "node tools/test-trial-verdict.mjs",
 ];

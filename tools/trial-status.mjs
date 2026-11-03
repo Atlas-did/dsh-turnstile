@@ -4,6 +4,7 @@ import { resolveStateDir } from './lib/state-root.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { validateHostEvidence } from './lib/host-evidence.mjs';
+import { trialVerdict } from './lib/trial-verdict.mjs';
 
 const args = process.argv.slice(2);
 const profile = args.find((a) => !a.startsWith('--'));
@@ -29,24 +30,14 @@ const hostLatest = latest ? hostRows.filter((r) => r.target === latest.target).a
 const hostCheck = hostLatest
   ? validateHostEvidence(hostLatest.evidence, { target: latest.target, profile, trialAt: latest.at })
   : { ok: false, errors: [] };
-const failed = latest && (latest.verdict === 'fail' || latest.verdict === 'blocked');
-// 「通过」有两种来源：host-evidence（最硬）或 verify-live 的六级（L2 用 dump-config）。
-// 两者都说 same claim 词，但 provider 不同，必须在结论里讲明白。
-const LADDER = ['static-only', 'loaded', 'routable', 'verified', 'verified-with-regression'];
-const ladderClaim = latest && LADDER.includes(latest.verdict) ? latest.verdict : null;
-const loaded = Boolean(latest && !failed && hostCheck.ok);
-const verdict = !latest ? 'unknown' : failed ? 'fail' : loaded ? 'ok' : 'warn';
-const summary = !latest ? '还没有试装记录'
-  : failed ? '最近一次试装未通过：' + (latest.note || latest.verdict)
-  : loaded ? `真实宿主重启与目标路由证据通过：${latest.target} ${hostLatest.evidence.route.path}=200`
-  : hostLatest && !hostCheck.ok ? '宿主证据未通过关联校验：' + hostCheck.errors.join('；')
-  : latest.verdict === 'static-pass' ? '最近一次试装仅静态通过；真实宿主插件加载未验证'
-  : ladderClaim ? '六级结论 ' + ladderClaim + '（加载层用 dump-config 判定，未采真实宿主证据）'
-  : '最近一次试装记录为 ' + latest.verdict + '；请核对是否包含真实宿主加载证据';
+// 结论映射统一走 lib（以前这段内联在 CLI 里，措辞一改测试就红）
+const tv = trialVerdict({ latest, hostLatest, hostCheck, file });
+const verdict = tv.verdict;
+const summary = tv.summary;
+const claim = tv.claim;
+const loaded = tv.loaded;
 const evidence = latest ? [{ source: file, at: latest.at, verdict: latest.verdict, note: latest.note }] : [];
 if (hostLatest) evidence.push({ source: file, at: hostLatest.at, verdict: hostLatest.verdict, valid: hostCheck.ok, errors: hostCheck.errors });
-// 与 verify-live 共用同一套 claim 词（对外只留 L0–L5 + claim，别再造第二套说法）
-const claim = !latest ? 'unknown' : failed ? 'failed' : (ladderClaim || (loaded ? 'verified-with-regression' : 'static-only'));
 const report = {
   ok: loaded,
   verdict,
@@ -64,4 +55,4 @@ const report = {
     ],
 };
 console.log(JSON.stringify(report, null, 2));
-process.exitCode = !latest ? 3 : failed ? 1 : loaded ? 0 : 2;
+process.exitCode = !latest ? 3 : tv.exitCode;
