@@ -140,6 +140,20 @@ try {
       const txt = el ? el.textContent : '';
       return !!el && txt.includes('磁盘版本') && txt.includes('声明版本') && txt.includes('无法判断');
     }));
+    ok('mini controls exist and say what they know', await page.evaluate(async () => {
+      const saved = state.view; state.view = 'steward'; render();
+      await new Promise((r) => setTimeout(r, 600));
+      const box = document.querySelector('[data-testid="mini-controls"]');
+      const status = document.querySelector('[data-testid="mini-status"]');
+      const err = document.querySelector('[data-testid="mini-status-error"]');
+      const startBtn = document.querySelector('[data-testid="mini-start"]');
+      const stopBtn = document.querySelector('[data-testid="mini-stop"]');
+      // 要么读到状态，要么明确报错；绝不能既没有状态也没有错误
+      const informed = Boolean(status || err);
+      const out = Boolean(box) && informed && (!status || Boolean(startBtn && stopBtn));
+      state.view = saved; render();
+      return out;
+    }));
     ok('the pane says where state lives and which rule picked it', await page.evaluate(() => {
       const saved = state.view; state.view = 'steward'; render();
       const el = document.querySelector('[data-testid="state-root"]');

@@ -206,18 +206,78 @@ function navPalette(){
     const copy=btn('复制',()=>{try{navigator.clipboard.writeText(text);}catch(e){}},'copy-cmd','btn plain');
     return node('div',{},[node('p',{class:'hint',text:label}),pre,copy]);
   }
+// mini 启停（两段式；不用 window.prompt/confirm，那会阻塞且无法测）
+async function miniRequest(command,dryRun,extra){
+  const body=Object.assign({command:command,args:{},dryRun:dryRun},extra||{});
+  const r=await fetch('/turnstile/run'+tokenSuffix(),{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  const j=await r.json();
+  if(!r.ok||j.ok===false)throw new Error(j.summary||j.error||('HTTP '+r.status));
+  return j;
+}
+function renderMiniStatus(box,j){
+  const running=j.running===true;
+  const head=node('p',{'data-testid':'mini-status',text:running?'mini 正在运行 · 端口 '+j.port:'mini 未运行'});
+  const actions=node('div',{class:'toolbar'});
+  const start=btn('启动 mini',function(){controlMini('mini-start',box);},'mini-start');
+  start.disabled=running;
+  const stop=btn('停止 mini',function(){controlMini('mini-stop',box);},'mini-stop','btn danger');
+  stop.disabled=!running;
+  actions.append(start,stop);
+  if(running&&j.url)actions.append(node('a',{class:'btn','data-testid':'mini-open',href:j.url,target:'_blank',rel:'noopener',text:'打开 mini'}));
+  box.replaceChildren(head,actions);
+  if(!running&&j.staleUrl)box.append(node('small',{class:'hint',text:'日志里有旧地址，但没通过存活检查，因此不给打开。'}));
+}
+async function runMiniStatus(box){
+  if(!box)return;
+  box.replaceChildren(node('p',{class:'hint',text:'正在检查 mini 进程…'}));
+  try{const result=await miniRequest('mini-status',true);renderMiniStatus(box,result.data||{});}
+  catch(e){box.replaceChildren(node('p',{class:'hint','data-testid':'mini-status-error',text:'mini 状态读取失败：'+e.message}));}
+}
+async function controlMini(command,box){
+  const stopping=command==='mini-stop';
+  try{
+    box.replaceChildren(node('p',{class:'hint',text:'正在生成'+(stopping?'停止':'启动')+'计划，尚未执行…'}));
+    const preview=await miniRequest(command,true);
+    if(!preview.applyToken)throw new Error('服务端没有签发一次性确认令牌');
+    const plan=((preview.data&&preview.data.plan)||[]).join(' / ')||preview.summary;
+    const row=node('div',{class:'toolbar'},[node('p',{class:'hint',text:plan})]);
+    if(stopping){
+      const input=node('input',{class:'input','data-testid':'mini-confirm-input',placeholder:'输入 mini 确认停止',style:'width:180px'});
+      const go=btn('确认停止',function(){
+        if(String(input.value||'').trim()!=='mini'){box.append(node('p',{class:'hint','data-testid':'mini-confirm-error',text:'确认文字不一致，未执行。'}));return;}
+        applyMini(command,preview,box,'mini');
+      },'mini-confirm','btn danger');
+      row.append(input,go);
+    } else {
+      row.append(btn('确认启动',function(){applyMini(command,preview,box,'');},'mini-confirm'));
+      row.append(btn('取消',function(){runMiniStatus(box);},'mini-cancel','btn plain'));
+    }
+    box.replaceChildren(row);
+  }catch(e){box.replaceChildren(node('p',{class:'hint','data-testid':'mini-action-error',text:'操作未完成：'+e.message}));}
+}
+async function applyMini(command,preview,box,confirmText){
+  try{
+    box.replaceChildren(node('p',{class:'hint',text:'已确认，正在'+(command==='mini-stop'?'停止':'启动并等待就绪')+'…'}));
+    const applied=await miniRequest(command,false,{applyToken:preview.applyToken,confirm:confirmText||undefined});
+    box.replaceChildren(node('p',{class:'hint','data-testid':'mini-action-result',text:applied.summary||'操作完成'}));
+    setTimeout(function(){runMiniStatus(box);},1200);
+  }catch(e){box.replaceChildren(node('p',{class:'hint','data-testid':'mini-action-error',text:'操作未完成：'+e.message}));}
+}
 function environmentPanel(){
   const list=(state.data&&state.data.environments)||[];
   const cur=state.data&&state.data.currentEnvironment;
   const rows=list.length?list.map(e=>node('div',{class:'prop'},[node('dt',{text:e.kind==='mini'?'mini':'主 DSH'}),node('dd',{},[node('span',{class:'mono','data-testid':'env-'+e.id,text:e.name+(e.current?'（当前）':'')}),btn(e.current?'当前':'切换',()=>setEnvironment(e.id),'select-env-'+e.id,e.current?'btn plain':'btn')])])):[node('p',{class:'hint','data-testid':'env-empty',text:'未发现可用环境（没有读到任何 profile）'})];
   const st=state.data&&state.data.state;
   const stateLine=st?node('p',{class:'hint','data-testid':'state-root',text:'状态根 '+st.dir+'（来源 '+st.source+(st.reliable?'':' · 不可靠')+'）'}):null;
+  const miniBox=node('div',{'data-testid':'mini-controls'});
   const mini=list.filter(e=>e.kind==='mini');
   const mainCount=list.filter(e=>e.kind==='main').length;
   // 数量分开写：把「环境数」和「profile 数」混在一句里，读者会以为少了一个
   const counts=node('p',{class:'hint','data-testid':'env-counts',text:'环境 '+list.length+' 个（主 DSH '+mainCount+' · mini '+mini.length+'）；只列出 DSH_HOME / MINI_HOME 下确实有 profiles 目录的那些。'});
   const cmdBoxes=(cur?[commandBlock('体检（终端）','node tools/doctor.mjs --dir "'+cur.dir+'"'),commandBlock('实装预检','node tools/preflight.mjs "'+cur.dir+'"')]:[]).concat([node('p',{class:'hint','data-testid':'mini-absence',text:mini.length?'mini 环境：'+mini.map(e=>e.name).join('、'):'未发现 mini 环境'})]);
-  return panel('环境管理'+(cur?' · 当前 '+cur.name:''),node('div',{'data-testid':'environment-list'},[counts,...(stateLine?[stateLine]:[]),node('dl',{},rows),...cmdBoxes]));
+  const panelNode=node('div',{'data-testid':'environment-list'},[counts,...(stateLine?[stateLine]:[]),miniBox,node('dl',{},rows),...cmdBoxes]);
+  setTimeout(function(){runMiniStatus(miniBox);},0);
+  return panel('环境管理'+(cur?' · 当前 '+cur.name:''),panelNode);
 }
 function steward(){
   const d=state.data,main=$('main');
