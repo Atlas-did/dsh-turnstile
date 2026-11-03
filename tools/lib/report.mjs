@@ -66,11 +66,19 @@ function normalizeNext(n) {
 
 export function shapeReport({ command, exitCode, parsed, stderr, mutating, dryRun, applyToken, durationMs, profile }) {
   const findings = Array.isArray(parsed && parsed.findings) ? parsed.findings.map((f, i) => normalizeFinding(f, i, profile)) : [];
-  const verdict = verdictFromExit(exitCode);
+  let verdict = verdictFromExit(exitCode);
   const raw = parsed && typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
   const isStatusWord = ['warn', 'ok', 'fail', 'clear', 'blocked', 'unknown', 'static-pass'].includes(raw.toLowerCase());
   const warned = parseTypedWarn(raw);
-  const summary = warned || ((!isStatusWord && raw) ? raw : humanSummary(verdict, findings, command));
+  // 底层已经说「有检查没跑」，统一入口不能继续转述成「通过」（评审 v3 §3.1）
+  const cov = parsed && parsed.coverage;
+  const skippedCount = cov && Number.isFinite(cov.skipped) ? cov.skipped : 0;
+  const effectiveVerdict = (skippedCount > 0 && verdict === 'ok') ? 'unknown' : verdict;
+  verdict = effectiveVerdict;
+  const skippedSummary = skippedCount > 0
+    ? '未完成：' + (cov.passed || 0) + ' 项通过，' + skippedCount + ' 项未跑（' + (cov.reasons || []).slice(0, 2).join('；') + '）——未跑的不算通过'
+    : '';
+  const summary = skippedCount > 0 ? skippedSummary : (warned || ((!isStatusWord && raw) ? raw : humanSummary(verdict, findings, command)));
 
   const p = profile || '<profile>';
   const next = Array.isArray(parsed && parsed.next) ? parsed.next.map(normalizeNext) : [];

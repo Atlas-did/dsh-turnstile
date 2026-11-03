@@ -13,7 +13,9 @@ const started = Date.now();
 
 for (const cmd of list) {
   const t = Date.now();
-  const r = spawnSync(cmd, { shell: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 900000 });
+  // 用启动 runner 的那个 Node 跑，而不是 PATH 里的 node：engines 声明要求 22.19+/24+
+  const execCmd = cmd.replace(/^node\s+/, JSON.stringify(process.execPath) + ' ');
+  const r = spawnSync(execCmd, { shell: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 900000 });
   const ok = r.status === 0;
   if (!ok) failed += 1;
   const tail = ((r.stdout || '') + (r.stderr || '')).trim().split(/\r?\n/).slice(-3).join(' | ').slice(0, 200);

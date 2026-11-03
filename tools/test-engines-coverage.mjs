@@ -1,5 +1,5 @@
 // 覆盖范围（C-14）：运行时版本未知时，报告必须说「一个都没评估」，不能看着像通过。
-import { coverageOf } from './engines.mjs';
+import { coverageOf } from './lib/engine-coverage.mjs';
 let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
 const rows = [
