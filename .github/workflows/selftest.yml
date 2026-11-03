@@ -79,3 +79,25 @@ jobs:
           if [ -n "$(git status --porcelain)" ]; then
             echo '测试改动了工作区：'; git status --porcelain; git diff --stat; exit 1;
           fi
+
+  # 离线浏览器套件单列：它们需要 Chromium，装起来比 gate 慢，但不能因此不跑。
+  # 2026-11-03：panel 套件曾在本地红了三轮没人发现，就是因为只在需要时才有人手动跑它。
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - name: install chromium for playwright-core
+        run: npx --yes playwright install --with-deps chromium
+      - name: offline console suites
+        run: |
+          node tools/e2e-console-offline.mjs
+          node tools/e2e-designer-offline.mjs
+          node tools/e2e-annotations-offline.mjs
+          node tools/e2e-panel-offline.mjs
+      - name: worktree must stay clean after browser suites
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then echo 'browser suites dirtied the worktree:'; git status --porcelain; exit 1; fi
