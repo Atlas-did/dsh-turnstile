@@ -4,6 +4,7 @@
 // exact row the loader reads instead of guessing from the package name.
 // usage: node tools/manage.mjs <profileDir> [--list] [--disable <pkg>] [--enable <pkg>] [--yes]
 import { readFileSync, writeFileSync, existsSync, copyFileSync, readdirSync } from 'node:fs';
+import { togglePlan } from './lib/manage-plan.mjs';
 import { join } from 'node:path';
 import { checkCompatibility } from './version.mjs';
 import { loadYaml } from './config.mjs';
@@ -190,7 +191,7 @@ const id = row.ids[0];
 // 唯一实现在 toggle-text.js：块内增删 disabled，保留用户 config；空块才移除。
 const next = toggleText(patchText, id, Boolean(doDisable));
 if (doDisable && row.disabled) {
-  if (argv.includes('--json')) { console.log(JSON.stringify({ ok: true, noop: true, action: 'disable', target, row: id, file: patchPath })); }
+  if (argv.includes('--json')) { console.log(JSON.stringify(togglePlan({ patchText, rowId: id, disable: true, target, file: patchPath, rowDisabled: true }))); }
   else console.log(target + ' 已经停用 (' + row.disabledIds.join(',') + ')');
   process.exit(0);
 }
@@ -198,9 +199,7 @@ if (doDisable && row.disabled) {
 const asJson = argv.includes('--json');
 if (!confirmed) {
   if (asJson) {
-    console.log(JSON.stringify({ ok: true, dryRun: true, action: doDisable ? 'disable' : 'enable', target, row: id, file: patchPath,
-      plan: [doDisable ? '块内插入 disabled: true（保留其它键）' : '删除块内 disabled: true（保留其它键，空块才移除）'],
-      expect: fingerprint(patchText) }, null, 2));
+    console.log(JSON.stringify(togglePlan({ patchText, rowId: id, disable: Boolean(doDisable), target, file: patchPath, nextText: next }), null, 2));
     process.exit(0);
   }
   console.log('DRY RUN — 会写 ' + patchPath);
