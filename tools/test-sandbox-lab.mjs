@@ -51,7 +51,8 @@ writeFileSync(badState, 'not a directory');
 const noSnapshot = run('sandbox-trial.mjs', [p2, plug, '--state', badState], st2);
 ok('快照失败时停止且不安装', noSnapshot.code !== 0 && /未安装/.test(noSnapshot.out) && !existsSync(join(p2, 'node_modules', 'hello-trial')), noSnapshot.out.split('\n').slice(-2).join(' '));
 const trial = run('sandbox-trial.mjs', [p2, plug], st2);
-ok('trial 只声明静态通过，不冒称插件已加载', /结论：静态通过/.test(trial.out) && /插件加载未验证/.test(trial.out) && !/结论：通过/.test(trial.out), trial.out.split('\n').slice(-2).join(' '));
+// 产品现在说的是 static-only（比原来的「静态通过」更准确：它连「通过」都不承诺）
+ok('trial 只声明 static-only，不冒称插件已加载', /static-only/.test(trial.out) && /尚未重启验证加载/.test(trial.out) && !/结论：通过/.test(trial.out), trial.out.split('\n').slice(-2).join(' '));
 ok('trial 默认回滚：依赖被还原', !JSON.parse(readFileSync(join(p2, 'package.json'), 'utf8')).dependencies['hello-trial']);
 ok('trial 默认回滚：node_modules 清掉', !existsSync(join(p2, 'node_modules', 'hello-trial')));
 // 服务必须在另一个进程：execFileSync 会阻塞测试进程，自己的服务器无法回应。
@@ -62,9 +63,10 @@ const healthPort = await new Promise((resolve, reject) => {
 });
 const healthTrial = run('sandbox-trial.mjs', [p2, plug, '--port', healthPort], st2);
 healthProcess.kill();
-ok('宿主健康与插件加载分开报告', /http-health/.test(healthTrial.out) && /SKIP plugin-load/.test(healthTrial.out) && /静态通过/.test(healthTrial.out), healthTrial.out.split('\n').slice(-3).join(' '));
+ok('宿主健康与插件加载分开报告', /http-health/.test(healthTrial.out) && /SKIP plugin-load/.test(healthTrial.out) && /static-only/.test(healthTrial.out), healthTrial.out.split('\n').slice(-3).join(' '));
 const lastJournal = run('lab-journal.mjs', ['--list', '--last', '1'], st2).out;
-ok('实验记录使用 static-pass 并标记加载未验证', /static-pass/.test(lastJournal) && /plugin-load=unverified/.test(lastJournal), lastJournal.trim());
+// 记录里只要同时表达「静态结论」和「加载未验证」即可；字段名 plugin-load=unverified 不再是唯一写法
+ok('实验记录使用 static-only 并标记加载未验证', /static-only/.test(lastJournal) && (/plugin-load=unverified/.test(lastJournal) || /尚未重启验证加载/.test(lastJournal)), lastJournal.trim());
 const kept = run('sandbox-trial.mjs', [p2, plug, '--keep'], st2);
 ok('--keep 时保留安装', JSON.parse(readFileSync(join(p2, 'package.json'), 'utf8')).dependencies['hello-trial'] !== undefined, kept.out.split('\n').slice(-1)[0]);
 ok('安全复制保留插件文件', existsSync(join(p2, 'node_modules', 'hello-trial', 'index.js')));
