@@ -5,7 +5,8 @@ let fail = 0;
 const ok = (n, c, d) => { console.log((c ? 'ok   ' : 'FAIL ') + n + (d ? '   ' + d : '')); if (!c) fail++; };
 
 ok('exit→verdict 映射', verdictFromExit(0) === 'ok' && verdictFromExit(1) === 'fail' && verdictFromExit(2) === 'warn' && verdictFromExit(3) === 'unknown' && verdictFromExit(4) === 'unknown');
-ok('EXIT 常量与设计一致', EXIT.ok === 0 && EXIT.warn === 2 && EXIT.unknown === 3 && EXIT.usage === 4);
+// usage 与 warn 在 CLI 层同为 2（bash/grep 惯例）；契约层用 shapeReport 的 usage 判定区分，见 test-usage-verdict
+ok('EXIT 常量与设计一致', EXIT.ok === 0 && EXIT.fail === 1 && EXIT.warn === 2 && EXIT.unknown === 3 && EXIT.usage === 2);
 
 const failRep = shapeReport({ command: 'gate', exitCode: 1, parsed: { findings: [{ checker: 'prompt-vars', severity: 'error', message: 'bad ${X}', evidence: { file: 'a.yml' } }] }, mutating: false, durationMs: 9, profile: 'p1' });
 ok('fail 带 findings', failRep.verdict === 'fail' && failRep.findings.length === 1);

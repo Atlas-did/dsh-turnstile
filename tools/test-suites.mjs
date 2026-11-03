@@ -96,4 +96,5 @@ export const SUITES = [
   "node tools/test-anchor-plan.mjs",
   "node tools/test-degraded-plan.mjs",
   "node tools/test-toggle-nested.mjs",
+  "node tools/test-usage-verdict.mjs",
 ];

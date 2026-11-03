@@ -3,7 +3,9 @@
 // 合并后保留两边的东西：人话 summary、agentPrompt 生产者、next 表（我） +
 // 底层 next 透传、data 透传、evidence 合并（kimi）。
 
-export const EXIT = { ok: 0, fail: 1, warn: 2, unknown: 3, usage: 4 };
+// 注意：CLI 层「用法错误」与「warn」都退 2（bash/grep 的惯例也是 2）。
+// 契约层用 shapeReport 的 usage 判定把两者分开，所以这里 usage 记 2，避免表与实际不一致。
+export const EXIT = { ok: 0, fail: 1, warn: 2, unknown: 3, usage: 2 };
 
 export function verdictFromExit(code) {
   if (code === 0) return 'ok';
@@ -66,7 +68,11 @@ function normalizeNext(n) {
 
 export function shapeReport({ command, exitCode, parsed, stderr, mutating, dryRun, applyToken, durationMs, profile }) {
   const findings = Array.isArray(parsed && parsed.findings) ? parsed.findings.map((f, i) => normalizeFinding(f, i, profile)) : [];
-  let verdict = verdictFromExit(exitCode);
+  // 用法错误 ≠ 检查结论：exit 2 + 没有 JSON + stderr 以 usage: 开头，才是「你参数写错了」。
+  // 规则刻意收窄，避免把真正的检查失败误判成用法问题。
+  const usageLine = String(stderr || '').split(/\r?\n/).find((l) => /^usage:/.test(l.trim())) || '';
+  const isUsage = exitCode === 2 && !parsed && Boolean(usageLine);
+  let verdict = isUsage ? 'usage' : verdictFromExit(exitCode);
   const raw = parsed && typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
   const isStatusWord = ['warn', 'ok', 'fail', 'clear', 'blocked', 'unknown', 'static-pass'].includes(raw.toLowerCase());
   const warned = parseTypedWarn(raw);
@@ -78,7 +84,7 @@ export function shapeReport({ command, exitCode, parsed, stderr, mutating, dryRu
   const skippedSummary = skippedCount > 0
     ? '未完成：' + (cov.passed || 0) + ' 项通过，' + skippedCount + ' 项未跑（' + (cov.reasons || []).slice(0, 2).join('；') + '）——未跑的不算通过'
     : '';
-  const summary = skippedCount > 0 ? skippedSummary : (warned || ((!isStatusWord && raw) ? raw : humanSummary(verdict, findings, command)));
+  const summary = isUsage ? '输入有误：' + usageLine.trim().slice(0, 160) : skippedCount > 0 ? skippedSummary : (warned || ((!isStatusWord && raw) ? raw : humanSummary(verdict, findings, command)));
 
   const p = profile || '<profile>';
   const next = Array.isArray(parsed && parsed.next) ? parsed.next.map(normalizeNext) : [];
