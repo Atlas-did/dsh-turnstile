@@ -11,6 +11,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = mkdtempSync(join(tmpdir(), 'host-evidence-'));
 const profile = join(root, 'home', 'profiles', 'mini');
 const state = join(root, 'home', 'turnstile-state');
+// resolver 会优先看 DSH_HOME：把状态根钉死到本测试的临时目录，避免被外部环境带偏
+process.env.DSH_TURNSTILE_STATE = state;
 const journal = join(state, 'lab-journal.jsonl');
 mkdirSync(profile, { recursive: true });
 mkdirSync(state, { recursive: true });
