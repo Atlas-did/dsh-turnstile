@@ -154,6 +154,15 @@ for (const r of results) r.state = stateFromCheck(r);
 // means "this plugin will not load", not "your profile is broken").
 const blocking = results.filter((r) => !r.ok && !selected.find((c) => c.name === r.name)?.advisory);
 const failed = blocking;
+// 覆盖范围：跳过项以前是 ok:true + exit:0，汇总只看 ok:false → 顶层会写成「通过」。
+// 这里单独记一份，让「没跑」有名字，不冒充「没问题」。
+const coverage = {
+  total: results.length,
+  passed: results.filter((r) => r.ok && !r.skipped).length,
+  skipped: results.filter((r) => r.skipped).length,
+  failed: results.filter((r) => !r.ok).length,
+  reasons: results.filter((r) => r.skipped).map((r) => r.name + ': ' + (r.skipReason || 'skipped')),
+};
 
 // Machine-readable report for panels/CI. Written unless --no-report.
 if (!isFlag('--no-report')) {
@@ -174,7 +183,8 @@ if (!isFlag('--no-report')) {
         summary: r.structured ? '' : (r.out.trim().split('\n').pop() || '').slice(0, 200),
       })),
       blocking: blocking.map((r) => r.name),
-      result: failed.length ? 'blocked' : 'clear',
+      coverage,
+      result: failed.length ? 'blocked' : coverage.skipped ? 'incomplete' : 'clear',
       exit: failed.length ? 1 : 0,
     }, null, 2) + '\n');
   } catch { /* a report is a convenience, never a gate */ }
@@ -191,7 +201,8 @@ if (isFlag('--json')) {
       summary: r.structured ? '' : (r.out.trim().split('\n').pop() || '').slice(0, 200),
     })),
     blocking: blocking.map((r) => r.name),
-    result: failed.length ? 'blocked' : 'clear',
+    coverage,
+    result: failed.length ? 'blocked' : coverage.skipped ? 'incomplete' : 'clear',
     exit: failed.length ? 1 : 0,
   }, null, 2));
 } else {
@@ -203,6 +214,7 @@ if (isFlag('--json')) {
       ? (n ? n + ' finding(s), e.g. ' + r.findings.slice(0, 2).map((f) => f.message + ' @ ' + (f.plugin || '?')).join('; ') : 'no findings')
       : (r.out.trim().split('\n').pop() || '').slice(0, 90);
     console.log('  ' + tag.padEnd(8) + r.name.padEnd(18) + String(r.ms).padStart(6) + 'ms  ' + detail);
+    if (coverage.skipped) console.log('\n  ' + coverage.passed + ' 项通过 · ' + coverage.skipped + ' 项未跑（不算通过）：' + coverage.reasons.join('；'));
     if (!r.ok) console.log('           hint: ' + r.hint);
   }
   console.log('');
