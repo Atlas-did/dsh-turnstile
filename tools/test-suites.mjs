@@ -86,4 +86,5 @@ export const SUITES = [
   "node tools/test-check-alias.mjs",
   "node tools/test-gate-coverage.mjs",
   "node tools/test-next-contract.mjs",
+  "node tools/test-state-root.mjs",
 ];

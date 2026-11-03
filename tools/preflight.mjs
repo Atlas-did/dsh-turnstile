@@ -12,6 +12,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadCheckManifest } from './lib/check-manifest.mjs';
 import { stateFromCheck } from './lib/check-phase.mjs';
+import { resolveStateDir } from './lib/state-root.mjs';
 
 const run = promisify(execFile);
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -167,7 +168,7 @@ const coverage = {
 // Machine-readable report for panels/CI. Written unless --no-report.
 if (!isFlag('--no-report')) {
   // B17: the panel reads this through DSH_TURNSTILE_STATE; writing elsewhere made the two disagree.
-  const stateDir = process.env.DSH_TURNSTILE_STATE || join(root, 'state');
+  const stateDir = resolveStateDir({ explicit: flagValue('--state'), profileDir: dir });
   const reportPath = (() => { const i = argv.indexOf('--report'); return i >= 0 ? argv[i + 1] : join(stateDir, 'report-' + (dir.split(/[\\/]/).pop()) + '.json'); })();
   try {
     const { mkdirSync } = await import('node:fs');

@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
+import { resolveStateDir } from './state-root.mjs';
 
 const TTL = 5 * 60 * 1000;
 const DEDUPE = 2000;
@@ -12,8 +13,7 @@ const DEDUPE = 2000;
 // 目录解析与宿主插件保持一致（index.js 用 DSH_HOME/turnstile-state），不新增第四套推导：
 //   DSH_TURNSTILE_STATE > DSH_HOME/turnstile-state > 用户主目录下的 .dsh/turnstile-state > 系统临时目录（仅兜底）
 function storeDir() {
-  const home = process.env.DSH_HOME || join(process.env.USERPROFILE || process.env.HOME || '', '.dsh');
-  return process.env.DSH_TURNSTILE_STATE || (home ? join(home, 'turnstile-state') : join(tmpdir(), 'turnstile-state'));
+  return resolveStateDir();
 }
 
 function storePath() {
