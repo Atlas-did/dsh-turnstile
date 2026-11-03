@@ -7,6 +7,7 @@ import { collectHealth } from '../plugins/turnstile-popup/lib/health-collect.js'
 import { COMMANDS } from './lib/commands.mjs';
 import { listOperations } from '../plugins/turnstile-popup/lib/journal.js';
 import { restartState } from './lib/lifecycle.mjs';
+import { resolveStateDir } from './lib/state-root.mjs';
 import { listEnvironments, defaultMiniHome } from '../plugins/turnstile-popup/lib/environments.js';
 import { homedir } from 'node:os';
 
@@ -53,7 +54,7 @@ export function collectConsoleData(profileDir, options = {}) {
   const profilePackage = readJson(profilePackagePath);
   if (!profilePackage) throw new Error('not a readable profile: ' + profileDir);
   const profileName = basename(profileDir);
-  const state = options.stateDir || process.env.DSH_TURNSTILE_STATE || join(profileDir, '..', '..', 'turnstile-state');
+  const state = resolveStateDir({ explicit: options.stateDir, profileDir });
   const bundleNames = profilePackage.dsh?.profile?.bundles || Object.keys(profilePackage.dependencies || {});
   const profilePatchPath = join(profileDir, 'cordis.patch.yml');
   const profileRows = patchRows(profilePatchPath);

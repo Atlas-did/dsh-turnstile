@@ -4,6 +4,7 @@
 import { readFileSync, statSync, mkdirSync, appendFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { validateHostEvidence } from './lib/host-evidence.mjs';
+import { resolveStateDir } from './lib/state-root.mjs';
 
 const argv = process.argv.slice(2);
 const input = argv.find((a) => !a.startsWith('--'));
@@ -34,7 +35,7 @@ const report = {
 };
 
 if (validation.ok && argv.includes('--record')) {
-  const state = val('--state') || process.env.DSH_TURNSTILE_STATE || join(resolve(raw.profile), '..', '..', 'turnstile-state');
+  const state = resolveStateDir({ explicit: val('--state'), profileDir: raw.profile });
   mkdirSync(state, { recursive: true });
   const file = join(state, 'lab-journal.jsonl');
   const entry = {
