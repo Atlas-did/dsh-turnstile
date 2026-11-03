@@ -10,6 +10,7 @@
 //   node tools/uia-act.mjs --profile <dir> --plugin <pkg> focus --name "窗口标题"
 //   node tools/uia-act.mjs --profile <dir> --plugin <pkg> invoke --name "按钮名" [--timeout 5000]
 //   node tools/uia-act.mjs --profile <dir> --plugin <pkg> set-value --name "输入框" --value "hi"
+import { resolveStateDir } from './lib/state-root.mjs';
 import { existsSync, readFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { startUia } from './uia-client.mjs';
@@ -38,7 +39,7 @@ if (!existsSync(join(pluginDir, 'package.json'))) { console.error('插件没装�
 
 const caps = declared(JSON.parse(readFileSync(join(pluginDir, 'package.json'), 'utf8')));
 const verdict = decide(caps, 'uia.act');
-const stateDir = process.env.DSH_TURNSTILE_STATE || join(profile, '..', '..', 'turnstile-state');
+const stateDir = resolveStateDir({ profileDir: profile });
 const auditFile = join(stateDir, 'windows-audit.jsonl');
 const record = (ok, reason) => {
   try { mkdirSync(stateDir, { recursive: true }); appendFileSync(auditFile, auditLine({ plugin, action: 'uia.act:' + verb, verdict: ok ? 'allow' : 'deny', reason })); } catch {}

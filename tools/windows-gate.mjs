@@ -7,6 +7,7 @@
 //   node tools/windows-gate.mjs <profileDir> --audit [--last 20]     # 看审计日志
 //
 // 动作见 lib/windows-gate.js 的 ACTIONS（uia.read / uia.act / input.simulate / fs.watch / proc.enumerate）。
+import { resolveStateDir } from './lib/state-root.mjs';
 import { existsSync, readFileSync, readdirSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { declared, decide, auditLine, ACTIONS } from '../plugins/turnstile-popup/lib/windows-gate.js';
@@ -18,7 +19,7 @@ const has = (n) => argv.includes(n);
 if (!dir) { console.error('usage: node tools/windows-gate.mjs <profileDir> [--check <pkg> <action>] [--audit]'); process.exit(2); }
 if (!existsSync(join(dir, 'package.json'))) { console.error('not a profile: ' + dir); process.exit(2); }
 
-const stateDir = process.env.DSH_TURNSTILE_STATE || join(dir, '..', '..', 'turnstile-state');
+const stateDir = resolveStateDir({ profileDir: dir });
 const auditFile = join(stateDir, 'windows-audit.jsonl');
 
 if (has('--audit')) {

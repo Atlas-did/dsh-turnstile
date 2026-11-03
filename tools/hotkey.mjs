@@ -8,6 +8,7 @@
 //
 // 规则：带 --profile/--plugin 时，插件必须在 package.json 里声明 dsh.windows.hotkeys 且包含该组合；
 // 不带时按「未声明」处理——直接拒绝（退出码 3）。
+import { resolveStateDir } from './lib/state-root.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -44,7 +45,7 @@ if (profile && plugin) {
   process.exit(3);
 }
 
-const stateDir = process.env.DSH_TURNSTILE_STATE || join(profile, '..', '..', 'turnstile-state');
+const stateDir = resolveStateDir({ profileDir: profile }); // 统一解析器：env > DSH_HOME > profile 相对 > 临时兜底
 try {
   mkdirSync(stateDir, { recursive: true });
   appendFileSync(join(stateDir, 'windows-audit.jsonl'), auditLine({ plugin, action: 'hotkey.register', verdict: 'allow', reason: specs }));

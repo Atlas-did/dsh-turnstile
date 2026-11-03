@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // 关联最近一次 trial 与真实宿主证据；static-pass 或孤立 HTTP 200 都不能变成加载成功。
+import { resolveStateDir } from './lib/state-root.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { validateHostEvidence } from './lib/host-evidence.mjs';
@@ -10,7 +11,7 @@ if (!profile) {
   console.error('usage: node tools/trial-status.mjs <profileDir> [--json]');
   process.exit(2);
 }
-const state = process.env.DSH_TURNSTILE_STATE || join(resolve(profile), '..', '..', 'turnstile-state');
+const state = resolveStateDir({ profileDir: resolve(profile) });
 const file = join(state, 'lab-journal.jsonl');
 let latest = null;
 const hostRows = [];

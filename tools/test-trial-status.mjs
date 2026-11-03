@@ -11,6 +11,8 @@ const script = join(here, 'trial-status.mjs');
 const root = mkdtempSync(join(tmpdir(), 'trial-status-'));
 const profile = join(root, 'home', 'profiles', 'mini');
 const state = join(root, 'home', 'turnstile-state');
+// 状态根现在由统一解析器决定：测试要显式清掉 DSH_HOME，才能验证「profile 相对」这条兜底
+if (process.env.DSH_TURNSTILE_STATE === undefined) delete process.env.DSH_HOME;
 const journal = join(state, 'lab-journal.jsonl');
 mkdirSync(profile, { recursive: true });
 mkdirSync(state, { recursive: true });
