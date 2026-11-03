@@ -140,6 +140,14 @@ try {
       const txt = el ? el.textContent : '';
       return !!el && txt.includes('磁盘版本') && txt.includes('声明版本') && txt.includes('无法判断');
     }));
+    ok('the pane says where state lives and which rule picked it', await page.evaluate(() => {
+      const saved = state.view; state.view = 'steward'; render();
+      const el = document.querySelector('[data-testid="state-root"]');
+      const txt = el ? el.textContent : '';
+      const ok = !!el && txt.includes('状态根') && /来源 (explicit|DSH_TURNSTILE_STATE|DSH_HOME|profile-relative|tmp-fallback)/.test(txt);
+      state.view = saved; render();
+      return ok;
+    }));
     ok('sidebar note stays inside the sidebar instead of being clipped', await page.evaluate(() => {
       const sb = document.querySelector('.sidebar');
       const note = document.querySelector('.side-note');

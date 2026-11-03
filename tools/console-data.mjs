@@ -7,7 +7,7 @@ import { collectHealth } from '../plugins/turnstile-popup/lib/health-collect.js'
 import { COMMANDS } from './lib/commands.mjs';
 import { listOperations } from '../plugins/turnstile-popup/lib/journal.js';
 import { restartState } from './lib/lifecycle.mjs';
-import { resolveStateDir } from './lib/state-root.mjs';
+import { resolveStateDir, describeStateDir } from './lib/state-root.mjs';
 import { listEnvironments, defaultMiniHome } from '../plugins/turnstile-popup/lib/environments.js';
 import { homedir } from 'node:os';
 
@@ -55,6 +55,8 @@ export function collectConsoleData(profileDir, options = {}) {
   if (!profilePackage) throw new Error('not a readable profile: ' + profileDir);
   const profileName = basename(profileDir);
   const state = resolveStateDir({ explicit: options.stateDir, profileDir });
+  // 面板也要能说清状态根在哪、由哪条规则算出来的
+  const stateInfo = describeStateDir(state, { explicit: options.stateDir, profileDir });
   const bundleNames = profilePackage.dsh?.profile?.bundles || Object.keys(profilePackage.dependencies || {});
   const profilePatchPath = join(profileDir, 'cordis.patch.yml');
   const profileRows = patchRows(profilePatchPath);
@@ -242,7 +244,7 @@ export function collectConsoleData(profileDir, options = {}) {
 
   return {
     actions,
-    environments, currentEnvironment,
+    environments, currentEnvironment, state: stateInfo,
     schema: 'turnstile/console@1',
     issues, issueGroups: groupIssues(issues), generatedAt: new Date().toISOString(),
     profile: { name: profileName, dir: cleanPath(profileDir), bundles: bundleNames.length },
