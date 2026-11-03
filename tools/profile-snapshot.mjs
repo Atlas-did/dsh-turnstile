@@ -7,6 +7,7 @@
 //   node tools/profile-snapshot.mjs <profileDir> --list
 //
 // 快照内容（都是可复算的，不猜）：插件名/版本/是否停用/UI 面/配置行，UI 面计数，配置体积。
+import { resolveStateDir } from './lib/state-root.mjs';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
@@ -17,7 +18,7 @@ const has = (n) => argv.includes(n);
 if (!profile) { console.error('usage: node tools/profile-snapshot.mjs <profileDir> --take|--diff|--list [--json]'); process.exit(2); }
 if (!existsSync(join(profile, 'package.json'))) { console.error('not a profile: ' + profile); process.exit(2); }
 
-const stateDir = process.env.DSH_TURNSTILE_STATE || join(profile, '..', '..', 'turnstile-state');
+const stateDir = resolveStateDir({ explicit: val('--state'), profileDir: profile });
 const snapDir = join(stateDir, 'snapshots');
 
 function build() {

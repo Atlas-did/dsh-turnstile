@@ -8,6 +8,7 @@
 //   node tools/sandbox-snapshot.mjs <profileDir> --take [--label 说明] [--state <dir>]
 //   node tools/sandbox-snapshot.mjs <profileDir> --list
 //   node tools/sandbox-snapshot.mjs <profileDir> --restore <name|latest>
+import { resolveStateDir } from './lib/state-root.mjs';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, readdirSync } from 'node:fs';
 import { join, basename } from 'node:path';
 
@@ -19,7 +20,7 @@ if (!dir) { console.error('usage: node tools/sandbox-snapshot.mjs <profileDir> -
 if (!existsSync(join(dir, 'package.json'))) { console.error('not a profile: ' + dir); process.exit(2); }
 
 const FILES = ['package.json', 'cordis.patch.yml', 'compatibility.json'];
-const stateDir = val('--state') || process.env.DSH_TURNSTILE_STATE || join(dir, '..', '..', 'turnstile-state');
+const stateDir = resolveStateDir({ explicit: val('--state'), profileDir: dir });
 const root = join(stateDir, 'snapshots');
 const profileName = basename(dir);
 
