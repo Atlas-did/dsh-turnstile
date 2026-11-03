@@ -3,6 +3,7 @@
 // service this profile actually knows (from ctx.provide() or the core list).
 // That filters out canvas/DOM look-alikes such as ctx.fillStyle.
 // usage: node tools/conflict.mjs <profileDir>
+import { verdictOfRows, severityOf } from './lib/conflict-verdict.mjs';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './config.mjs';
@@ -161,14 +162,14 @@ if (wantsJson()) {
   // 让消费者知道这份结论建立在哪种知识上（current 可断言、stale 只提示、absent 是内置兜底）
   const knowledge = { state: knowledgeState, source: knowledgeSource, hints: STALE_HINTS.size };
   const findings = uniq.map((r) => ({
-    severity: (r.kind === 'dep-divergence' || r.kind === 'ctx-assign-stale') ? 'warning' : 'error',
+    severity: severityOf(r.kind),
     plugin: r.plugin,
     resource: r.detail,
     message: r.kind,
     evidence: { file: 'profile' },
   }));
   // 只有真实冲突才非零；stale 线索不阻断（它没有当前证据）
-  const code = uniq.some((r) => r.kind !== 'dep-divergence' && r.kind !== 'ctx-assign-stale') ? 6 : 0;
+  const code = verdictOfRows(uniq).code;
   emitJson('conflict', findings, code, { knowledge });
   process.exit(code);
 }
