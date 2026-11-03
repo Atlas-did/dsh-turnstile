@@ -93,6 +93,12 @@ function help() {
 }
 
 if (!argv.length || ['help', '-h', '--help'].includes(argv[0])) { help(); process.exit(0); }
+// help 教的是 `check risk <profile>`，但注册表里叫 check-risk：把组合写法在分发前归一，
+// 否则同一个动作会有两种输出形状（原始 JSON vs 统一契约），智能体拿到哪一种全靠运气。
+if (argv[0] === 'check' && argv[1] && !argv[1].startsWith('-')) {
+  const combined = 'check-' + argv[1];
+  if (COMMANDS[combined]) argv.splice(0, 2, combined);
+}
 
 // 步骤 3：写操作在 CLI 侧也要 token（把 skill 里的口头纪律变成代码约束）。
 if (COMMANDS[argv[0]] && COMMANDS[argv[0]].mutating) {
