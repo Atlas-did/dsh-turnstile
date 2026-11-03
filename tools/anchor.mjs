@@ -6,6 +6,7 @@ import { readFileSync, existsSync, writeFileSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { patchFiles } from './lib/patch-files.mjs';
 import { safeWritePatch } from './lib/patch-write.mjs';
+import { anchorOverride, anchorPreview } from './lib/anchor-plan.mjs';
 
 // --expect 与 manage 同一语义：dry-run 给的指纹与当前内容不符就拒绝写
 const expectFlag = () => { const i = process.argv.indexOf('--expect'); return i >= 0 ? process.argv[i + 1] : undefined; };
@@ -92,8 +93,8 @@ let rowIdx = lines.findIndex((l) => rowRe.test(l));
 // unusable exactly when two plugins fight over one slot. Insert the override instead.
 if (rowIdx === -1) {
   if (clear) { console.error('row ' + row + ' has no profile override to clear'); process.exit(3); }
-  const appended = text.replace(/\s*$/, '') + '\n- id: ' + row + '\n  config:\n    anchor: ' + anchor + '\n';
-  console.log('- id: ' + row + '\n  config:\n    anchor: ' + anchor + '\n');
+  const appended = anchorOverride({ text, rowId: row, anchor });
+  console.log(anchorPreview({ rowId: row, anchor }));
   if (!apply) { console.log('dry run: pass --apply to write this override into cordis.patch.yml'); process.exit(0); }
   try { safeWritePatch(patchPath, appended, { expected: expectFlag() }); } catch (e) { console.error(String(e.message)); process.exit(1); }
   console.log('wrote override for ' + row + ' (backup kept)');
