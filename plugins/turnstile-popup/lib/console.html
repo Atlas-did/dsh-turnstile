@@ -349,7 +349,7 @@ function overview(){
   const main=$('main');main.append(healthCard);main.append(pageHead('控制台总览',d.profile.name+' · '+d.profile.dir));
   if(state.notice)main.append(node('div',{class:'notice',text:state.notice}));
   const _banner=pageBanner('overview');main.append(deltaStrip());if(_banner)main.append(_banner);
-  if(!d.coverage.report)main.append(node('div',{class:'notice',text:'尚未读取到门禁报告；“未观测”不代表安全。请先运行 preflight。'}));
+  // 「未观测」只在一处说清：顶部提示条（带动作按钮）与 hero 判定已经表达，这一行原本是第三遍同样的句子
   main.append(node('section',{class:'hero'},[node('div',{class:'hero-line'},[node('span',{class:'verdict '+verdict[1],text:verdict[0]}),report?chip(report.result||'unknown',blocking?'bad':'good'):null]),node('p',{text:report?blocking+' 个阻塞项 · '+(report.checks||[]).length+' 项检查':'没有报告时不推断 CLEAR / BLOCKED。'})]));
   const metrics=[['plugins',d.plugins.length,'插件','管理插件和配置行'],['surfaces',d.surfaces.length,'UI 面','查看界面占用与关联'],['architecture',d.architecture.nodes.length,'架构节点','逐层下钻到源码'],['history',d.history.length,'历史记录','检查是否反复波动']];
   main.append(node('div',{class:'metrics'},metrics.map(([view,n,label,hint])=>{const b=btn('',()=>setView(view),'metric-'+view,'metric');b.append(node('strong',{text:String(n)}),node('span',{text:label+' · '+hint}));return b;})));

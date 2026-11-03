@@ -607,6 +607,15 @@ try {
     await page.goto(base + '/?env=main:console-fixture', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(900); // 等首屏数据请求发出后再断言（导航后不需要再渲染任何具体元素）
     ok('data requests carry the selected environment', envReqs.some((u) => u.indexOf('/api/console') !== -1 && u.indexOf('env=main') !== -1), JSON.stringify(envReqs.slice(-3)));
+    // 夹具本身有报告，所以「未观测」只会在没有报告时出现：临时清掉报告再渲染，验证文案只出现一次
+    ok('the unobserved state is stated once, not three times', await page.evaluate(() => {
+      const savedReport = state.data.report, savedView = state.view;
+      state.data.report = null; state.view = 'overview'; render();
+      const body = document.querySelector('#main').innerText;
+      const out = body.includes('未观测') && !body.includes('尚未读取到门禁报告');
+      state.data.report = savedReport; state.view = savedView; render();
+      return out;
+    }));
     ok('no uncaught browser errors', pageErrors.length === 0, pageErrors.join(' | ').slice(0, 200));
   }
 } catch (e) {
