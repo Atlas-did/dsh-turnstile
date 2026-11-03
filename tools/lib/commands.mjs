@@ -32,6 +32,11 @@ export const COMMANDS = {
   'preinstall': { script: 'preinstall.mjs', mutating: false, json: true, timeout: 90000, positional: ['profile', 'pkg'] },
   'trial-status': { script: 'trial-status.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'] },
   'host-evidence': { script: 'host-evidence.mjs', mutating: false, json: true, timeout: 60000, positional: ['input'] },
+  // mini 实验场：status/url 只读；start/stop 是没有 dry-run 的写操作，stop 还要求逐字确认 target
+  'mini-status': { script: 'mini-ctl.mjs', mutating: false, json: true, timeout: 10000, fixed: ['status'], flags: ['--mini'] },
+  'mini-url': { script: 'mini-ctl.mjs', mutating: false, json: true, timeout: 10000, fixed: ['url'], flags: ['--mini'] },
+  'mini-start': { script: 'mini-ctl.mjs', mutating: true, drySafe: false, json: true, timeout: 90000, fixed: ['start'], flags: ['--mini'] },
+  'mini-stop': { script: 'mini-ctl.mjs', mutating: true, drySafe: false, danger: true, dangerTarget: 'mini', json: true, timeout: 70000, fixed: ['stop'], flags: ['--mini'] },
   // 三查也进注册表（以前完全不在表里，面板/智能体只能自己拼命令）
   'check-risk': { script: 'risk.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'] },
   'check-conflict': { script: 'conflict.mjs', mutating: false, json: true, timeout: 60000, positional: ['profile'] },

@@ -69,7 +69,8 @@ export async function handleRun(body, { toolsRoot } = {}) {
       }
       // 高危命令：apply 时必须逐字确认目标（防「手滑点到确认」）
       if (spec.danger) {
-        const target = String((args && (args.package || args.profile)) || '');
+        // dangerTarget 允许声明静态目标（如 mini），不必让调用方伪造一个 args 字段
+        const target = String(spec.dangerTarget || (args && (args.package || args.profile)) || '');
         if (String((body && body.confirm) || '') !== target) {
           return { status: 403, body: { ok: false, verdict: 'unknown', summary: '高危操作需要 confirm 与目标逐字一致（收到 "' + String((body && body.confirm) || '') + '"，期望 "' + target + '"）', next: ['先 dry-run 看计划，再带 confirm 重放'] } };
         }

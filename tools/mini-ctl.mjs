@@ -67,7 +67,8 @@ if (cmd === 'status') {
   if (up && u) console.log('  url  ' + u.url.slice(0, 46) + '…');
   if (!up) console.log('  （日志里最后一条 url 可能已失效）');
   console.log('  port ' + PORT + '  日志 ' + LOG);
-  process.exit(up ? 0 : 1);
+  // JSON 模式下「未运行」是合法状态：退出码 0，让调用方区分「读不到」与「就是没开」
+  process.exit(process.argv.includes('--json') ? 0 : (up ? 0 : 1));
 }
 
 if (cmd === 'url') {
