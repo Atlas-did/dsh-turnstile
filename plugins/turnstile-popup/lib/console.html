@@ -276,7 +276,8 @@ function environmentPanel(){
   const counts=node('p',{class:'hint','data-testid':'env-counts',text:'环境 '+list.length+' 个（主 DSH '+mainCount+' · mini '+mini.length+'）；只列出 DSH_HOME / MINI_HOME 下确实有 profiles 目录的那些。'});
   const cmdBoxes=(cur?[commandBlock('体检（终端）','node tools/doctor.mjs --dir "'+cur.dir+'"'),commandBlock('实装预检','node tools/preflight.mjs "'+cur.dir+'"')]:[]).concat([node('p',{class:'hint','data-testid':'mini-absence',text:mini.length?'mini 环境：'+mini.map(e=>e.name).join('、'):'未发现 mini 环境'})]);
   const panelNode=node('div',{'data-testid':'environment-list'},[counts,...(stateLine?[stateLine]:[]),miniBox,node('dl',{},rows),...cmdBoxes]);
-  setTimeout(function(){runMiniStatus(miniBox);},0);
+  // 不自动拉状态：每次 render 都发一个 /turnstile/run 会让视图切换的持久化断言变得不确定
+  miniBox.append(btn('检查 mini 状态',function(){runMiniStatus(miniBox);},'mini-refresh','btn plain'));
   return panel('环境管理'+(cur?' · 当前 '+cur.name:''),panelNode);
 }
 function steward(){

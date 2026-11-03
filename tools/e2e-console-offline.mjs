@@ -142,7 +142,9 @@ try {
     }));
     ok('mini controls exist and say what they know', await page.evaluate(async () => {
       const saved = state.view; state.view = 'steward'; render();
-      await new Promise((r) => setTimeout(r, 600));
+      const refresh = document.querySelector('[data-testid="mini-refresh"]');
+      if (refresh) refresh.click();
+      await new Promise((r) => setTimeout(r, 800));
       const box = document.querySelector('[data-testid="mini-controls"]');
       const status = document.querySelector('[data-testid="mini-status"]');
       const err = document.querySelector('[data-testid="mini-status-error"]');
