@@ -3,6 +3,7 @@
 // usage: node tools/doctor.mjs <profileName> [--home <DSH_HOME>] [--budget <bytes>]
 //        node tools/doctor.mjs --dir <profileDir>
 import { describeStateDir, resolveStateDir } from './lib/state-root.mjs';
+import { doctorFindings } from './lib/doctor-findings.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync, readdirSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -140,13 +141,8 @@ const warn = userOff.length + dups.length + hot.length + skipped.length;
 
 // --json：给 agent 读的统一形状（doctor 的发现就是「停用 / 路由重名 / UI 抢占 / 引擎跳过」四类）
 if (process.argv.includes('--json')) {
-  const findings = [];
-  for (const n of skipped) findings.push({ checker: 'engines', severity: 'error', id: 'engine-skip', title: n + ' 会被引擎闸门跳过', evidence: ['engines.dsh 不满足当前运行时'], falsifier: '运行时升级/降级到该范围后，本条消失' });
-  for (const d of dups) findings.push({ checker: 'providers', severity: 'warn', id: 'route-dup-' + d[0], title: '模型 id ' + d[0] + ' 在 ' + d[1].size + ' 个路由重复', evidence: [...d[1]], falsifier: '只保留一个路由里的该模型即为误报' });
-  for (const h of hot) findings.push({ checker: 'ui-surface', severity: 'warn', id: 'ui-hot-' + h[0], title: h[0] + ' 被 ' + h[1] + ' 个插件注入', evidence: ['ui-scan surfaces'], falsifier: '把其中一个插件换到别的面后，本条消失' });
-  for (const off of userOff) findings.push({ checker: 'manage', severity: 'warn', id: 'disabled-' + off, title: off + ' 被手动停用', evidence: ['cordis.patch.yml disabled:true'], falsifier: '启用后本条消失' });
-  // 与宿主/独立控制台同一份 issue（方案 02 验收：CLI 与 UI 产生同一 issue ID）
-  // doctor 的四类 findings 用同一套 issue 形状（ID 以 doctor. 开头）
+  // 四类发现由纯函数组装（可离线断言 id/severity），这里只负责把结果接进 issue 流水线
+  const findings = doctorFindings({ skipped, dups, hot, userOff });
   const findingIssues = issuesFromFindings(findings);
   let healthIssues = [];
   try {
