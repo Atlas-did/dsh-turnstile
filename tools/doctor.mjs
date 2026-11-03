@@ -2,6 +2,7 @@
 // tools/doctor.mjs — one command, the whole picture of a DSH profile.
 // usage: node tools/doctor.mjs <profileName> [--home <DSH_HOME>] [--budget <bytes>]
 //        node tools/doctor.mjs --dir <profileDir>
+import { describeStateDir, resolveStateDir } from './lib/state-root.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync, readdirSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -153,8 +154,11 @@ if (process.argv.includes('--json')) {
     healthIssues = issuesFromHealth(items, { source: 'health' });
   } catch (e) { healthIssues = []; if (process.env.TS_DEBUG) console.error('health issues failed: ' + (e && e.message)); }
   const allIssues = healthIssues.concat(findingIssues).map((x) => Object.assign({}, x, { detail: issueDetail(x) }));
+  // 状态根在哪、由哪条规则算出来的：排查「报告读不到」时先看这一行，不必猜
+  const stateInfo = describeStateDir(resolveStateDir({ profileDir: dir }), { profileDir: dir });
   realLog(JSON.stringify({
     profile: profileName, runtime: hostVer,
+    state: stateInfo,
     issues: allIssues, issueGroups: groupIssues(allIssues),
     healthIssueIds: healthIssues.map((x) => x.id),
     findingIssueIds: findingIssues.map((x) => x.id),
