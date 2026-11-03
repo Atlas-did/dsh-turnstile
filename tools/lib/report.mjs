@@ -74,6 +74,9 @@ export function shapeReport({ command, exitCode, parsed, stderr, mutating, dryRu
 
   const p = profile || '<profile>';
   const next = Array.isArray(parsed && parsed.next) ? parsed.next.map(normalizeNext) : [];
+  // 脚本透传的 next 里带 <profile> 占位符：能替换就替换，替换不了就标出来，别让用户去执行一条跑不通的命令
+  if (profile) for (const n of next) n.command = String(n.command || '').split('<profile>').join(p);
+  for (const n of next) n.needsSubstitution = /<[a-z][a-z0-9_-]*>/i.test(String(n.command || ''));
   const add = (label, cmd, isMutating, reason) => next.push({ label, command: cmd, mutating: Boolean(isMutating), reason });
   for (const [cmd, label] of (NEXT_BY_COMMAND[command] || [])) {
     if (cmd === command) continue;
@@ -81,6 +84,13 @@ export function shapeReport({ command, exitCode, parsed, stderr, mutating, dryRu
   }
   if (mutating && dryRun) add('确认执行（写入）', '# 前端点确认执行，或带 applyToken 重放', true, '写操作两段式：先计划，后确认');
   if (verdict === 'unknown') add('补齐证据再判断', 'node tools/turnstile.mjs doctor ' + p, false, 'undetermined：缺证据，不要擅自修复');
+  // 去重：同一条命令只留一条（先出现的优先，脚本给的比兜底更具体）；`--json` 只是输出开关，算同一条
+  const keyOf = (c) => String(c || '').replace(/\s--json\b/g, '').trim();
+  const seen = new Set();
+  const deduped = next.filter((n) => { const k = keyOf(n.command); if (!k || seen.has(k)) return false; seen.add(k); return true; });
+  next.length = 0; next.push(...deduped);
+  // 占位符标记要在所有来源都加完之后统一算一次（包括上面这些合成项）
+  for (const n of next) n.needsSubstitution = /<[a-z][a-z0-9_-]*>/i.test(String(n.command || ''));
   if (!next.length && command !== 'doctor') add('回到整体体检', 'node tools/turnstile.mjs doctor ' + p, false, '本命令没有更具体的下一步');
 
   const evidence = Array.isArray(parsed && parsed.evidence) ? parsed.evidence.map((e) => (typeof e === 'string' ? e : JSON.stringify(e))).slice(0, 6) : [];
