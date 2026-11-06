@@ -33,11 +33,22 @@ function guessMini() {
 const MINI = guessMini();
 const PORT = Number(val('--port') || process.env.MINI_PORT || 18770);
 const LOG = join(MINI, 'logs', 'mini.log');
+const jsonMode = process.argv.includes('--json');
+function report(data, message, code = 0) {
+  if (jsonMode) console.log(JSON.stringify({ ...data, summary: message }));
+  else if (message) console.log(message);
+  process.exit(code);
+}
 // 仓库位置：优先本文件所在仓库（tools/ 的上一级），不再假定 <MINI>/oss/dsh-turnstile
 const REPO = process.env.TURNSTILE_REPO
   || (existsSync(join(MINI, 'oss', 'dsh-turnstile', 'tools')) ? join(MINI, 'oss', 'dsh-turnstile') : dirname(dirname(fileURLToPath(import.meta.url))));
 
-if (!existsSync(MINI)) { console.error('找不到 mini 目录：' + MINI + '（用 MINI_HOME 指定）'); process.exit(2); }
+if (!existsSync(MINI)) {
+  const message = '找不到 mini 目录：' + MINI + '（用 --mini 或 MINI_HOME 指定）';
+  if (jsonMode) report({ ok: false, status: 'unknown', mini: MINI, port: PORT, log: LOG, error: message }, message, 2);
+  console.error(message);
+  process.exit(2);
+}
 
 function logTail(n = 2000) {
   try { const t = readFileSync(LOG, 'utf8'); return t.slice(-n); } catch { return ''; }
@@ -63,6 +74,7 @@ async function alive() {
 if (cmd === 'status') {
   const up = await alive();
   const u = url();
+  if (jsonMode) report({ ok: true, status: up ? 'running' : 'stopped', mini: MINI, port: PORT, log: LOG, url: up && u ? u.url : null }, 'mini ' + (up ? '运行中' : '未运行'));
   console.log('mini ' + (up ? '运行中' : '未运行') + ' · ' + MINI);
   if (up && u) console.log('  url  ' + u.url.slice(0, 46) + '…');
   if (!up) console.log('  （日志里最后一条 url 可能已失效）');
@@ -73,7 +85,13 @@ if (cmd === 'status') {
 
 if (cmd === 'url') {
   const u = url();
-  if (!u) { console.error('日志里还没有带 token 的 URL（先 start）'); process.exit(1); }
+  if (!u) {
+    const message = '日志里还没有带 token 的 URL（先 start）';
+    if (jsonMode) report({ ok: false, status: 'stopped', mini: MINI, port: PORT, log: LOG, url: null, error: message }, message, 1);
+    console.error(message);
+    process.exit(1);
+  }
+  if (jsonMode) report({ ok: true, status: 'url-available', mini: MINI, port: u.port, log: LOG, url: u.url }, 'mini URL 已就绪');
   console.log(u.url);
   process.exit(0);
 }
@@ -83,13 +101,20 @@ if (cmd === 'stop') {
   try {
     if (existsSync(ps)) execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps], { encoding: 'utf8', timeout: 60000 });
     else execFileSync('powershell', ['-NoProfile', '-Command', 'Get-CimInstance Win32_Process -Filter "Name=\'node.exe\'" | Where-Object { $_.CommandLine -like \'*mini*18770*\' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'], { encoding: 'utf8', timeout: 60000 });
-    console.log('mini 已停止');
-    process.exit(0);
-  } catch (e) { console.error('停止失败：' + String(e.message).slice(0, 120)); process.exit(1); }
+    report({ ok: true, status: 'stopped', mini: MINI, port: PORT, log: LOG }, 'mini 已停止');
+  } catch (e) {
+    const message = '停止失败：' + String(e.message).slice(0, 120);
+    if (jsonMode) report({ ok: false, status: 'unknown', mini: MINI, port: PORT, log: LOG, error: message }, message, 1);
+    console.error(message);
+    process.exit(1);
+  }
 }
 
 if (cmd === 'start') {
-  if (await alive()) { console.log('mini 已在运行：' + url().url.slice(0, 46) + '…'); process.exit(0); }
+  if (await alive()) {
+    const u = url();
+    report({ ok: true, status: 'running', mini: MINI, port: u.port, log: LOG, url: u.url }, 'mini 已在运行');
+  }
   const env = {
     ...process.env,
     DSH_HOME: join(MINI, 'home'),
@@ -99,19 +124,29 @@ if (cmd === 'start') {
   };
   mkdirSync(join(MINI, 'logs'), { recursive: true });
   const bin = join(MINI, 'runtime', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js');
-  if (!existsSync(bin)) { console.error('找不到 dsh 运行时：' + bin); process.exit(2); }
+  if (!existsSync(bin)) {
+    const message = '找不到 dsh 运行时：' + bin;
+    if (jsonMode) report({ ok: false, status: 'unknown', mini: MINI, port: PORT, log: LOG, error: message }, message, 2);
+    console.error(message);
+    process.exit(2);
+  }
   // stdout/stderr 必须落到日志：不然进程自己生成的新 token 谁也看不到，
   // 而 `/` 会一直 401（插件路由却还能用，掩盖了问题）。
   const { openSync } = await import('node:fs');
   const logFd = openSync(LOG, 'a');
   const child = spawn(process.execPath, [bin, 'mini', '--no-open', '--port', String(PORT)], { cwd: MINI, env, detached: true, stdio: ['ignore', logFd, logFd], windowsHide: true });
   child.unref();
-  console.log('已启动（pid ' + child.pid + '），等它就绪…');
+  if (!jsonMode) console.log('已启动（pid ' + child.pid + '），等它就绪…');
   for (let i = 0; i < 40; i += 1) {
     await new Promise((r) => setTimeout(r, 1500));
-    if (await alive()) { console.log('就绪：' + url().url); process.exit(0); }
+    if (await alive()) {
+      const u = url();
+      report({ ok: true, status: 'running', mini: MINI, port: u.port, log: LOG, pid: child.pid, url: u.url }, 'mini 已启动并就绪');
+    }
   }
-  console.error('60 秒内没起来，看日志：' + LOG);
+  const message = '60 秒内没起来，看日志：' + LOG;
+  if (jsonMode) report({ ok: false, status: 'failed', mini: MINI, port: PORT, log: LOG, pid: child.pid, error: message }, message, 1);
+  console.error(message);
   process.exit(1);
 }
 

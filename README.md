@@ -122,6 +122,7 @@ observation 与 evidence 不保存 URL token。
 | 宿主加载证据 | `host-observe` / `host-evidence` / `trial-status` |
 | 推主环境前比较 | `sandbox-promote <sandboxProfile> <mainProfile>`，默认 dry-run |
 | 接入自己的检查器 | `gate <profile> --checks <manifest.json>`，见 [扩展契约](docs/148-check-extension.md) |
+| 测 GitHub / 模型端点直连 | 安装 `plugins/turnstile-netcheck` 后打开 `/turnstile/netcheck` |
 
 ## 验证与发布检查
 

@@ -1,5 +1,6 @@
 // 由 package.json 的 test:all 链拆出来的套件清单：新增/删除测试时改这里，runner 会逐条跑完。
 export const SUITES = [
+  "node plugins/turnstile-netcheck/test/checks.test.mjs",
   "node plugins/turnstile-popup/test/ui-scan.test.mjs",
   "node plugins/turnstile-popup/test/slot-attr.test.mjs",
   "node plugins/turnstile-popup/test/ask.test.mjs",

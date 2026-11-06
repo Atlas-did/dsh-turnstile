@@ -117,6 +117,10 @@ Point it at a real DSH install: `DSH_BIN=/path/to/@deepseek-ai/dsh/lib/bin.js`
 Advisory (never blocking): version matrix (`OK` / `SKIPPED` / `UNCERTIFIED` / `EXEMPTED`), stale decisions,
 and drift — bundles added since the last gate run.
 
+For a fixed, read-only direct network check, install `plugins/turnstile-netcheck` and open
+`/turnstile/netcheck`. It checks the repository page, Git smart HTTP, OpenCode, and DeepSeek
+over Node HTTPS without reading proxy settings or credentials.
+
 ## The UI threshold is a capacity limit, not an aesthetic complaint
 
 ```

@@ -1,7 +1,7 @@
 // 单一入口：转发正确、未知子命令明确报错、旧行为兼容。
 import assert from 'node:assert';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,6 +41,15 @@ ok('组合命令 snapshot list 生效', /快照|还没有快照|\d{4}-\d{2}-\d{2
 
 const check = run(['check', 'risk', fixture]);
 ok('check risk 转发到 risk.mjs', /risk|summary/i.test(check.out), check.out.trim().split('\n')[0].slice(0, 40));
+
+const miniRoot = mkdtempSync(join(tmpdir(), 'turnstile-mini-'));
+mkdirSync(join(miniRoot, 'logs'), { recursive: true });
+const miniStatus = run(['mini-status', '--mini', miniRoot, '--json']);
+const miniStatusData = JSON.parse(miniStatus.out).data;
+ok('mini-status 返回可读的停止状态', miniStatus.code === 0 && miniStatusData?.status === 'stopped' && miniStatusData?.mini === miniRoot, String(miniStatus.code));
+const miniUrl = run(['mini-url', '--mini', miniRoot, '--json']);
+const miniUrlData = JSON.parse(miniUrl.out).data;
+ok('mini-url 缺少 token 时返回结构化失败', miniUrl.code === 1 && miniUrlData?.status === 'stopped' && miniUrlData?.url === null, String(miniUrl.code));
 
 // 旧行为：裸 profile 路径 → gate（这里只验证它确实走到了 preflight，不追求跑完）
 const legacy = run([fixture, '--only', 'risk']);

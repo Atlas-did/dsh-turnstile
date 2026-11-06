@@ -1,0 +1,12 @@
+{
+  "name": "turnstile-netcheck",
+  "version": "0.1.0",
+  "description": "Read-only direct HTTPS checks for GitHub and common DSH model endpoints.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": { ".": "./lib/index.js", "./checks": "./lib/checks.js", "./cordis.patch.yml": "./cordis.patch.yml" },
+  "engines": { "node": ">=22.19" },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}
